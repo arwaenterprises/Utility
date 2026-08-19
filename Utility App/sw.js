@@ -6,7 +6,7 @@
 //
 // BUMP CACHE_VERSION every time you deploy a change to index.html/js/css,
 // same as the ?v= numbers in index.html's script tags.
-const CACHE_VERSION = 'ak-utility-v9';
+const CACHE_VERSION = 'ak-utility-v10';
 
 const APP_SHELL = [
     './',
