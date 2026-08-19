@@ -47,7 +47,7 @@ const ScannerT = {
         errUniqueLockedDuringBox: "Close the current box before changing the No Dup setting",
         lblUniqueToggle: "No Dup",
         lblModeNu: "Nu",
-        lblModeAlphanumeric: "Alphanumeric"
+        lblModeAlphanumeric: "ALNU"
     },
     ar: {
         lblStaffName: "اسمك", lblRemark: "ملاحظة", lblStartSession: "بدء الجلسة",
@@ -68,8 +68,8 @@ const ScannerT = {
         errDuplicateBarcode: "تم مسح هذا الباركود مسبقًا في هذا الصندوق",
         errUniqueLockedDuringBox: "أغلق الصندوق الحالي قبل تغيير إعداد منع التكرار",
         lblUniqueToggle: "بدون تكرار",
-        lblModeNu: "أرقام",
-        lblModeAlphanumeric: "أرقام وحروف"
+        lblModeNu: "Nu",
+        lblModeAlphanumeric: "ALNU"
     }
 };
 
