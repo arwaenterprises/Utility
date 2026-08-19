@@ -3,7 +3,6 @@
 // ============================================
 const ScannerState = {
     staffName: '',
-    purpose: '',
     remark: '',
     currentBox: null,
     boxScanning: false,
@@ -29,7 +28,7 @@ function newScanUid() {
 
 const ScannerT = {
     en: {
-        lblStaffName: "Your Name", lblPurpose: "Purpose", lblRemark: "Remark", lblStartSession: "Start Session",
+        lblStaffName: "Your Name", lblRemark: "Remark", lblStartSession: "Start Session",
         lblStore: "Store:", lblStaff: "Staff:", lblTotal: "Total", lblBoxQty: "Box Qty", lblBoxes: "Boxes",
         lblBoxId: "Box ID", lblBarcode: "Barcode", lblCloseBox: "Close Box", lblRecentScans: "Last 5 Scans",
         thBarcode: "Barcode", thTime: "Time", thAction: "Del", lblDownload: "Download", lblReset: "Reset",
@@ -37,14 +36,11 @@ const ScannerT = {
         lblAreYouSure: "Are you sure you want to close this box?", lblScanToConfirm: "Scan box ID to confirm",
         lblResetTitle: "Reset Session?", lblResetMsg: "This will download your data and start a new session.",
         lblDeleteTitle: "Delete Scan?", lblDeleteMsg: "Delete this scan?", lblSettingsTitle: "Settings",
-        lblLanguage: "Language", lblAdminReset: "Admin Reset", lblAdminResetDesc: "Reset store and all data",
-        lblExecuteReset: "Execute Reset", boxIdPlaceholder: "Scan box ID...", barcodePlaceholder: "Scan barcode...",
+        lblLanguage: "Language", boxIdPlaceholder: "Scan box ID...", barcodePlaceholder: "Scan barcode...",
         remarkPlaceholder: "e.g., Fall Winter 2023 stocks", staffPlaceholder: "Enter your name...",
-        selectPurpose: "-- Select purpose --", errEnterName: "Please enter your name",
-        errSelectPurpose: "Please select purpose", errEnterRemark: "Please enter a remark",
+        errEnterName: "Please enter your name", errEnterRemark: "Please enter a remark",
         errBoxFirst: "Scan Box ID first", errSameBox: "Scan same Box ID!", errCloseBoxFirst: "Close the box first!",
-        errBoxAlreadyClosed: "Box already closed", msgAdminResetSuccess: "Store reset successful!",
-        msgInvalidAdminCode: "Invalid admin code.",
+        errBoxAlreadyClosed: "Box already closed",
         errNumericOnly: "Numeric mode (Nu) is active — alphanumeric barcode not allowed",
         errModeLockedDuringBox: "Close the current box before changing Nu/AlNu mode",
         errDuplicateBarcode: "This barcode was already scanned in this box",
@@ -52,7 +48,7 @@ const ScannerT = {
         lblUniqueToggle: "No Dup"
     },
     ar: {
-        lblStaffName: "اسمك", lblPurpose: "الغرض", lblRemark: "ملاحظة", lblStartSession: "بدء الجلسة",
+        lblStaffName: "اسمك", lblRemark: "ملاحظة", lblStartSession: "بدء الجلسة",
         lblStore: "المتجر:", lblStaff: "الموظف:", lblTotal: "الإجمالي", lblBoxQty: "الصندوق", lblBoxes: "مكتمل",
         lblBoxId: "رقم الصندوق", lblBarcode: "الباركود", lblCloseBox: "إغلاق الصندوق", lblRecentScans: "آخر 5 مسح",
         thBarcode: "الباركود", thTime: "الوقت", thAction: "حذف", lblDownload: "تحميل", lblReset: "إعادة",
@@ -60,14 +56,11 @@ const ScannerT = {
         lblAreYouSure: "هل أنت متأكد من إغلاق هذا الصندوق؟", lblScanToConfirm: "امسح رقم الصندوق للتأكيد",
         lblResetTitle: "إعادة تعيين؟", lblResetMsg: "سيتم تحميل البيانات وبدء جلسة جديدة.",
         lblDeleteTitle: "حذف المسح؟", lblDeleteMsg: "حذف هذا المسح؟", lblSettingsTitle: "الإعدادات",
-        lblLanguage: "اللغة", lblAdminReset: "إعادة تعيين المسؤول", lblAdminResetDesc: "إعادة تعيين المتجر وجميع البيانات",
-        lblExecuteReset: "تنفيذ إعادة التعيين", boxIdPlaceholder: "امسح رقم الصندوق...", barcodePlaceholder: "امسح الباركود...",
+        lblLanguage: "اللغة", boxIdPlaceholder: "امسح رقم الصندوق...", barcodePlaceholder: "امسح الباركود...",
         remarkPlaceholder: "مثال: مخزون خريف وشتاء 2023", staffPlaceholder: "أدخل اسمك...",
-        selectPurpose: "-- اختر الغرض --", errEnterName: "الرجاء إدخال اسمك",
-        errSelectPurpose: "الرجاء اختيار الغرض", errEnterRemark: "الرجاء إدخال ملاحظة",
+        errEnterName: "الرجاء إدخال اسمك", errEnterRemark: "الرجاء إدخال ملاحظة",
         errBoxFirst: "امسح رقم الصندوق أولاً", errSameBox: "امسح نفس رقم الصندوق!", errCloseBoxFirst: "أغلق الصندوق أولاً!",
-        errBoxAlreadyClosed: "الصندوق مغلق بالفعل", msgAdminResetSuccess: "تمت إعادة تعيين المتجر بنجاح!",
-        msgInvalidAdminCode: "رمز المسؤول غير صالح.",
+        errBoxAlreadyClosed: "الصندوق مغلق بالفعل",
         errNumericOnly: "وضع الأرقام (Nu) مفعّل — لا يُسمح بباركود يحتوي على حروف",
         errModeLockedDuringBox: "أغلق الصندوق الحالي قبل تغيير وضع Nu/AlNu",
         errDuplicateBarcode: "تم مسح هذا الباركود مسبقًا في هذا الصندوق",
@@ -168,7 +161,6 @@ async function clearAllScans() {
 function saveScannerSession() {
     Storage.setJSON('scanner_session', {
         staffName: ScannerState.staffName,
-        purpose: ScannerState.purpose,
         remark: ScannerState.remark,
         currentBox: ScannerState.currentBox,
         boxScanning: ScannerState.boxScanning,
@@ -183,7 +175,6 @@ function loadScannerSession() {
     const session = Storage.getJSON('scanner_session');
     if (session) {
         ScannerState.staffName = session.staffName || '';
-        ScannerState.purpose = session.purpose || '';
         ScannerState.remark = session.remark || '';
         ScannerState.currentBox = session.currentBox || null;
         ScannerState.boxScanning = session.boxScanning || false;
@@ -200,7 +191,6 @@ function clearScannerSession() {
     Storage.remove('scanner_session');
     Storage.remove('active_session');
     ScannerState.staffName = '';
-    ScannerState.purpose = '';
     ScannerState.remark = '';
     ScannerState.currentBox = null;
     ScannerState.boxScanning = false;
@@ -233,8 +223,6 @@ function applyScannerTranslations() {
     document.getElementById('scannerRemarkInput').placeholder = scannerT('remarkPlaceholder');
     document.getElementById('boxIdInput').placeholder = scannerT('boxIdPlaceholder');
     document.getElementById('barcodeInput').placeholder = scannerT('barcodePlaceholder');
-    const purposeSelect = document.getElementById('scannerPurposeSelect');
-    if (purposeSelect.options[0]) purposeSelect.options[0].textContent = scannerT('selectPurpose');
     document.body.classList.toggle('rtl', ScannerState.language === 'ar');
     document.getElementById('modeNuBtn').checked = ScannerState.inputMode === 'Nu';
     document.getElementById('modeAlNuBtn').checked = ScannerState.inputMode === 'AlNu';
@@ -294,15 +282,12 @@ function syncScannerUniqueLock() {
 // ============================================
 function startScannerSession() {
     const staff = document.getElementById('scannerStaffInput').value.trim();
-    const purpose = document.getElementById('scannerPurposeSelect').value;
     const remark = document.getElementById('scannerRemarkInput').value.trim();
-    
+
     if (!staff) { alert(scannerT('errEnterName')); document.getElementById('scannerStaffInput').focus(); return; }
-    if (!purpose) { alert(scannerT('errSelectPurpose')); document.getElementById('scannerPurposeSelect').focus(); return; }
     if (!remark) { alert(scannerT('errEnterRemark')); document.getElementById('scannerRemarkInput').focus(); return; }
-    
+
     ScannerState.staffName = staff;
-    ScannerState.purpose = purpose;
     ScannerState.remark = remark;
     
     setActiveSession('boxScanner', true);
@@ -387,7 +372,6 @@ async function handleBarcodeScan(e) {
         storeId: AppState.storeId,
         storeName: AppState.storeName,
         staffName: ScannerState.staffName,
-        purpose: ScannerState.purpose,
         remark: ScannerState.remark,
         boxNumber: String(ScannerState.currentBox),
         barcode: String(barcode),
@@ -642,16 +626,16 @@ async function downloadScannerExcel() {
     }
     const scans = await getAllScans();
     if (scans.length === 0) {
-        const data = [['Store ID', 'Store Name', 'Staff', 'Purpose', 'Remark', 'Box Number', 'Barcode', 'Qty', 'Box Status', 'Timestamp']];
+        const data = [['Store ID', 'Store Name', 'Staff', 'Remark', 'Box Number', 'Barcode', 'Qty', 'Box Status', 'Timestamp']];
         const ws = XLSX.utils.aoa_to_sheet(data);
-        ws['!cols'] = [{wch:12},{wch:20},{wch:12},{wch:12},{wch:20},{wch:12},{wch:20},{wch:5},{wch:8},{wch:18}];
+        ws['!cols'] = [{wch:12},{wch:20},{wch:12},{wch:20},{wch:12},{wch:20},{wch:5},{wch:8},{wch:18}];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Scans');
         XLSX.writeFile(wb, `${AppState.storeId}_empty_${new Date().toISOString().slice(0,10)}.xlsx`);
         return;
     }
     const data = scans.map(s => ({
-        'Store ID': s.storeId, 'Store Name': s.storeName, 'Staff': s.staffName, 'Purpose': s.purpose,
+        'Store ID': s.storeId, 'Store Name': s.storeName, 'Staff': s.staffName,
         'Remark': s.remark, 'Box Number': s.boxNumber, 'Barcode': s.barcode, 'Qty': s.qty,
         'Box Status': s.boxStatus || 'Open', 'Timestamp': new Date(s.timestamp).toLocaleString()
     }));
@@ -680,7 +664,6 @@ async function executeResetSession(confirmed) {
         await clearAllScans();
         clearScannerSession();
         document.getElementById('scannerStaffInput').value = '';
-        document.getElementById('scannerPurposeSelect').value = '';
         document.getElementById('scannerRemarkInput').value = '';
         document.getElementById('boxIdInput').value = '';
         document.getElementById('barcodeInput').value = '';
@@ -693,37 +676,7 @@ async function executeResetSession(confirmed) {
     }
 }
 
-// ============================================
-// BOX SCANNER - ADMIN RESET
-// ============================================
-async function executeAdminReset() {
-    const code = document.getElementById('adminCodeInput').value;
-    if (code === CONFIG.ADMIN_CODE) {
-        Storage.remove('store_id');
-        Storage.remove('store_name');
-        Storage.remove('store_location');
-        clearScannerSession();
-        await clearAllScans();
-        AppState.storeId = '';
-        AppState.storeName = '';
-        AppState.storeLocation = '';
-        setActiveSession('boxScanner', false);
-        document.getElementById('scannerSettingsModal').classList.remove('active');
-        document.getElementById('adminCodeInput').value = '';
-        updateHeaderStore();
-        document.getElementById('storeIdInput').value = '';
-        document.getElementById('storeConfirmBox').style.display = 'none';
-        document.getElementById('lookupStoreBtn').style.display = 'block';
-        document.getElementById('loginError').classList.remove('show');
-        showScreen('loginScreen');
-        alert(scannerT('msgAdminResetSuccess'));
-    } else {
-        alert(scannerT('msgInvalidAdminCode'));
-    }
-}
-
 function openScannerSettings() {
-    document.getElementById('adminCodeInput').value = '';
     document.getElementById('scannerSettingsModal').classList.add('active');
 }
 
@@ -770,7 +723,6 @@ function setupScannerEventListeners() {
     document.getElementById('resetNoBtn').addEventListener('click', () => executeResetSession(false));
     document.getElementById('openScannerSettingsBtn').addEventListener('click', (e) => { e.preventDefault(); openScannerSettings(); });
     document.getElementById('closeSettingsBtn').addEventListener('click', closeScannerSettings);
-    document.getElementById('adminResetBtn').addEventListener('click', executeAdminReset);
 }
 
 // ============================================
@@ -783,7 +735,7 @@ async function initBoxScanner() {
     const hasSession = loadScannerSession();
     applyScannerTranslations();
     
-    if (hasSession && ScannerState.staffName && ScannerState.purpose && ScannerState.remark) {
+    if (hasSession && ScannerState.staffName && ScannerState.remark) {
         document.getElementById('dispScannerStore').textContent = `${AppState.storeId} - ${AppState.storeName}`;
         document.getElementById('dispScannerStaff').textContent = ScannerState.staffName;
         setActiveSession('boxScanner', true);

@@ -111,16 +111,6 @@
                         </div>
                         
                         <div class="form-group">
-                            <label id="lblPurpose">Purpose</label>
-                            <select id="scannerPurposeSelect" class="form-select">
-                                <option value="">-- Select purpose --</option>
-                                <option value="Store to Store">Store to Store</option>
-                                <option value="Store to DC">Store to DC</option>
-                                <option value="DC Scan">DC Scan</option>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
                             <label id="lblRemark">Remark</label>
                             <input type="text" id="scannerRemarkInput" class="form-input" placeholder="e.g., Fall Winter 2023 stocks">
                         </div>
@@ -275,12 +265,6 @@
                                     <button class="lang-btn active" id="settingsLangEnBtn" data-lang="en">EN</button>
                                     <button class="lang-btn" id="settingsLangArBtn" data-lang="ar">عربي</button>
                                 </div>
-                            </div>
-                            <div class="settings-section">
-                                <h4 id="lblAdminReset">Admin Reset</h4>
-                                <p style="font-size: 13px; color: var(--ak-text-light); margin-bottom: 12px;" id="lblAdminResetDesc">Reset store and all data</p>
-                                <input type="password" id="adminCodeInput" class="form-input" placeholder="Enter admin code" style="margin-bottom: 10px;">
-                                <button class="btn btn-secondary" style="background: var(--ak-danger); color: white; border: none; width: 100%;" id="adminResetBtn">🔓 <span id="lblExecuteReset">Execute Reset</span></button>
                             </div>
                         </div>
                         <div class="modal-buttons">
@@ -605,16 +589,6 @@
                         <div class="form-group">
                             <label>Your Name</label>
                             <input type="text" id="ysStaffInput" class="form-input" placeholder="Enter your name..." autocomplete="off">
-                        </div>
-                        <div class="form-group">
-                            <label>Purpose</label>
-                            <select id="ysPurposeSelect" class="form-select">
-                                <option value="">-- Select purpose --</option>
-                                <option value="Season Segregation">Season Segregation</option>
-                                <option value="Year Segregation">Year Segregation</option>
-                                <option value="Returns Sorting">Returns Sorting</option>
-                                <option value="DC Sorting">DC Sorting</option>
-                            </select>
                         </div>
                         <div class="form-group">
                             <label>Remark</label>
@@ -969,14 +943,14 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=6"></script>
-    <script src="js/app.js?v=6"></script>
-    <script src="js/boxScanner.js?v=6"></script>
-    <script src="js/itemBarcode.js?v=6"></script>
-    <script src="js/boxCode.js?v=6"></script>
-    <script src="js/photoCapture.js?v=6"></script>
-    <script src="js/boxSegregate.js?v=6"></script>
-    <script src="js/priceCheck.js?v=6"></script>
-    <script src="js/yearSegregate.js?v=6"></script>
+    <script src="js/config.js?v=7"></script>
+    <script src="js/app.js?v=7"></script>
+    <script src="js/boxScanner.js?v=7"></script>
+    <script src="js/itemBarcode.js?v=7"></script>
+    <script src="js/boxCode.js?v=7"></script>
+    <script src="js/photoCapture.js?v=7"></script>
+    <script src="js/boxSegregate.js?v=7"></script>
+    <script src="js/priceCheck.js?v=7"></script>
+    <script src="js/yearSegregate.js?v=7"></script>
 </body>
 </html>
