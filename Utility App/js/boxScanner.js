@@ -9,6 +9,7 @@ const ScannerState = {
     boxScanning: false,
     language: 'en',
     inputMode: 'AlNu',
+    uniqueMode: false,
     scans: [],
     pendingDeleteId: null,
     completedBoxes: new Set(),
@@ -45,7 +46,10 @@ const ScannerT = {
         errBoxAlreadyClosed: "Box already closed", msgAdminResetSuccess: "Store reset successful!",
         msgInvalidAdminCode: "Invalid admin code.",
         errNumericOnly: "Numeric mode (Nu) is active — alphanumeric barcode not allowed",
-        errModeLockedDuringBox: "Close the current box before changing Nu/AlNu mode"
+        errModeLockedDuringBox: "Close the current box before changing Nu/AlNu mode",
+        errDuplicateBarcode: "This barcode was already scanned in this box",
+        errUniqueLockedDuringBox: "Close the current box before changing the No Dup setting",
+        lblUniqueToggle: "No Dup"
     },
     ar: {
         lblStaffName: "اسمك", lblPurpose: "الغرض", lblRemark: "ملاحظة", lblStartSession: "بدء الجلسة",
@@ -65,7 +69,10 @@ const ScannerT = {
         errBoxAlreadyClosed: "الصندوق مغلق بالفعل", msgAdminResetSuccess: "تمت إعادة تعيين المتجر بنجاح!",
         msgInvalidAdminCode: "رمز المسؤول غير صالح.",
         errNumericOnly: "وضع الأرقام (Nu) مفعّل — لا يُسمح بباركود يحتوي على حروف",
-        errModeLockedDuringBox: "أغلق الصندوق الحالي قبل تغيير وضع Nu/AlNu"
+        errModeLockedDuringBox: "أغلق الصندوق الحالي قبل تغيير وضع Nu/AlNu",
+        errDuplicateBarcode: "تم مسح هذا الباركود مسبقًا في هذا الصندوق",
+        errUniqueLockedDuringBox: "أغلق الصندوق الحالي قبل تغيير إعداد منع التكرار",
+        lblUniqueToggle: "بدون تكرار"
     }
 };
 
@@ -167,6 +174,7 @@ function saveScannerSession() {
         boxScanning: ScannerState.boxScanning,
         language: ScannerState.language,
         inputMode: ScannerState.inputMode,
+        uniqueMode: ScannerState.uniqueMode,
         completedBoxes: Array.from(ScannerState.completedBoxes)
     });
 }
@@ -181,6 +189,7 @@ function loadScannerSession() {
         ScannerState.boxScanning = session.boxScanning || false;
         ScannerState.language = session.language || 'en';
         ScannerState.inputMode = session.inputMode || 'AlNu';
+        ScannerState.uniqueMode = session.uniqueMode || false;
         ScannerState.completedBoxes = new Set(session.completedBoxes || []);
         return true;
     }
@@ -230,6 +239,8 @@ function applyScannerTranslations() {
     document.getElementById('modeNuBtn').checked = ScannerState.inputMode === 'Nu';
     document.getElementById('modeAlNuBtn').checked = ScannerState.inputMode === 'AlNu';
     document.getElementById('modeRadioToggle').classList.toggle('locked', ScannerState.boxScanning);
+    document.getElementById('uniqueToggleBtn').checked = ScannerState.uniqueMode;
+    document.getElementById('uniqueToggleWrap').classList.toggle('locked', ScannerState.boxScanning);
     document.getElementById('langEnBtn').classList.toggle('active', ScannerState.language === 'en');
     document.getElementById('langArBtn').classList.toggle('active', ScannerState.language === 'ar');
     document.getElementById('settingsLangEnBtn').classList.toggle('active', ScannerState.language === 'en');
@@ -259,6 +270,23 @@ function guardScannerModeToggle(e) {
 
 function syncScannerModeLock() {
     document.getElementById('modeRadioToggle').classList.toggle('locked', ScannerState.boxScanning);
+}
+
+function setScannerUniqueMode(enabled) {
+    ScannerState.uniqueMode = enabled;
+    document.getElementById('uniqueToggleBtn').checked = enabled;
+    saveScannerSession();
+}
+
+function guardScannerUniqueToggle(e) {
+    if (ScannerState.boxScanning) {
+        e.preventDefault();
+        alert(scannerT('errUniqueLockedDuringBox'));
+    }
+}
+
+function syncScannerUniqueLock() {
+    document.getElementById('uniqueToggleWrap').classList.toggle('locked', ScannerState.boxScanning);
 }
 
 // ============================================
@@ -317,6 +345,7 @@ function handleBoxIdScan(e) {
         document.getElementById('barcodeInput').focus();
         updateScannerStats();
         syncScannerModeLock();
+        syncScannerUniqueLock();
     } else {
         document.getElementById('boxIdInput').value = '';
     }
@@ -339,7 +368,20 @@ async function handleBarcodeScan(e) {
         document.getElementById('boxIdInput').focus();
         return;
     }
-    
+
+    if (ScannerState.uniqueMode) {
+        const isDup = ScannerState.scans.some(s =>
+            s.boxNumber === ScannerState.currentBox &&
+            s.boxStatus === 'Open' &&
+            s.barcode === String(barcode)
+        );
+        if (isDup) {
+            alert(scannerT('errDuplicateBarcode') + ': ' + barcode);
+            document.getElementById('barcodeInput').value = '';
+            return;
+        }
+    }
+
     const scan = {
         scanUid: newScanUid(),
         storeId: AppState.storeId,
@@ -432,6 +474,7 @@ async function executeCloseBox() {
         await loadAndDisplayScans();
         updateScannerStats();
         syncScannerModeLock();
+        syncScannerUniqueLock();
         if (AppState.isOnline) await autoSyncScans();
     } finally {
         ScannerState.isProcessingClose = false;
@@ -702,6 +745,8 @@ function setupScannerEventListeners() {
     document.getElementById('modeAlNuBtn').addEventListener('click', guardScannerModeToggle);
     document.getElementById('modeNuBtn').addEventListener('change', () => setScannerInputMode('Nu'));
     document.getElementById('modeAlNuBtn').addEventListener('change', () => setScannerInputMode('AlNu'));
+    document.getElementById('uniqueToggleBtn').addEventListener('click', guardScannerUniqueToggle);
+    document.getElementById('uniqueToggleBtn').addEventListener('change', (e) => setScannerUniqueMode(e.target.checked));
     document.getElementById('settingsLangEnBtn').addEventListener('click', () => setScannerLanguage('en'));
     document.getElementById('settingsLangArBtn').addEventListener('click', () => setScannerLanguage('ar'));
     document.getElementById('startSessionBtn').addEventListener('click', startScannerSession);

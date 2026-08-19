@@ -671,6 +671,44 @@ body.rtl { direction: rtl; }
     opacity: 0.55;
 }
 
+.info-bar-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.unique-toggle {
+    display: flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ak-text);
+}
+
+.unique-toggle label {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.unique-toggle input[type="checkbox"] {
+    accent-color: var(--ak-maroon);
+    width: 13px;
+    height: 13px;
+    margin: 0;
+    cursor: pointer;
+}
+
+.unique-toggle.locked label,
+.unique-toggle.locked input[type="checkbox"] {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
 .stats-row {
     display: flex;
     gap: 8px;
