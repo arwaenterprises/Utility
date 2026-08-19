@@ -1,0 +1,4466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>AK Utility</title>
+    
+    <style>
+        /* ============================================
+           ROOT VARIABLES & THEME
+           ============================================ */
+        :root {
+            --ak-maroon: #8B1A32;
+            --ak-maroon-dark: #6D1428;
+            --ak-maroon-light: #A83350;
+            --ak-cream: #F5F0DC;
+            --ak-cream-light: #FAF8F0;
+            --ak-text: #333333;
+            --ak-text-light: #666666;
+            --ak-success: #28a745;
+            --ak-danger: #dc3545;
+            --ak-warning: #ffc107;
+            --ak-info: #17a2b8;
+            --ak-white: #ffffff;
+            --ak-gray-100: #f8f9fa;
+            --ak-gray-200: #e9ecef;
+            --ak-gray-300: #dee2e6;
+            
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.3);
+            --glass-shadow: 0 8px 32px rgba(139, 26, 50, 0.15);
+            
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+            --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
+            --shadow-glow: 0 0 20px rgba(139, 26, 50, 0.3);
+            
+            --transition-fast: 0.15s ease;
+            --transition-normal: 0.3s ease;
+            --transition-slow: 0.5s ease;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--ak-cream-light) 0%, var(--ak-cream) 100%);
+            min-height: 100vh;
+            color: var(--ak-text);
+            overflow-x: hidden;
+        }
+
+        body.rtl { direction: rtl; }
+
+        /* ============================================
+           HEADER
+           ============================================ */
+        .header {
+            background: linear-gradient(135deg, var(--ak-maroon) 0%, var(--ak-maroon-dark) 100%);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: var(--shadow-lg);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--ak-white);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--ak-maroon);
+            font-size: 14px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .header-title {
+            flex: 1;
+            color: var(--ak-white);
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .header-store {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 6px 12px;
+            border-radius: 20px;
+            color: var(--ak-white);
+            font-size: 12px;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+            display: none;
+        }
+
+        .header-store.show { display: block; }
+
+        .online-status {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .online-status.online { background: var(--ak-success); color: var(--ak-white); }
+        .online-status.offline { background: var(--ak-warning); color: #333; }
+        .online-status::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        /* ============================================
+           MAIN CONTAINER
+           ============================================ */
+        .main-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 16px;
+            min-height: calc(100vh - 64px);
+        }
+
+        /* ============================================
+           SCREENS
+           ============================================ */
+        .screen { display: none; animation: fadeIn var(--transition-normal); }
+        .screen.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ============================================
+           CARDS
+           ============================================ */
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--glass-shadow);
+            transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .card-title {
+            color: var(--ak-maroon);
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-subtitle {
+            color: var(--ak-text-light);
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        /* ============================================
+           FORM ELEMENTS
+           ============================================ */
+        .form-group { margin-bottom: 20px; }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--ak-maroon);
+            font-size: 14px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid var(--ak-gray-200);
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all var(--transition-fast);
+            background: var(--ak-white);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--ak-maroon);
+            box-shadow: 0 0 0 3px rgba(139, 26, 50, 0.1);
+        }
+
+        .form-input::placeholder { color: var(--ak-gray-300); }
+
+        .form-group.hidden { display: none; }
+
+        .form-select {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid var(--ak-gray-200);
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all var(--transition-fast);
+            background: var(--ak-white);
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238B1A32' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            padding-right: 40px;
+        }
+
+        .form-select:focus {
+            outline: none;
+            border-color: var(--ak-maroon);
+            box-shadow: 0 0 0 3px rgba(139, 26, 50, 0.1);
+        }
+
+        /* ============================================
+           BUTTONS
+           ============================================ */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--ak-maroon) 0%, var(--ak-maroon-dark) 100%);
+            color: var(--ak-white);
+            box-shadow: 0 4px 15px rgba(139, 26, 50, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(139, 26, 50, 0.4);
+        }
+
+        .btn-primary:active { transform: translateY(0); }
+
+        .btn-primary:disabled {
+            background: var(--ak-gray-300);
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: var(--ak-white);
+            color: var(--ak-maroon);
+            border: 2px solid var(--ak-maroon);
+        }
+
+        .btn-secondary:hover { background: var(--ak-cream-light); }
+
+        .btn-block { width: 100%; }
+
+        .btn-group { display: flex; gap: 12px; }
+        .btn-group .btn { flex: 1; }
+
+        /* ============================================
+           STORE INFO BOX
+           ============================================ */
+        .store-info-box {
+            background: linear-gradient(135deg, rgba(40, 167, 69, 0.1) 0%, rgba(40, 167, 69, 0.05) 100%);
+            border: 2px solid var(--ak-success);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+            animation: slideUp var(--transition-normal);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .store-info-box h3 {
+            color: var(--ak-success);
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .store-info-box .detail {
+            margin: 8px 0;
+            font-size: 14px;
+            color: var(--ak-text);
+        }
+
+        .store-info-box .detail strong { color: var(--ak-maroon); }
+
+        /* ============================================
+           ERROR MESSAGE
+           ============================================ */
+        .error-msg {
+            background: linear-gradient(135deg, rgba(220, 53, 69, 0.1) 0%, rgba(220, 53, 69, 0.05) 100%);
+            border: 1px solid var(--ak-danger);
+            color: var(--ak-danger);
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-bottom: 16px;
+            display: none;
+            animation: shake 0.5s ease;
+        }
+
+        .error-msg.show { display: block; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        /* ============================================
+           HOME SCREEN - APP GRID
+           ============================================ */
+        .home-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .home-header h2 {
+            color: var(--ak-maroon);
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .home-header p {
+            color: var(--ak-text-light);
+            font-size: 14px;
+        }
+
+        .app-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        @media (min-width: 500px) {
+            .app-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+
+        .app-tile {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 24px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .app-tile::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--ak-maroon) 0%, var(--ak-maroon-light) 100%);
+            transform: scaleX(0);
+            transition: transform var(--transition-normal);
+        }
+
+        .app-tile:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg), var(--shadow-glow);
+        }
+
+        .app-tile:hover::before { transform: scaleX(1); }
+
+        .app-tile.locked {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .app-tile.locked:hover {
+            transform: none;
+            box-shadow: var(--glass-shadow);
+        }
+
+        .app-tile-icon {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .app-tile-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--ak-text);
+        }
+
+        .app-tile-lock {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity var(--transition-fast);
+        }
+
+        .app-tile.locked .app-tile-lock { opacity: 1; }
+
+        .session-banner {
+            background: linear-gradient(135deg, var(--ak-warning) 0%, #ffb300 100%);
+            color: #333;
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .session-banner.show { display: flex; }
+        .session-banner-icon { font-size: 1.25rem; }
+        .session-banner-text { flex: 1; }
+        .session-banner-text strong { display: block; font-size: 13px; }
+
+        .session-banner-btn {
+            background: rgba(0, 0, 0, 0.1);
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background var(--transition-fast);
+        }
+
+        .session-banner-btn:hover { background: rgba(0, 0, 0, 0.2); }
+
+        /* ============================================
+           APP CONTAINER
+           ============================================ */
+        .app-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .app-back-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: var(--ak-white);
+            border: 1px solid var(--ak-gray-200);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.25rem;
+            transition: all var(--transition-fast);
+        }
+
+        .app-back-btn:hover {
+            background: var(--ak-cream-light);
+            border-color: var(--ak-maroon);
+        }
+
+        .app-back-btn.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .app-back-btn.disabled:hover {
+            background: var(--ak-white);
+            border-color: var(--ak-gray-200);
+        }
+
+        .app-title { flex: 1; }
+
+        .app-title h2 {
+            color: var(--ak-maroon);
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .app-title p {
+            color: var(--ak-text-light);
+            font-size: 12px;
+        }
+
+        /* ============================================
+           LOADING SPINNER
+           ============================================ */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--ak-gray-200);
+            border-top-color: var(--ak-maroon);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .btn .spinner {
+            width: 16px;
+            height: 16px;
+            border-width: 2px;
+            border-top-color: var(--ak-white);
+        }
+
+        /* ============================================
+           RESPONSIVE
+           ============================================ */
+        @media (max-width: 400px) {
+            .header { padding: 10px 16px; }
+            .header-title { font-size: 1.1rem; }
+            .main-container { padding: 12px; }
+            .card { padding: 20px; }
+            .app-tile { padding: 20px 12px; }
+            .app-tile-icon { font-size: 2rem; }
+        }
+
+        /* ============================================
+           APP MODULE CONTAINERS
+           ============================================ */
+        #boxScannerApp,
+        #itemBarcodeApp,
+        #boxCodeApp,
+        #photoCaptureApp,
+        #boxSegregateApp {
+            display: none;
+        }
+
+        #boxScannerApp.active,
+        #itemBarcodeApp.active,
+        #boxCodeApp.active,
+        #photoCaptureApp.active,
+        #boxSegregateApp.active {
+            display: block;
+        }
+
+        .app-placeholder {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--ak-text-light);
+        }
+
+        .app-placeholder-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .app-placeholder h3 {
+            color: var(--ak-maroon);
+            margin-bottom: 8px;
+        }
+
+        /* ============================================
+           BOX SCANNER MODULE - CSS
+           ============================================ */
+        .lang-toggle {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .lang-btn {
+            padding: 10px 20px;
+            border: 2px solid var(--ak-maroon);
+            background: var(--ak-white);
+            color: var(--ak-maroon);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all var(--transition-fast);
+        }
+
+        .lang-btn.active {
+            background: var(--ak-maroon);
+            color: var(--ak-white);
+        }
+
+        .lang-btn:hover:not(.active) { background: var(--ak-cream-light); }
+
+        .info-bar {
+            background: var(--ak-white);
+            padding: 10px 14px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            border-left: 4px solid var(--ak-maroon);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .info-bar span {
+            color: var(--ak-maroon);
+            font-weight: 600;
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .stat-box {
+            flex: 1;
+            background: linear-gradient(135deg, var(--ak-maroon) 0%, var(--ak-maroon-dark) 100%);
+            padding: 12px 8px;
+            border-radius: 12px;
+            text-align: center;
+            color: var(--ak-white);
+            box-shadow: var(--shadow-md);
+        }
+
+        .stat-label {
+            font-size: 10px;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        .scan-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 12px;
+            box-shadow: var(--glass-shadow);
+        }
+
+        .close-box-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--ak-danger) 0%, #c82333 100%);
+            color: var(--ak-white);
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 16px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+            transition: all var(--transition-fast);
+        }
+
+        .close-box-btn.show { display: flex; }
+
+        .close-box-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+        }
+
+        .scans-table-container {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: var(--glass-shadow);
+        }
+
+        .scans-table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .scans-table-title {
+            color: var(--ak-maroon);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .sync-badge {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+
+        .sync-badge.synced { background: var(--ak-success); color: var(--ak-white); }
+        .sync-badge.pending { background: var(--ak-warning); color: #333; }
+
+        .scans-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .scans-table th {
+            background: var(--ak-maroon);
+            color: var(--ak-white);
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        .scans-table th:first-child { border-radius: 8px 0 0 8px; }
+        .scans-table th:last-child { border-radius: 0 8px 8px 0; }
+
+        .scans-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--ak-gray-200);
+        }
+
+        .scans-table tr:last-child td { border-bottom: none; }
+
+        .delete-scan-btn {
+            background: var(--ak-danger);
+            color: var(--ak-white);
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .delete-scan-btn:hover { background: #c82333; }
+
+        .action-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .action-row .btn {
+            flex: 1;
+            padding: 12px 16px;
+            font-size: 14px;
+        }
+
+        .settings-link {
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .settings-link a {
+            color: var(--ak-text-light);
+            text-decoration: none;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: color var(--transition-fast);
+        }
+
+        .settings-link a:hover { color: var(--ak-maroon); }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: var(--ak-white);
+            border-radius: 16px;
+            max-width: 340px;
+            width: 100%;
+            padding: 24px;
+            box-shadow: var(--shadow-lg);
+            animation: modalIn var(--transition-normal);
+        }
+
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .modal-title {
+            color: var(--ak-maroon);
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .modal-body {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-body p {
+            color: var(--ak-text);
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .modal-qty {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--ak-maroon);
+            margin: 12px 0;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid var(--ak-maroon);
+            border-radius: 10px;
+            font-size: 16px;
+            text-align: center;
+            margin-top: 12px;
+        }
+
+        .modal-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(139, 26, 50, 0.2);
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .modal-buttons .btn { flex: 1; }
+
+        .settings-section {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--ak-gray-200);
+        }
+
+        .settings-section:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .settings-section h4 {
+            color: var(--ak-maroon);
+            font-size: 14px;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .settings-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+        }
+
+        .settings-row label {
+            font-size: 14px;
+            color: var(--ak-text);
+        }
+
+        .input-highlight { animation: highlightPulse 0.5s ease; }
+
+        @keyframes highlightPulse {
+            0%, 100% { background: var(--ak-white); }
+            50% { background: #d4edda; }
+        }
+
+        body.rtl .info-bar {
+            border-left: none;
+            border-right: 4px solid var(--ak-maroon);
+        }
+
+        body.rtl .scans-table th,
+        body.rtl .scans-table td { text-align: right; }
+
+        body.rtl .form-select {
+            background-position: left 16px center;
+            padding-left: 40px;
+            padding-right: 16px;
+        }
+
+        .scanner-screen { display: none; }
+        .scanner-screen.active { display: block; }
+
+        /* ============================================
+           PRINT MODULES (Item Barcode & Box Code) - CSS
+           ============================================ */
+        .print-settings-bar {
+            background: var(--ak-gray-100);
+            border: 1px solid var(--ak-gray-200);
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            font-size: 13px;
+        }
+
+        .print-setting-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .print-setting-label { color: var(--ak-text-light); }
+        .print-setting-value { font-weight: 600; color: var(--ak-maroon); }
+
+        .mode-toggle {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 20px;
+            padding: 14px;
+            background: var(--ak-gray-100);
+            border-radius: 10px;
+        }
+
+        .mode-toggle label {
+            font-weight: 500;
+            color: var(--ak-text);
+            font-size: 14px;
+        }
+
+        .toggle-buttons {
+            display: flex;
+            gap: 0;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid var(--ak-maroon);
+        }
+
+        .toggle-btn {
+            padding: 10px 20px;
+            border: none;
+            background: var(--ak-white);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--ak-maroon);
+            transition: all var(--transition-fast);
+        }
+
+        .toggle-btn.active {
+            background: var(--ak-maroon);
+            color: var(--ak-white);
+        }
+
+        .toggle-btn:hover:not(.active) { background: var(--ak-cream-light); }
+
+        .form-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .form-group-header label {
+            font-weight: 500;
+            color: var(--ak-maroon);
+            font-size: 14px;
+            margin-bottom: 0;
+        }
+
+        .upload-buttons {
+            display: flex;
+            gap: 6px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border: 1px solid var(--ak-maroon);
+        }
+
+        .btn-small-outline {
+            background: var(--ak-white);
+            color: var(--ak-maroon);
+        }
+
+        .btn-small-outline:hover { background: var(--ak-cream-light); }
+
+        .btn-small-filled {
+            background: var(--ak-maroon);
+            color: var(--ak-white);
+            border-color: var(--ak-maroon);
+        }
+
+        .btn-small-filled:hover { background: var(--ak-maroon-dark); }
+
+        .help-text {
+            font-size: 12px;
+            color: var(--ak-text-light);
+            margin-top: 6px;
+        }
+
+        .csv-preview {
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--ak-gray-100);
+            border: 1px solid var(--ak-gray-200);
+            border-radius: 10px;
+            display: none;
+        }
+
+        .csv-preview.show { display: block; }
+
+        .csv-preview h4 {
+            font-size: 14px;
+            color: var(--ak-maroon);
+            margin-bottom: 12px;
+        }
+
+        .csv-preview-content {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: var(--ak-text);
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .csv-preview-row {
+            padding: 4px 8px;
+            border-bottom: 1px solid var(--ak-gray-200);
+        }
+
+        .csv-preview-row:last-child { border-bottom: none; }
+
+        .csv-preview-summary {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--ak-gray-300);
+            font-weight: 600;
+            color: var(--ak-maroon);
+            font-size: 13px;
+        }
+
+        .csv-preview-actions {
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .qty-input-group { display: none; }
+        .qty-input-group.show { display: block; }
+
+        .preview-area {
+            margin-top: 20px;
+            padding: 20px;
+            background: var(--ak-gray-100);
+            border: 2px dashed var(--ak-gray-300);
+            border-radius: 12px;
+            text-align: center;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .preview-area h4 {
+            color: var(--ak-text-light);
+            margin-bottom: 12px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .preview-label {
+            background: var(--ak-white);
+            padding: 16px;
+            border: 1px solid var(--ak-gray-300);
+            border-radius: 8px;
+            display: inline-block;
+        }
+
+        .print-status {
+            margin-top: 16px;
+            padding: 14px;
+            border-radius: 10px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .print-status.show { display: flex; }
+
+        .print-status.processing {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+        }
+
+        .print-status.success {
+            background: #d4edda;
+            border: 1px solid #28a745;
+            color: #155724;
+        }
+
+        .print-status.error {
+            background: #f8d7da;
+            border: 1px solid #dc3545;
+            color: #721c24;
+        }
+
+        .print-status-text {
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .info-note {
+            background: #e7f3ff;
+            border: 1px solid #b3d7ff;
+            border-left: 4px solid #0066cc;
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #004080;
+        }
+
+        .info-note strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .form-row .form-group { flex: 1; }
+
+        .print-settings-section {
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--ak-gray-200);
+        }
+
+        .print-settings-section:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .print-settings-section h4 {
+            color: var(--ak-maroon);
+            font-size: 13px;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .print-settings-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+        }
+
+        .print-settings-row label {
+            font-size: 14px;
+            color: var(--ak-text);
+        }
+
+        .print-settings-row select {
+            padding: 8px 12px;
+            border: 1px solid var(--ak-gray-300);
+            border-radius: 6px;
+            font-size: 14px;
+            min-width: 160px;
+        }
+
+        .print-settings-row select:focus {
+            outline: none;
+            border-color: var(--ak-maroon);
+        }
+
+        .hidden-input { display: none; }
+
+        #printContainer { display: none; }
+/* ==================== */
+        /* PHOTO CAPTURE STYLES */
+        /* ==================== */
+        
+        .photo-mode-toggle {
+            display: flex;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 20px;
+        }
+        
+        .photo-mode-btn {
+            flex: 1;
+            padding: 10px 16px;
+            border: none;
+            background: transparent;
+            color: rgba(255,255,255,0.6);
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .photo-mode-btn.active {
+            background: var(--accent-gradient);
+            color: white;
+        }
+        
+        .camera-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto 20px;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #000;
+            aspect-ratio: 3/4;
+        }
+        
+        .camera-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .camera-container canvas {
+            display: none;
+        }
+        
+        .capture-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: white;
+            border: 4px solid var(--primary);
+            cursor: pointer;
+            margin: 20px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        
+        .capture-btn:active {
+            transform: scale(0.95);
+            background: var(--primary);
+        }
+        
+        .capture-btn::after {
+            content: '';
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--primary);
+        }
+        
+        .capture-btn:active::after {
+            background: white;
+        }
+        
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+        }
+        
+        .photo-thumb {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+        
+        .photo-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .photo-thumb .delete-photo {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(220,53,69,0.9);
+            color: white;
+            border: none;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .photo-thumb .photo-name {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            font-size: 8px;
+            padding: 2px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .photo-stats {
+            display: flex;
+            justify-content: space-around;
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .photo-stat {
+            text-align: center;
+        }
+        
+        .photo-stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .photo-stat-label {
+            font-size: 11px;
+            color: rgba(255,255,255,0.6);
+        }
+        
+        .sku-input-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .sku-input-row input {
+            flex: 1;
+        }
+        
+        .sku-counter {
+            background: var(--primary);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            min-width: 50px;
+            text-align: center;
+        }
+        
+        .photo-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .photo-actions .btn {
+            flex: 1;
+        }
+        
+        .download-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .download-option label {
+            font-size: 13px;
+            color: rgba(255,255,255,0.8);
+        }
+        
+        .download-option select {
+            flex: 1;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-size: 13px;
+        }
+        @media print {
+            body * { visibility: hidden; }
+            #printContainer, #printContainer * { visibility: visible; }
+            #printContainer {
+                display: block;
+                position: absolute;
+                left: 0;
+                top: 0;
+            }
+            .print-label {
+                page-break-after: always;
+                page-break-inside: avoid;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 2mm;
+                text-align: center;
+                width: 100%;
+            }
+            .print-label:last-child { page-break-after: avoid; }
+            .print-label svg,
+            .print-label canvas,
+            .print-label img {
+                max-width: 100%;
+                height: auto;
+                display: block;
+                margin: 0 auto;
+            }
+            @page { margin: 0; padding: 0; }
+        }
+
+        /* ============================================
+           BOX SEGREGATE MODULE
+           ============================================ */
+        .bs-wrap { display: flex; flex-direction: column; gap: 12px; }
+
+        .bs-top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .bs-sync-btn {
+            padding: 8px 16px;
+            background: var(--ak-maroon);
+            color: var(--ak-white);
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        .bs-sync-btn:hover { background: var(--ak-maroon-dark); }
+        .bs-sync-btn:disabled { opacity: 0.6; cursor: default; }
+
+        .bs-search-row {
+            display: flex;
+            gap: 8px;
+        }
+        .bs-search-row input {
+            flex: 1;
+            padding: 12px 14px;
+            border: 2px solid var(--ak-gray-300);
+            border-radius: 10px;
+            background: var(--ak-white);
+            color: var(--ak-text);
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.2s;
+            min-width: 0;
+            font-family: inherit;
+        }
+        .bs-search-row input::placeholder { color: var(--ak-text-light); }
+        .bs-search-row input:focus { border-color: var(--ak-maroon); }
+        .bs-search-row input.bs-kbd-active { border-color: var(--ak-maroon); background: #fff8f9; }
+
+        .bs-icon-btn {
+            width: 46px;
+            height: 46px;
+            border: none;
+            border-radius: 10px;
+            font-size: 20px;
+            cursor: pointer;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .bs-icon-btn:active { transform: scale(0.92); }
+        .bs-cam-btn { background: var(--ak-maroon); color: var(--ak-white); }
+        .bs-cam-btn:hover { background: var(--ak-maroon-dark); }
+        .bs-cam-btn.active { background: var(--ak-danger); }
+        .bs-kbd-btn { background: var(--ak-gray-200); color: var(--ak-text); }
+        .bs-kbd-btn:hover { background: var(--ak-gray-300); }
+        .bs-kbd-btn.active { background: var(--ak-maroon); color: var(--ak-white); }
+
+        .bs-cam-overlay {
+            border-radius: 12px;
+            overflow: hidden;
+            background: #000;
+        }
+        #bsQrReader {
+            width: 100%;
+        }
+        #bsQrReader video {
+            width: 100% !important;
+            border-radius: 12px 12px 0 0;
+        }
+        #bsQrReader img { display: none !important; }
+        #bsQrReader__dashboard_section_csr span,
+        #bsQrReader__dashboard_section_swaplink { display: none !important; }
+        .bs-cam-close {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: #222;
+            color: #fff;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            border-radius: 0 0 12px 12px;
+        }
+        .bs-cam-close:hover { background: #333; }
+
+        .bs-ts {
+            font-size: 11px;
+            color: var(--ak-text-light);
+            margin-left: auto;
+            text-align: right;
+            line-height: 1.4;
+        }
+
+        @keyframes bsFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+        .bs-result {
+            background: var(--ak-gray-100);
+            border: 1px solid var(--ak-gray-200);
+            border-left: 4px solid var(--ak-maroon);
+            border-radius: 12px;
+            padding: 14px 16px;
+            animation: bsFadeIn 0.18s ease;
+        }
+        .bs-result-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--ak-maroon);
+            margin-bottom: 10px;
+            word-break: break-all;
+        }
+        .bs-field {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--ak-gray-200);
+            gap: 10px;
+        }
+        .bs-field:last-child { border-bottom: none; padding-bottom: 0; }
+        .bs-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--ak-text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            flex-shrink: 0;
+            padding-top: 2px;
+        }
+        .bs-value {
+            font-size: 14px;
+            color: var(--ak-text);
+            font-weight: 600;
+            text-align: right;
+            word-break: break-word;
+        }
+        .bs-value.empty { color: var(--ak-gray-300); font-style: italic; font-weight: 400; }
+
+        .bs-notfound {
+            background: #fff5f5;
+            border: 1px solid #ffcccc;
+            border-radius: 12px;
+            padding: 14px 16px;
+            text-align: center;
+            animation: bsFadeIn 0.18s ease;
+            color: var(--ak-danger);
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .bs-notfound span { display: block; font-size: 12px; color: var(--ak-text-light); margin-top: 4px; font-weight: 400; word-break: break-all; }
+    </style>
+
+    <!-- External Libraries -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-logo">AK</div>
+        <h1 class="header-title">AK Utility</h1>
+        <div class="header-store" id="headerStore"></div>
+        <div class="online-status online" id="onlineStatus">Online</div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="main-container">
+        
+        <!-- SCREEN: Store Login -->
+        <div id="loginScreen" class="screen active">
+            <div class="card">
+                <h2 class="card-title">🏪 Store Login</h2>
+                <p class="card-subtitle">Enter your Store ID to access utilities</p>
+                
+                <div class="form-group">
+                    <label for="storeIdInput">Store ID</label>
+                    <input type="text" id="storeIdInput" class="form-input" placeholder="e.g., BLA1140" autocomplete="off" autocapitalize="characters">
+                </div>
+                
+                <div class="error-msg" id="loginError"></div>
+                
+                <button class="btn btn-primary btn-block" id="lookupStoreBtn">
+                    <span id="lookupBtnText">Search Your Store</span>
+                </button>
+                
+                <div id="storeConfirmBox" class="store-info-box" style="display: none;">
+                    <h3>✓ Store Found</h3>
+                    <div class="detail"><strong>Store ID:</strong> <span id="confirmStoreId"></span></div>
+                    <div class="detail"><strong>Store Name:</strong> <span id="confirmStoreName"></span></div>
+                    <div class="detail"><strong>Location:</strong> <span id="confirmLocation"></span></div>
+                    <p style="margin-top: 16px; font-weight: 500; color: var(--ak-text);">Is this your store?</p>
+                    <div class="btn-group" style="margin-top: 12px;">
+                        <button class="btn btn-primary" id="confirmYesBtn">Yes, Continue</button>
+                        <button class="btn btn-secondary" id="confirmNoBtn">No</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SCREEN: Home -->
+        <div id="homeScreen" class="screen">
+            <div class="home-header">
+                <h2>Welcome!</h2>
+                <p>Select a utility to get started</p>
+            </div>
+            
+            <div class="session-banner" id="sessionBanner">
+                <span class="session-banner-icon">📦</span>
+                <div class="session-banner-text">
+                    <strong>Box Scanner Session Active</strong>
+                    <span id="sessionBannerInfo">Complete or reset to switch apps</span>
+                </div>
+                <button class="session-banner-btn" id="goToSessionBtn">Go to Scanner</button>
+            </div>
+            
+            <div class="app-grid" id="appGrid"></div>
+        </div>
+
+        <!-- SCREEN: App Container -->
+        <div id="appScreen" class="screen">
+            <div class="app-header">
+                <button class="app-back-btn" id="appBackBtn" title="Back to Home">←</button>
+                <div class="app-title">
+                    <h2 id="appTitleText">App Name</h2>
+                    <p id="appSubtitleText">App description</p>
+                </div>
+            </div>
+            
+            <!-- BOX SCANNER APP -->
+            <div id="boxScannerApp" class="app-module">
+                
+                <!-- Session Setup Screen -->
+                <div id="scannerSessionScreen" class="scanner-screen active">
+                    <div class="card">
+                        <h2 class="card-title">📋 Session Setup</h2>
+                        <p class="card-subtitle">Enter session details to start scanning</p>
+                        
+                        <div class="lang-toggle">
+                            <button class="lang-btn active" id="langEnBtn" data-lang="en">EN</button>
+                            <button class="lang-btn" id="langArBtn" data-lang="ar">عربي</button>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label id="lblStaffName">Your Name</label>
+                            <input type="text" id="scannerStaffInput" class="form-input" placeholder="Enter your name...">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label id="lblPurpose">Purpose</label>
+                            <select id="scannerPurposeSelect" class="form-select">
+                                <option value="">-- Select purpose --</option>
+                                <option value="Store to Store">Store to Store</option>
+                                <option value="Store to DC">Store to DC</option>
+                                <option value="DC Scan">DC Scan</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label id="lblRemark">Remark</label>
+                            <input type="text" id="scannerRemarkInput" class="form-input" placeholder="e.g., Fall Winter 2023 stocks">
+                        </div>
+                        
+                        <button class="btn btn-primary btn-block" id="startSessionBtn">
+                            <span id="lblStartSession">Start Session</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Scanning Screen -->
+                <div id="scannerScanScreen" class="scanner-screen">
+                    <div class="info-bar">
+                        <span id="lblStore">Store:</span> <span id="dispScannerStore">-</span> | 
+                        <span id="lblStaff">Staff:</span> <span id="dispScannerStaff">-</span>
+                    </div>
+                    
+                    <div class="stats-row">
+                        <div class="stat-box">
+                            <div class="stat-label" id="lblTotal">Total</div>
+                            <div class="stat-number" id="statTotal">0</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label" id="lblBoxQty">Box Qty</div>
+                            <div class="stat-number" id="statBoxQty">0</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label" id="lblBoxes">Boxes</div>
+                            <div class="stat-number" id="statBoxes">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="scan-card">
+                        <button class="close-box-btn" id="closeBoxBtn">
+                            ✕ <span id="lblCloseBox">Close Box</span> <span id="closeBoxBtnId"></span>
+                        </button>
+                        
+                        <div class="form-group" id="boxIdGroup">
+                            <label id="lblBoxId">Box ID</label>
+                            <input type="text" id="boxIdInput" class="form-input" placeholder="Scan box ID...">
+                        </div>
+                        
+                        <div class="form-group hidden" id="barcodeGroup">
+                            <label id="lblBarcode">Barcode</label>
+                            <input type="text" id="barcodeInput" class="form-input" placeholder="Scan barcode...">
+                        </div>
+                    </div>
+                    
+                    <div class="scans-table-container">
+                        <div class="scans-table-header">
+                            <span class="scans-table-title" id="lblRecentScans">Last 5 Scans</span>
+                            <span class="sync-badge synced" id="syncBadge">✓</span>
+                        </div>
+                        <table class="scans-table">
+                            <thead>
+                                <tr>
+                                    <th id="thBarcode">Barcode</th>
+                                    <th id="thTime">Time</th>
+                                    <th id="thAction">Del</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scansTableBody"></tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="action-row">
+                        <button class="btn btn-primary" id="downloadBtn">📥 <span id="lblDownload">Download</span></button>
+                        <button class="btn btn-secondary" id="resetSessionBtn" style="background: var(--ak-danger); color: white; border: none;">🔄 <span id="lblReset">Reset</span></button>
+                    </div>
+                    
+                    <div class="settings-link">
+                        <a href="#" id="openScannerSettingsBtn">⚙️ <span id="lblSettings">Settings</span></a>
+                    </div>
+                </div>
+                
+                <!-- Close Box Modal -->
+                <div class="modal-overlay" id="closeBoxModal">
+                    <div class="modal">
+                        <h3 class="modal-title"><span id="lblCloseBoxTitle">Close Box</span> <span id="modalBoxId"></span></h3>
+                        <div class="modal-body">
+                            <p id="lblQtyItems">Quantity:</p>
+                            <div class="modal-qty"><span id="modalBoxQty">0</span> <span id="lblItems">items</span></div>
+                            <div id="closeBoxStep1">
+                                <p id="lblAreYouSure">Are you sure you want to close this box?</p>
+                            </div>
+                            <div id="closeBoxStep2" style="display: none;">
+                                <p id="lblScanToConfirm">Scan box ID to confirm</p>
+                                <input type="text" id="closeBoxScanInput" class="modal-input" placeholder="Scan box ID...">
+                            </div>
+                        </div>
+                        <div class="modal-buttons" id="closeBoxButtons1">
+                            <button class="btn btn-primary" id="closeBoxYesBtn">Yes</button>
+                            <button class="btn btn-secondary" id="closeBoxCancelBtn">Cancel</button>
+                        </div>
+                        <div class="modal-buttons" id="closeBoxButtons2" style="display: none;">
+                            <button class="btn btn-secondary" id="closeBoxBackBtn">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Reset Modal -->
+                <div class="modal-overlay" id="resetModal">
+                    <div class="modal">
+                        <h3 class="modal-title" id="lblResetTitle">Reset Session?</h3>
+                        <div class="modal-body">
+                            <p id="lblResetMsg">This will download your data and start a new session.</p>
+                        </div>
+                        <div class="modal-buttons">
+                            <button class="btn btn-primary" id="resetYesBtn">Yes</button>
+                            <button class="btn btn-secondary" id="resetNoBtn">No</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Delete Modal -->
+                <div class="modal-overlay" id="deleteModal">
+                    <div class="modal">
+                        <h3 class="modal-title" id="lblDeleteTitle">Delete Scan?</h3>
+                        <div class="modal-body">
+                            <p id="lblDeleteMsg">Delete this scan?</p>
+                            <p style="font-weight: 600; color: var(--ak-maroon);" id="deleteInfo"></p>
+                        </div>
+                        <div class="modal-buttons">
+                            <button class="btn btn-secondary" style="background: var(--ak-danger); color: white; border: none;" id="deleteYesBtn">Delete</button>
+                            <button class="btn btn-secondary" id="deleteNoBtn">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Settings Modal -->
+                <div class="modal-overlay" id="scannerSettingsModal">
+                    <div class="modal">
+                        <h3 class="modal-title">⚙️ <span id="lblSettingsTitle">Settings</span></h3>
+                        <div class="modal-body" style="text-align: left;">
+                            <div class="settings-section">
+                                <h4 id="lblLanguage">Language</h4>
+                                <div class="lang-toggle" style="justify-content: flex-start;">
+                                    <button class="lang-btn active" id="settingsLangEnBtn" data-lang="en">EN</button>
+                                    <button class="lang-btn" id="settingsLangArBtn" data-lang="ar">عربي</button>
+                                </div>
+                            </div>
+                            <div class="settings-section">
+                                <h4 id="lblAdminReset">Admin Reset</h4>
+                                <p style="font-size: 13px; color: var(--ak-text-light); margin-bottom: 12px;" id="lblAdminResetDesc">Reset store and all data</p>
+                                <input type="password" id="adminCodeInput" class="form-input" placeholder="Enter admin code" style="margin-bottom: 10px;">
+                                <button class="btn btn-secondary" style="background: var(--ak-danger); color: white; border: none; width: 100%;" id="adminResetBtn">🔓 <span id="lblExecuteReset">Execute Reset</span></button>
+                            </div>
+                        </div>
+                        <div class="modal-buttons">
+                            <button class="btn btn-primary btn-block" id="closeSettingsBtn">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ITEM BARCODE APP -->
+            <div id="itemBarcodeApp" class="app-module">
+                <div class="card">
+                    <div class="print-settings-bar">
+                        <div class="print-setting-item">
+                            <span class="print-setting-label">Mode:</span>
+                            <span class="print-setting-value" id="itemDisplayMode">Barcode</span>
+                        </div>
+                        <div class="print-setting-item">
+                            <span class="print-setting-label">Type:</span>
+                            <span class="print-setting-value" id="itemDisplayType">Numeric</span>
+                        </div>
+                        <button class="btn-small btn-small-outline" id="openItemSettingsBtn">⚙️ Settings</button>
+                    </div>
+                    
+                    <div class="mode-toggle">
+                        <label>Print Mode:</label>
+                        <div class="toggle-buttons">
+                            <button class="toggle-btn active" data-mode="single" id="itemModeSingle">Single</button>
+                            <button class="toggle-btn" data-mode="bulk" id="itemModeBulk">Bulk</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="form-group-header">
+                            <label>Scan or Enter Barcode:</label>
+                            <div class="upload-buttons">
+                                <button class="btn-small btn-small-outline" id="downloadTemplateBtn">📥 Template</button>
+                                <button class="btn-small btn-small-filled" id="uploadCsvBtn">📤 Upload</button>
+                                <input type="file" id="csvFileInput" class="hidden-input" accept=".csv">
+                            </div>
+                        </div>
+                        <input type="text" id="itemBarcodeInput" class="form-input" placeholder="Scan barcode, paste comma-separated, or upload CSV..." autocomplete="off">
+                        <p class="help-text">Supports: single barcode, comma-separated (e.g., 123,456,789), or CSV upload</p>
+                    </div>
+                    
+                    <div class="csv-preview" id="itemCsvPreview">
+                        <h4>📋 CSV Preview</h4>
+                        <div class="csv-preview-content" id="itemCsvPreviewContent"></div>
+                        <div class="csv-preview-summary" id="itemCsvPreviewSummary"></div>
+                        <div class="csv-preview-actions">
+                            <button class="btn btn-primary" id="printCsvBtn">🖨️ Print All</button>
+                            <button class="btn btn-secondary" id="cancelCsvBtn">Cancel</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group qty-input-group" id="itemQtyGroup">
+                        <label>Quantity (max 200):</label>
+                        <input type="number" id="itemQtyInput" class="form-input" min="1" max="200" value="1" placeholder="Enter quantity">
+                        <p class="help-text">Enter quantity and press Enter to print</p>
+                    </div>
+                    
+                    <button class="btn btn-primary btn-block" id="printItemBtn">🖨️ Print Label</button>
+                    
+                    <div class="print-status" id="itemStatus">
+                        <span class="spinner"></span>
+                        <span class="print-status-text" id="itemStatusText">Processing...</span>
+                    </div>
+                    
+                    <div class="preview-area" id="itemPreviewArea">
+                        <h4>Label Preview</h4>
+                        <p style="color: var(--ak-text-light);">Scan a barcode to see preview</p>
+                    </div>
+                </div>
+                
+                <!-- Item Settings Modal -->
+                <div class="modal-overlay" id="itemSettingsModal">
+                    <div class="modal">
+                        <h3 class="modal-title">⚙️ Print Settings</h3>
+                        <div class="modal-body" style="text-align: left;">
+                            <div class="print-settings-section">
+                                <h4>Output Format</h4>
+                                <div class="print-settings-row">
+                                    <label>Label Type:</label>
+                                    <select id="settingOutputFormat">
+                                        <option value="barcode">Barcode</option>
+                                        <option value="qrcode">QR Code</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="print-settings-section">
+                                <h4>Barcode Settings</h4>
+                                <div class="print-settings-row">
+                                    <label>Barcode Type:</label>
+                                    <select id="settingBarcodeType">
+                                        <option value="numeric">Numeric (Code 128C)</option>
+                                        <option value="alphanumeric">Alphanumeric (Code 128B)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="print-settings-section">
+                                <h4>Test Print</h4>
+                                <p style="font-size: 13px; color: var(--ak-text-light); margin-bottom: 10px;">Print a test label to verify printer settings.</p>
+                                <button class="btn btn-secondary btn-block" id="testPrintBtn">🖨️ Print Test Label</button>
+                            </div>
+                        </div>
+                        <div class="modal-buttons">
+                            <button class="btn btn-secondary" id="cancelItemSettingsBtn">Cancel</button>
+                            <button class="btn btn-primary" id="saveItemSettingsBtn">Save Settings</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- BOX CODE APP -->
+            <div id="boxCodeApp" class="app-module">
+                <div class="card">
+                    <div class="info-note">
+                        <strong>ℹ️ Label Size: 4×6 inches</strong>
+                        Prints 2 sequential codes per label to save space. Example: Qty 10 = 5 physical labels.
+                    </div>
+                    
+                    <div class="print-settings-bar">
+                        <div class="print-setting-item">
+                            <span class="print-setting-label">Prefix:</span>
+                            <span class="print-setting-value" id="boxDisplayPrefix">RTO</span>
+                        </div>
+                        <div class="print-setting-item">
+                            <span class="print-setting-label">Mode:</span>
+                            <span class="print-setting-value" id="boxDisplayMode">Barcode</span>
+                        </div>
+                        <button class="btn-small btn-small-outline" id="openBoxSettingsBtn">⚙️ Settings</button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>TRN Number:</label>
+                        <input type="text" id="trnInput" class="form-input" placeholder="e.g., TR-0012365" autocomplete="off">
+                        <p class="help-text">Enter the Transfer Reference Number</p>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Start From:</label>
+                            <input type="number" id="boxStartFrom" class="form-input" min="1" max="999" value="1" placeholder="1">
+                            <p class="help-text">Starting number</p>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantity (max 100):</label>
+                            <input type="number" id="boxQtyInput" class="form-input" min="1" max="100" value="1" placeholder="Enter quantity">
+                            <p class="help-text">Number of codes</p>
+                        </div>
+                    </div>
+                    
+                    <div class="preview-area" id="boxPreviewArea">
+                        <h4>First Label Preview</h4>
+                        <p style="color: var(--ak-text-light);">Enter TRN to see preview</p>
+                    </div>
+                    
+                    <button class="btn btn-primary btn-block" id="printBoxBtn">🖨️ Print Box Labels</button>
+                    
+                    <div class="print-status" id="boxStatus">
+                        <span class="spinner"></span>
+                        <span class="print-status-text" id="boxStatusText">Processing...</span>
+                    </div>
+                </div>
+                
+                <!-- Box Code Settings Modal -->
+                <div class="modal-overlay" id="boxSettingsModal">
+                    <div class="modal">
+                        <h3 class="modal-title">⚙️ Box Code Settings</h3>
+                        <div class="modal-body" style="text-align: left;">
+                            <div class="print-settings-section">
+                                <h4>Output Format</h4>
+                                <div class="print-settings-row">
+                                    <label>Label Type:</label>
+                                    <select id="settingBoxOutputFormat">
+                                        <option value="barcode">Barcode</option>
+                                        <option value="qrcode">QR Code</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="print-settings-section">
+                                <h4>Box Code Prefix</h4>
+                                <div class="print-settings-row">
+                                    <label>Prefix:</label>
+                                    <input type="text" id="settingBoxPrefix" class="form-input" value="RTO" placeholder="e.g., RTO" style="width: 120px;">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-buttons">
+                            <button class="btn btn-secondary" id="cancelBoxSettingsBtn">Cancel</button>
+                            <button class="btn btn-primary" id="saveBoxSettingsBtn">Save Settings</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+<!-- Photo Capture App -->
+            <div id="photoCaptureApp" class="app-module">
+                <div class="card">
+                    <h2 class="card-title">📷 Photo Capture</h2>
+                    
+                    <!-- Mode Toggle -->
+                    <div class="photo-mode-toggle">
+                        <button class="photo-mode-btn active" id="singleModeBtn" onclick="setPhotoMode('single')">Single</button>
+                        <button class="photo-mode-btn" id="multiModeBtn" onclick="setPhotoMode('multi')">Multi (up to 8)</button>
+                    </div>
+                    
+                    <!-- SKU Input -->
+                    <div class="form-group">
+                        <label>Scan or Enter SKU:</label>
+                        <div class="sku-input-row">
+                            <input type="number" id="skuInput" inputmode="numeric" pattern="[0-9]*" placeholder="Enter numeric SKU">
+                            <div class="sku-counter" id="skuPhotoCount">0</div>
+                        </div>
+                        <small style="color: rgba(255,255,255,0.5);" id="skuHint">Single mode: 1 photo per SKU</small>
+                    </div>
+                    
+                    <!-- Camera -->
+                    <div class="camera-container" id="cameraContainer">
+                        <video id="cameraVideo" autoplay playsinline></video>
+                        <canvas id="cameraCanvas"></canvas>
+                    </div>
+                    
+                    <!-- Capture Button -->
+                    <div style="text-align: center;">
+                        <button class="capture-btn" id="captureBtn" onclick="capturePhoto()"></button>
+                        <p style="color: rgba(255,255,255,0.5); font-size: 12px; margin-top: 5px;">Tap to capture</p>
+                    </div>
+                    
+                    <!-- Stats -->
+                    <div class="photo-stats">
+                        <div class="photo-stat">
+                            <div class="photo-stat-value" id="totalSkus">0</div>
+                            <div class="photo-stat-label">SKUs</div>
+                        </div>
+                        <div class="photo-stat">
+                            <div class="photo-stat-value" id="totalPhotos">0</div>
+                            <div class="photo-stat-label">Photos</div>
+                        </div>
+                        <div class="photo-stat">
+                            <div class="photo-stat-value" id="sessionSize">0 MB</div>
+                            <div class="photo-stat-label">Size</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Download Option -->
+                    <div class="download-option">
+                        <label>Download as:</label>
+                        <select id="downloadType">
+                            <option value="session">One ZIP (All Photos)</option>
+                            <option value="sku">Separate ZIP per SKU</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Photo Grid -->
+                    <div class="photo-grid" id="photoGrid">
+                        <p style="color: rgba(255,255,255,0.4); text-align: center; grid-column: 1/-1; padding: 20px;">No photos captured yet</p>
+                    </div>
+                    
+                    <!-- Actions -->
+                    <div class="photo-actions">
+                        <button class="btn btn-secondary" onclick="clearPhotoSession()">🗑️ Clear All</button>
+                        <button class="btn btn-primary" onclick="downloadPhotos()">📥 Download ZIP</button>
+                    </div>
+                </div>
+            </div>
+
+<!-- Box Segregate App -->
+            <div id="boxSegregateApp" class="app-module">
+                <div class="card">
+                <div class="bs-wrap">
+                    <div class="bs-top-bar">
+                        <button class="bs-sync-btn" id="bsRefreshBtn" onclick="refreshBsFromSheets()">↻ Sync Data</button>
+                        <span id="bsTimestamp" class="bs-ts">No data</span>
+                    </div>
+                    <div class="bs-search-row">
+                        <input type="text" id="bsBarcodeInput" inputmode="none" placeholder="Point camera or HHT scan…" autocomplete="off" autocorrect="off" spellcheck="false">
+                        <button class="bs-icon-btn bs-cam-btn" id="bsCamBtn" onclick="toggleBsCamera()" title="Scan with camera">📷</button>
+                        <button class="bs-icon-btn bs-kbd-btn" id="bsKbdBtn" onclick="toggleBsKeyboard()" title="Type manually">⌨️</button>
+                    </div>
+                    <!-- Camera overlay -->
+                    <div id="bsCamOverlay" class="bs-cam-overlay" style="display:none;">
+                        <div id="bsQrReader"></div>
+                        <button class="bs-cam-close" onclick="stopBsCamera()">✕ Close Camera</button>
+                    </div>
+                    <div id="bsResultCard" class="bs-result" style="display:none;"></div>
+                    <div id="bsNotFound" class="bs-notfound" style="display:none;"></div>
+                </div>
+                </div>
+            </div>
+
+    </main>
+
+    <!-- Hidden Print Container -->
+    <div id="printContainer"></div>
+
+    <script>
+        // ============================================
+        // CONFIGURATION
+        // ============================================
+        const CONFIG = {
+            GOOGLE_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzOc6X_mxeknOoSppEelhR555OvJwKBShfUYxwmEzme-nuSlV3pSekTD_YbXUL2Smz9Rg/exec',
+            ADMIN_CODE: 'AK@2026',
+            STORAGE_PREFIX: 'aku_'
+        };
+
+        // ============================================
+        // APP REGISTRY
+        // ============================================
+        const APPS = [
+            { id: 'boxScanner', name: 'Box Scanner', icon: '📦', description: 'Scan items into boxes', sessionRequired: true, containerId: 'boxScannerApp' },
+            { id: 'itemBarcode', name: 'Item Barcode', icon: '🏷️', description: 'Print item labels', sessionRequired: false, containerId: 'itemBarcodeApp' },
+            { id: 'boxCode', name: 'Box Code', icon: '📤', description: 'Generate box labels', sessionRequired: false, containerId: 'boxCodeApp' },
+            { id: 'photoCapture', name: 'Photo Capture For Increff URLs', icon: '📷', description: 'Capture product photos', sessionRequired: false, containerId: 'photoCaptureApp' },
+            { id: 'boxSegregate', name: 'Box Segregate', icon: '🔍', description: 'Look up box details by barcode', sessionRequired: false, containerId: 'boxSegregateApp' }
+        ];
+
+        // ============================================
+        // GLOBAL STATE
+        // ============================================
+        const AppState = {
+            storeId: '',
+            storeName: '',
+            storeLocation: '',
+            currentApp: null,
+            currentScreen: 'loginScreen',
+            hasActiveSession: false,
+            activeSessionApp: null,
+            isOnline: navigator.onLine
+        };
+
+        // ============================================
+        // STORAGE HELPERS
+        // ============================================
+        const Storage = {
+            get(key) { return localStorage.getItem(CONFIG.STORAGE_PREFIX + key); },
+            set(key, value) { localStorage.setItem(CONFIG.STORAGE_PREFIX + key, value); },
+            remove(key) { localStorage.removeItem(CONFIG.STORAGE_PREFIX + key); },
+            getJSON(key) {
+                const val = this.get(key);
+                if (!val) return null;
+                try { return JSON.parse(val); } catch (e) { return null; }
+            },
+            setJSON(key, value) { this.set(key, JSON.stringify(value)); }
+        };
+
+        // ============================================
+        // ONLINE STATUS
+        // ============================================
+        function updateOnlineStatus() {
+            AppState.isOnline = navigator.onLine;
+            const el = document.getElementById('onlineStatus');
+            if (AppState.isOnline) {
+                el.textContent = 'Online';
+                el.className = 'online-status online';
+            } else {
+                el.textContent = 'Offline';
+                el.className = 'online-status offline';
+            }
+        }
+
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+
+        // ============================================
+        // SCREEN NAVIGATION
+        // ============================================
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            AppState.currentScreen = screenId;
+        }
+
+        // ============================================
+        // GOOGLE SHEETS API
+        // ============================================
+        async function fetchFromGoogleSheets(action, params = {}) {
+            if (!AppState.isOnline) return null;
+            try {
+                const url = new URL(CONFIG.GOOGLE_SCRIPT_URL);
+                url.searchParams.append('action', action);
+                Object.keys(params).forEach(k => url.searchParams.append(k, params[k]));
+                const response = await fetch(url.toString());
+                return await response.json();
+            } catch (e) {
+                console.error('Google Sheets fetch error:', e);
+                return null;
+            }
+        }
+
+        // ============================================
+        // STORE LOGIN
+        // ============================================
+        async function lookupStore() {
+            const input = document.getElementById('storeIdInput');
+            const errorDiv = document.getElementById('loginError');
+            const btn = document.getElementById('lookupStoreBtn');
+            const btnText = document.getElementById('lookupBtnText');
+            
+            const storeId = input.value.trim().toUpperCase();
+            if (!storeId) {
+                showError(errorDiv, 'Please enter a Store ID');
+                return;
+            }
+            
+            btn.disabled = true;
+            btnText.innerHTML = '<span class="spinner"></span> Looking up...';
+            errorDiv.classList.remove('show');
+            
+            const result = await fetchFromGoogleSheets('getStore', { storeId });
+            
+            btn.disabled = false;
+            btnText.textContent = 'Lookup Store';
+            
+            if (result && result.success && result.store) {
+                AppState.storeId = result.store.storeId;
+                AppState.storeName = result.store.storeName;
+                AppState.storeLocation = result.store.location;
+                
+                document.getElementById('confirmStoreId').textContent = result.store.storeId;
+                document.getElementById('confirmStoreName').textContent = result.store.storeName;
+                document.getElementById('confirmLocation').textContent = result.store.location;
+                
+                document.getElementById('storeConfirmBox').style.display = 'block';
+                btn.style.display = 'none';
+            } else {
+                showError(errorDiv, 'Store not found. Please check the Store ID.');
+            }
+        }
+
+        function confirmStore(confirmed) {
+            if (confirmed) {
+                Storage.set('store_id', AppState.storeId);
+                Storage.set('store_name', AppState.storeName);
+                Storage.set('store_location', AppState.storeLocation);
+                updateHeaderStore();
+                showScreen('homeScreen');
+                renderAppGrid();
+            } else {
+                document.getElementById('storeIdInput').value = '';
+                document.getElementById('storeConfirmBox').style.display = 'none';
+                document.getElementById('lookupStoreBtn').style.display = 'block';
+                AppState.storeId = '';
+                AppState.storeName = '';
+                AppState.storeLocation = '';
+            }
+        }
+
+        function showError(element, message) {
+            element.textContent = message;
+            element.classList.add('show');
+        }
+
+        function updateHeaderStore() {
+            const el = document.getElementById('headerStore');
+            if (AppState.storeId) {
+                el.textContent = AppState.storeId;
+                el.classList.add('show');
+            } else {
+                el.classList.remove('show');
+            }
+        }
+
+        // ============================================
+        // HOME SCREEN
+        // ============================================
+        function renderAppGrid() {
+            const grid = document.getElementById('appGrid');
+            grid.innerHTML = '';
+            
+            APPS.forEach(app => {
+                const tile = document.createElement('div');
+                tile.className = 'app-tile';
+                tile.dataset.appId = app.id;
+                
+                const isLocked = AppState.hasActiveSession && AppState.activeSessionApp !== app.id && app.sessionRequired;
+                if (isLocked) tile.classList.add('locked');
+                
+                tile.innerHTML = `
+                    <span class="app-tile-icon">${app.icon}</span>
+                    <span class="app-tile-name">${app.name}</span>
+                    <span class="app-tile-lock">🔒</span>
+                `;
+                
+                tile.addEventListener('click', () => { if (!isLocked) openApp(app.id); });
+                grid.appendChild(tile);
+            });
+            
+            updateSessionBanner();
+        }
+
+        function updateSessionBanner() {
+            const banner = document.getElementById('sessionBanner');
+            banner.classList.toggle('show', AppState.hasActiveSession);
+        }
+
+        // ============================================
+        // APP NAVIGATION
+        // ============================================
+        function openApp(appId) {
+            const app = APPS.find(a => a.id === appId);
+            if (!app) return;
+            
+            AppState.currentApp = appId;
+            document.getElementById('appTitleText').innerHTML = `${app.icon} ${app.name}`;
+            document.getElementById('appSubtitleText').textContent = app.description;
+            
+            document.querySelectorAll('.app-module').forEach(m => m.classList.remove('active'));
+            document.getElementById(app.containerId).classList.add('active');
+            
+            updateBackButton();
+            showScreen('appScreen');
+            initializeApp(appId);
+        }
+
+        function updateBackButton() {
+            const btn = document.getElementById('appBackBtn');
+            const app = APPS.find(a => a.id === AppState.currentApp);
+            
+            if (app && app.sessionRequired && AppState.hasActiveSession) {
+                btn.classList.add('disabled');
+                btn.title = 'Complete or reset session to go back';
+            } else {
+                btn.classList.remove('disabled');
+                btn.title = 'Back to Home';
+            }
+        }
+
+        function goToHome() {
+            const app = APPS.find(a => a.id === AppState.currentApp);
+            if (app && app.sessionRequired && AppState.hasActiveSession) return;
+            
+            AppState.currentApp = null;
+            showScreen('homeScreen');
+            renderAppGrid();
+        }
+
+        // ============================================
+        // SESSION MANAGEMENT
+        // ============================================
+        function setActiveSession(appId, active) {
+            AppState.hasActiveSession = active;
+            AppState.activeSessionApp = active ? appId : null;
+            if (active) {
+                Storage.set('active_session', appId);
+            } else {
+                Storage.remove('active_session');
+            }
+            updateBackButton();
+        }
+
+        function checkExistingSession() {
+            const activeSession = Storage.get('active_session');
+            if (activeSession) {
+                AppState.hasActiveSession = true;
+                AppState.activeSessionApp = activeSession;
+            }
+        }
+
+        // ============================================
+        // BOX SCANNER MODULE - STATE & CONFIG
+        // ============================================
+        const ScannerState = {
+            staffName: '',
+            purpose: '',
+            remark: '',
+            currentBox: null,
+            boxScanning: false,
+            language: 'en',
+            scans: [],
+            pendingDeleteId: null,
+            completedBoxes: new Set(),
+            isProcessingClose: false,
+            isSyncing: false
+        };
+
+        const ScannerT = {
+            en: {
+                lblStaffName: "Your Name", lblPurpose: "Purpose", lblRemark: "Remark", lblStartSession: "Start Session",
+                lblStore: "Store:", lblStaff: "Staff:", lblTotal: "Total", lblBoxQty: "Box Qty", lblBoxes: "Boxes",
+                lblBoxId: "Box ID", lblBarcode: "Barcode", lblCloseBox: "Close Box", lblRecentScans: "Last 5 Scans",
+                thBarcode: "Barcode", thTime: "Time", thAction: "Del", lblDownload: "Download", lblReset: "Reset",
+                lblSettings: "Settings", lblCloseBoxTitle: "Close Box", lblQtyItems: "Quantity:", lblItems: "items",
+                lblAreYouSure: "Are you sure you want to close this box?", lblScanToConfirm: "Scan box ID to confirm",
+                lblResetTitle: "Reset Session?", lblResetMsg: "This will download your data and start a new session.",
+                lblDeleteTitle: "Delete Scan?", lblDeleteMsg: "Delete this scan?", lblSettingsTitle: "Settings",
+                lblLanguage: "Language", lblAdminReset: "Admin Reset", lblAdminResetDesc: "Reset store and all data",
+                lblExecuteReset: "Execute Reset", boxIdPlaceholder: "Scan box ID...", barcodePlaceholder: "Scan barcode...",
+                remarkPlaceholder: "e.g., Fall Winter 2023 stocks", staffPlaceholder: "Enter your name...",
+                selectPurpose: "-- Select purpose --", errEnterName: "Please enter your name",
+                errSelectPurpose: "Please select purpose", errEnterRemark: "Please enter a remark",
+                errBoxFirst: "Scan Box ID first", errSameBox: "Scan same Box ID!", errCloseBoxFirst: "Close the box first!",
+                errBoxAlreadyClosed: "Box already closed", msgAdminResetSuccess: "Store reset successful!",
+                msgInvalidAdminCode: "Invalid admin code."
+            },
+            ar: {
+                lblStaffName: "اسمك", lblPurpose: "الغرض", lblRemark: "ملاحظة", lblStartSession: "بدء الجلسة",
+                lblStore: "المتجر:", lblStaff: "الموظف:", lblTotal: "الإجمالي", lblBoxQty: "الصندوق", lblBoxes: "مكتمل",
+                lblBoxId: "رقم الصندوق", lblBarcode: "الباركود", lblCloseBox: "إغلاق الصندوق", lblRecentScans: "آخر 5 مسح",
+                thBarcode: "الباركود", thTime: "الوقت", thAction: "حذف", lblDownload: "تحميل", lblReset: "إعادة",
+                lblSettings: "الإعدادات", lblCloseBoxTitle: "إغلاق الصندوق", lblQtyItems: "الكمية:", lblItems: "قطعة",
+                lblAreYouSure: "هل أنت متأكد من إغلاق هذا الصندوق؟", lblScanToConfirm: "امسح رقم الصندوق للتأكيد",
+                lblResetTitle: "إعادة تعيين؟", lblResetMsg: "سيتم تحميل البيانات وبدء جلسة جديدة.",
+                lblDeleteTitle: "حذف المسح؟", lblDeleteMsg: "حذف هذا المسح؟", lblSettingsTitle: "الإعدادات",
+                lblLanguage: "اللغة", lblAdminReset: "إعادة تعيين المسؤول", lblAdminResetDesc: "إعادة تعيين المتجر وجميع البيانات",
+                lblExecuteReset: "تنفيذ إعادة التعيين", boxIdPlaceholder: "امسح رقم الصندوق...", barcodePlaceholder: "امسح الباركود...",
+                remarkPlaceholder: "مثال: مخزون خريف وشتاء 2023", staffPlaceholder: "أدخل اسمك...",
+                selectPurpose: "-- اختر الغرض --", errEnterName: "الرجاء إدخال اسمك",
+                errSelectPurpose: "الرجاء اختيار الغرض", errEnterRemark: "الرجاء إدخال ملاحظة",
+                errBoxFirst: "امسح رقم الصندوق أولاً", errSameBox: "امسح نفس رقم الصندوق!", errCloseBoxFirst: "أغلق الصندوق أولاً!",
+                errBoxAlreadyClosed: "الصندوق مغلق بالفعل", msgAdminResetSuccess: "تمت إعادة تعيين المتجر بنجاح!",
+                msgInvalidAdminCode: "رمز المسؤول غير صالح."
+            }
+        };
+
+        function scannerT(key) { return ScannerT[ScannerState.language][key] || key; }
+
+        // ============================================
+        // BOX SCANNER - DATABASE
+        // ============================================
+        let scannerDB;
+        const SCANNER_DB_NAME = 'AKBoxScannerDB';
+        const SCANNER_STORE = 'scans';
+
+        function initScannerDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(SCANNER_DB_NAME, 1);
+                req.onerror = () => reject(req.error);
+                req.onsuccess = () => { scannerDB = req.result; resolve(scannerDB); };
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(SCANNER_STORE)) {
+                        db.createObjectStore(SCANNER_STORE, { keyPath: 'id', autoIncrement: true });
+                    }
+                };
+            });
+        }
+
+        async function addScan(scan) {
+            return new Promise((resolve, reject) => {
+                const tx = scannerDB.transaction([SCANNER_STORE], 'readwrite');
+                const store = tx.objectStore(SCANNER_STORE);
+                const req = store.add(scan);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        async function getAllScans() {
+            return new Promise((resolve, reject) => {
+                const tx = scannerDB.transaction([SCANNER_STORE], 'readonly');
+                const store = tx.objectStore(SCANNER_STORE);
+                const req = store.getAll();
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        async function updateScan(scan) {
+            return new Promise((resolve, reject) => {
+                const tx = scannerDB.transaction([SCANNER_STORE], 'readwrite');
+                const store = tx.objectStore(SCANNER_STORE);
+                const req = store.put(scan);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        async function deleteScanById(id) {
+            return new Promise((resolve, reject) => {
+                const tx = scannerDB.transaction([SCANNER_STORE], 'readwrite');
+                const store = tx.objectStore(SCANNER_STORE);
+                const req = store.delete(id);
+                req.onsuccess = () => resolve();
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        async function clearAllScans() {
+            return new Promise((resolve, reject) => {
+                const tx = scannerDB.transaction([SCANNER_STORE], 'readwrite');
+                const store = tx.objectStore(SCANNER_STORE);
+                const req = store.clear();
+                req.onsuccess = () => resolve();
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        // ============================================
+        // BOX SCANNER - SESSION PERSISTENCE
+        // ============================================
+        function saveScannerSession() {
+            Storage.setJSON('scanner_session', {
+                staffName: ScannerState.staffName,
+                purpose: ScannerState.purpose,
+                remark: ScannerState.remark,
+                currentBox: ScannerState.currentBox,
+                boxScanning: ScannerState.boxScanning,
+                language: ScannerState.language,
+                completedBoxes: Array.from(ScannerState.completedBoxes)
+            });
+        }
+
+        function loadScannerSession() {
+            const session = Storage.getJSON('scanner_session');
+            if (session) {
+                ScannerState.staffName = session.staffName || '';
+                ScannerState.purpose = session.purpose || '';
+                ScannerState.remark = session.remark || '';
+                ScannerState.currentBox = session.currentBox || null;
+                ScannerState.boxScanning = session.boxScanning || false;
+                ScannerState.language = session.language || 'en';
+                ScannerState.completedBoxes = new Set(session.completedBoxes || []);
+                return true;
+            }
+            return false;
+        }
+
+        function clearScannerSession() {
+            Storage.remove('scanner_session');
+            Storage.remove('active_session');
+            ScannerState.staffName = '';
+            ScannerState.purpose = '';
+            ScannerState.remark = '';
+            ScannerState.currentBox = null;
+            ScannerState.boxScanning = false;
+            ScannerState.scans = [];
+            ScannerState.completedBoxes = new Set();
+        }
+
+        // ============================================
+        // BOX SCANNER - UI HELPERS
+        // ============================================
+        function showScannerScreen(screenId) {
+            document.querySelectorAll('#boxScannerApp .scanner-screen').forEach(s => {
+                s.classList.remove('active');
+                s.style.display = 'none';
+            });
+            const targetScreen = document.getElementById(screenId);
+            if (targetScreen) {
+                targetScreen.classList.add('active');
+                targetScreen.style.display = 'block';
+            }
+        }
+
+        function applyScannerTranslations() {
+            const lang = ScannerT[ScannerState.language];
+            Object.keys(lang).forEach(key => {
+                const el = document.getElementById(key);
+                if (el && !el.matches('input, select')) el.textContent = lang[key];
+            });
+            document.getElementById('scannerStaffInput').placeholder = scannerT('staffPlaceholder');
+            document.getElementById('scannerRemarkInput').placeholder = scannerT('remarkPlaceholder');
+            document.getElementById('boxIdInput').placeholder = scannerT('boxIdPlaceholder');
+            document.getElementById('barcodeInput').placeholder = scannerT('barcodePlaceholder');
+            const purposeSelect = document.getElementById('scannerPurposeSelect');
+            if (purposeSelect.options[0]) purposeSelect.options[0].textContent = scannerT('selectPurpose');
+            document.body.classList.toggle('rtl', ScannerState.language === 'ar');
+            document.getElementById('langEnBtn').classList.toggle('active', ScannerState.language === 'en');
+            document.getElementById('langArBtn').classList.toggle('active', ScannerState.language === 'ar');
+            document.getElementById('settingsLangEnBtn').classList.toggle('active', ScannerState.language === 'en');
+            document.getElementById('settingsLangArBtn').classList.toggle('active', ScannerState.language === 'ar');
+        }
+
+        function setScannerLanguage(lang) {
+            ScannerState.language = lang;
+            applyScannerTranslations();
+            saveScannerSession();
+            updateScansTable();
+        }
+
+        // ============================================
+        // BOX SCANNER - SESSION MANAGEMENT
+        // ============================================
+        function startScannerSession() {
+            const staff = document.getElementById('scannerStaffInput').value.trim();
+            const purpose = document.getElementById('scannerPurposeSelect').value;
+            const remark = document.getElementById('scannerRemarkInput').value.trim();
+            
+            if (!staff) { alert(scannerT('errEnterName')); document.getElementById('scannerStaffInput').focus(); return; }
+            if (!purpose) { alert(scannerT('errSelectPurpose')); document.getElementById('scannerPurposeSelect').focus(); return; }
+            if (!remark) { alert(scannerT('errEnterRemark')); document.getElementById('scannerRemarkInput').focus(); return; }
+            
+            ScannerState.staffName = staff;
+            ScannerState.purpose = purpose;
+            ScannerState.remark = remark;
+            
+            setActiveSession('boxScanner', true);
+            saveScannerSession();
+            
+            document.getElementById('dispScannerStore').textContent = `${AppState.storeId} - ${AppState.storeName}`;
+            document.getElementById('dispScannerStaff').textContent = ScannerState.staffName;
+            
+            showScannerScreen('scannerScanScreen');
+            document.getElementById('boxIdInput').focus();
+            loadAndDisplayScans();
+            updateBackButton();
+        }
+
+        // ============================================
+        // BOX SCANNER - SCANNING LOGIC
+        // ============================================
+        function handleBoxIdScan(e) {
+            if (e.key !== 'Enter') return;
+            const boxId = document.getElementById('boxIdInput').value.trim();
+            if (!boxId) return;
+            
+            if (!ScannerState.boxScanning) {
+                if (ScannerState.completedBoxes.has(boxId)) {
+                    const boxQty = ScannerState.scans.filter(s => s.boxNumber === boxId).length;
+                    alert(scannerT('errBoxAlreadyClosed') + ' (' + boxQty + ' items)');
+                    document.getElementById('boxIdInput').value = '';
+                    return;
+                }
+                
+                ScannerState.currentBox = boxId;
+                ScannerState.boxScanning = true;
+                saveScannerSession();
+                
+                document.getElementById('boxIdGroup').classList.add('hidden');
+                document.getElementById('barcodeGroup').classList.remove('hidden');
+                document.getElementById('boxIdInput').value = '';
+                document.getElementById('closeBoxBtn').classList.add('show');
+                document.getElementById('closeBoxBtnId').textContent = boxId;
+                document.getElementById('barcodeInput').focus();
+                updateScannerStats();
+            } else {
+                document.getElementById('boxIdInput').value = '';
+            }
+        }
+
+        async function handleBarcodeScan(e) {
+            if (e.key !== 'Enter') return;
+            const barcode = document.getElementById('barcodeInput').value.trim();
+            if (!barcode) return;
+            
+            if (!ScannerState.boxScanning) {
+                alert(scannerT('errBoxFirst'));
+                document.getElementById('barcodeInput').value = '';
+                document.getElementById('boxIdInput').focus();
+                return;
+            }
+            
+            const scan = {
+                storeId: AppState.storeId,
+                storeName: AppState.storeName,
+                staffName: ScannerState.staffName,
+                purpose: ScannerState.purpose,
+                remark: ScannerState.remark,
+                boxNumber: String(ScannerState.currentBox),
+                barcode: String(barcode),
+                qty: 1,
+                boxStatus: 'Open',
+                timestamp: new Date().toISOString(),
+                synced: false
+            };
+            
+            await addScan(scan);
+            document.getElementById('barcodeInput').value = '';
+            document.getElementById('barcodeInput').classList.add('input-highlight');
+            setTimeout(() => document.getElementById('barcodeInput').classList.remove('input-highlight'), 500);
+            await loadAndDisplayScans();
+        }
+
+        // ============================================
+        // BOX SCANNER - CLOSE BOX
+        // ============================================
+        function showCloseBoxModal() {
+            const boxQty = ScannerState.scans.filter(s => s.boxNumber === ScannerState.currentBox).length;
+            document.getElementById('modalBoxId').textContent = ScannerState.currentBox;
+            document.getElementById('modalBoxQty').textContent = boxQty;
+            document.getElementById('closeBoxStep1').style.display = 'block';
+            document.getElementById('closeBoxStep2').style.display = 'none';
+            document.getElementById('closeBoxButtons1').style.display = 'flex';
+            document.getElementById('closeBoxButtons2').style.display = 'none';
+            document.getElementById('closeBoxScanInput').value = '';
+            document.getElementById('closeBoxModal').classList.add('active');
+        }
+
+        function closeBoxProceedToScan() {
+            document.getElementById('closeBoxStep1').style.display = 'none';
+            document.getElementById('closeBoxStep2').style.display = 'block';
+            document.getElementById('closeBoxButtons1').style.display = 'none';
+            document.getElementById('closeBoxButtons2').style.display = 'flex';
+            setTimeout(() => document.getElementById('closeBoxScanInput').focus(), 100);
+        }
+
+        function handleCloseBoxScan(e) {
+            if (e.key !== 'Enter') return;
+            const scannedId = document.getElementById('closeBoxScanInput').value.trim();
+            if (scannedId === ScannerState.currentBox) {
+                executeCloseBox();
+            } else {
+                alert(scannerT('errSameBox'));
+                document.getElementById('closeBoxScanInput').value = '';
+                document.getElementById('closeBoxScanInput').focus();
+            }
+        }
+
+        function cancelCloseBox() {
+            document.getElementById('closeBoxModal').classList.remove('active');
+            document.getElementById('closeBoxScanInput').value = '';
+            document.getElementById('barcodeInput').focus();
+        }
+
+        async function executeCloseBox() {
+            if (ScannerState.isProcessingClose) return;
+            ScannerState.isProcessingClose = true;
+            document.getElementById('closeBoxModal').classList.remove('active');
+            document.getElementById('closeBoxScanInput').value = '';
+            
+            try {
+                const closedBox = ScannerState.currentBox;
+                for (const scan of ScannerState.scans) {
+                    if (scan.boxNumber === closedBox && scan.boxStatus === 'Open') {
+                        scan.boxStatus = 'Closed';
+                        scan.synced = false;
+                        await updateScan(scan);
+                    }
+                }
+                if (ScannerState.currentBox) ScannerState.completedBoxes.add(ScannerState.currentBox);
+                ScannerState.currentBox = null;
+                ScannerState.boxScanning = false;
+                saveScannerSession();
+                
+                document.getElementById('boxIdGroup').classList.remove('hidden');
+                document.getElementById('barcodeGroup').classList.add('hidden');
+                document.getElementById('closeBoxBtn').classList.remove('show');
+                document.getElementById('closeBoxBtnId').textContent = '';
+                document.getElementById('boxIdInput').focus();
+                await loadAndDisplayScans();
+                updateScannerStats();
+                if (AppState.isOnline) await autoSyncScans();
+            } finally {
+                ScannerState.isProcessingClose = false;
+            }
+        }
+
+        // ============================================
+        // BOX SCANNER - DISPLAY & STATS
+        // ============================================
+        async function loadAndDisplayScans() {
+            ScannerState.scans = await getAllScans();
+            updateScannerStats();
+            updateScansTable();
+            updateSyncBadge();
+        }
+
+        function updateScannerStats() {
+            document.getElementById('statTotal').textContent = ScannerState.scans.length;
+            let boxQty = 0;
+            if (ScannerState.currentBox) {
+                boxQty = ScannerState.scans.filter(s => s.boxNumber === ScannerState.currentBox).length;
+            }
+            document.getElementById('statBoxQty').textContent = boxQty;
+            document.getElementById('statBoxes').textContent = ScannerState.completedBoxes.size;
+        }
+
+        function updateScansTable() {
+            const tbody = document.getElementById('scansTableBody');
+            tbody.innerHTML = '';
+            const currentBoxScans = ScannerState.scans.filter(s => s.boxNumber === ScannerState.currentBox && s.boxStatus === 'Open');
+            const recent = currentBoxScans.slice(-5).reverse();
+            
+            if (recent.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--ak-text-light);">No scans yet</td></tr>`;
+                return;
+            }
+            
+            recent.forEach(scan => {
+                const tr = document.createElement('tr');
+                const time = new Date(scan.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                tr.innerHTML = `<td>${scan.barcode}</td><td>${time}</td><td><button class="delete-scan-btn" data-id="${scan.id}" data-barcode="${scan.barcode}">✕</button></td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateSyncBadge() {
+            const pending = ScannerState.scans.filter(s => !s.synced && s.boxStatus === 'Closed').length;
+            const badge = document.getElementById('syncBadge');
+            if (pending === 0) {
+                badge.textContent = '✓';
+                badge.className = 'sync-badge synced';
+            } else {
+                badge.textContent = pending;
+                badge.className = 'sync-badge pending';
+            }
+        }
+
+        // ============================================
+        // BOX SCANNER - DELETE SCAN
+        // ============================================
+        function showDeleteModal(id, barcode) {
+            ScannerState.pendingDeleteId = id;
+            document.getElementById('deleteInfo').textContent = barcode;
+            document.getElementById('deleteModal').classList.add('active');
+        }
+
+        async function executeDeleteScan(confirmed) {
+            document.getElementById('deleteModal').classList.remove('active');
+            if (confirmed && ScannerState.pendingDeleteId) {
+                await deleteScanById(ScannerState.pendingDeleteId);
+                await loadAndDisplayScans();
+            }
+            ScannerState.pendingDeleteId = null;
+        }
+
+        // ============================================
+        // BOX SCANNER - GOOGLE SHEETS SYNC
+        // ============================================
+        async function postToGoogleSheets(action, data) {
+            if (!AppState.isOnline) return null;
+            try {
+                const response = await fetch(CONFIG.GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, ...data })
+                });
+                return { success: true };
+            } catch (e) {
+                console.error('Google Sheets post error:', e);
+                return null;
+            }
+        }
+
+        async function autoSyncScans() {
+            if (ScannerState.isSyncing) return;
+            ScannerState.isSyncing = true;
+            try {
+                const unsynced = ScannerState.scans.filter(s => !s.synced && s.boxStatus === 'Closed');
+                if (unsynced.length === 0) return;
+                const result = await postToGoogleSheets('addScans', { scans: unsynced });
+                if (result && result.success) {
+                    for (const scan of unsynced) {
+                        scan.synced = true;
+                        await updateScan(scan);
+                    }
+                    await loadAndDisplayScans();
+                    console.log('Auto-synced ' + unsynced.length + ' scans');
+                }
+            } catch (e) {
+                console.log('Auto-sync failed:', e);
+            } finally {
+                ScannerState.isSyncing = false;
+            }
+        }
+
+        // ============================================
+        // BOX SCANNER - DOWNLOAD EXCEL
+        // ============================================
+        async function downloadScannerExcel() {
+            if (ScannerState.boxScanning && ScannerState.currentBox) {
+                alert(scannerT('errCloseBoxFirst'));
+                return;
+            }
+            const scans = await getAllScans();
+            if (scans.length === 0) {
+                const data = [['Store ID', 'Store Name', 'Staff', 'Purpose', 'Remark', 'Box Number', 'Barcode', 'Qty', 'Box Status', 'Timestamp']];
+                const ws = XLSX.utils.aoa_to_sheet(data);
+                ws['!cols'] = [{wch:12},{wch:20},{wch:12},{wch:12},{wch:20},{wch:12},{wch:20},{wch:5},{wch:8},{wch:18}];
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Scans');
+                XLSX.writeFile(wb, `${AppState.storeId}_empty_${new Date().toISOString().slice(0,10)}.xlsx`);
+                return;
+            }
+            const data = scans.map(s => ({
+                'Store ID': s.storeId, 'Store Name': s.storeName, 'Staff': s.staffName, 'Purpose': s.purpose,
+                'Remark': s.remark, 'Box Number': s.boxNumber, 'Barcode': s.barcode, 'Qty': s.qty,
+                'Box Status': s.boxStatus || 'Open', 'Timestamp': new Date(s.timestamp).toLocaleString()
+            }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            ws['!cols'] = [{wch:12},{wch:20},{wch:12},{wch:12},{wch:20},{wch:12},{wch:20},{wch:5},{wch:8},{wch:18}];
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Scans');
+            XLSX.writeFile(wb, `${AppState.storeId}_${ScannerState.staffName}_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+
+        // ============================================
+        // BOX SCANNER - RESET SESSION
+        // ============================================
+        function showResetModal() {
+            if (ScannerState.boxScanning && ScannerState.currentBox) {
+                alert(scannerT('errCloseBoxFirst'));
+                return;
+            }
+            document.getElementById('resetModal').classList.add('active');
+        }
+
+        async function executeResetSession(confirmed) {
+            document.getElementById('resetModal').classList.remove('active');
+            if (confirmed) {
+                await downloadScannerExcel();
+                await clearAllScans();
+                clearScannerSession();
+                document.getElementById('scannerStaffInput').value = '';
+                document.getElementById('scannerPurposeSelect').value = '';
+                document.getElementById('scannerRemarkInput').value = '';
+                document.getElementById('boxIdInput').value = '';
+                document.getElementById('barcodeInput').value = '';
+                document.getElementById('barcodeGroup').classList.add('hidden');
+                document.getElementById('boxIdGroup').classList.remove('hidden');
+                document.getElementById('closeBoxBtn').classList.remove('show');
+                setActiveSession('boxScanner', false);
+                showScannerScreen('scannerSessionScreen');
+                updateBackButton();
+            }
+        }
+
+        // ============================================
+        // BOX SCANNER - ADMIN RESET
+        // ============================================
+        async function executeAdminReset() {
+            const code = document.getElementById('adminCodeInput').value;
+            if (code === CONFIG.ADMIN_CODE) {
+                Storage.remove('store_id');
+                Storage.remove('store_name');
+                Storage.remove('store_location');
+                clearScannerSession();
+                await clearAllScans();
+                AppState.storeId = '';
+                AppState.storeName = '';
+                AppState.storeLocation = '';
+                setActiveSession('boxScanner', false);
+                document.getElementById('scannerSettingsModal').classList.remove('active');
+                document.getElementById('adminCodeInput').value = '';
+                updateHeaderStore();
+                document.getElementById('storeIdInput').value = '';
+                document.getElementById('storeConfirmBox').style.display = 'none';
+                document.getElementById('lookupStoreBtn').style.display = 'block';
+                document.getElementById('loginError').classList.remove('show');
+                showScreen('loginScreen');
+                alert(scannerT('msgAdminResetSuccess'));
+            } else {
+                alert(scannerT('msgInvalidAdminCode'));
+            }
+        }
+
+        function openScannerSettings() {
+            document.getElementById('adminCodeInput').value = '';
+            document.getElementById('scannerSettingsModal').classList.add('active');
+        }
+
+        function closeScannerSettings() {
+            document.getElementById('scannerSettingsModal').classList.remove('active');
+        }
+
+        // ============================================
+        // BOX SCANNER - EVENT LISTENERS
+        // ============================================
+        function setupScannerEventListeners() {
+            document.getElementById('langEnBtn').addEventListener('click', () => setScannerLanguage('en'));
+            document.getElementById('langArBtn').addEventListener('click', () => setScannerLanguage('ar'));
+            document.getElementById('settingsLangEnBtn').addEventListener('click', () => setScannerLanguage('en'));
+            document.getElementById('settingsLangArBtn').addEventListener('click', () => setScannerLanguage('ar'));
+            document.getElementById('startSessionBtn').addEventListener('click', startScannerSession);
+            document.getElementById('boxIdInput').addEventListener('keypress', handleBoxIdScan);
+            document.getElementById('barcodeInput').addEventListener('keypress', handleBarcodeScan);
+            document.getElementById('closeBoxBtn').addEventListener('click', showCloseBoxModal);
+            document.getElementById('closeBoxYesBtn').addEventListener('click', closeBoxProceedToScan);
+            document.getElementById('closeBoxCancelBtn').addEventListener('click', cancelCloseBox);
+            document.getElementById('closeBoxBackBtn').addEventListener('click', cancelCloseBox);
+            document.getElementById('closeBoxScanInput').addEventListener('keypress', handleCloseBoxScan);
+            document.getElementById('scansTableBody').addEventListener('click', (e) => {
+                if (e.target.classList.contains('delete-scan-btn')) {
+                    showDeleteModal(parseInt(e.target.dataset.id), e.target.dataset.barcode);
+                }
+            });
+            document.getElementById('deleteYesBtn').addEventListener('click', () => executeDeleteScan(true));
+            document.getElementById('deleteNoBtn').addEventListener('click', () => executeDeleteScan(false));
+            document.getElementById('downloadBtn').addEventListener('click', downloadScannerExcel);
+            document.getElementById('resetSessionBtn').addEventListener('click', showResetModal);
+            document.getElementById('resetYesBtn').addEventListener('click', () => executeResetSession(true));
+            document.getElementById('resetNoBtn').addEventListener('click', () => executeResetSession(false));
+            document.getElementById('openScannerSettingsBtn').addEventListener('click', (e) => { e.preventDefault(); openScannerSettings(); });
+            document.getElementById('closeSettingsBtn').addEventListener('click', closeScannerSettings);
+            document.getElementById('adminResetBtn').addEventListener('click', executeAdminReset);
+        }
+
+        // ============================================
+        // BOX SCANNER - INITIALIZATION
+        // ============================================
+        async function initBoxScanner() {
+            await initScannerDB();
+            setupScannerEventListeners();
+            const hasSession = loadScannerSession();
+            applyScannerTranslations();
+            
+            if (hasSession && ScannerState.staffName && ScannerState.purpose && ScannerState.remark) {
+                document.getElementById('dispScannerStore').textContent = `${AppState.storeId} - ${AppState.storeName}`;
+                document.getElementById('dispScannerStaff').textContent = ScannerState.staffName;
+                setActiveSession('boxScanner', true);
+                if (ScannerState.boxScanning && ScannerState.currentBox) {
+                    document.getElementById('boxIdGroup').classList.add('hidden');
+                    document.getElementById('barcodeGroup').classList.remove('hidden');
+                    document.getElementById('closeBoxBtn').classList.add('show');
+                    document.getElementById('closeBoxBtnId').textContent = ScannerState.currentBox;
+                }
+                showScannerScreen('scannerScanScreen');
+                if (ScannerState.boxScanning) {
+                    document.getElementById('barcodeInput').focus();
+                } else {
+                    document.getElementById('boxIdInput').focus();
+                }
+                await loadAndDisplayScans();
+            } else {
+                showScannerScreen('scannerSessionScreen');
+            }
+            
+            setInterval(async () => {
+                if (AppState.isOnline && ScannerState.staffName) await autoSyncScans();
+            }, 10000);
+        }
+
+        // ============================================
+        // APP INITIALIZATION
+        // ============================================
+        function initializeApp(appId) {
+            switch (appId) {
+                case 'boxScanner': initBoxScanner(); break;
+                case 'itemBarcode': initItemBarcode(); break;
+                case 'boxCode': initBoxCode(); break;
+                case 'photoCapture': initPhotoCapture(); break;
+                case 'boxSegregate': initBoxSegregate(); break;
+            }
+        }
+
+// ============================================
+        // PRINT MODULES - SHARED STATE
+        // ============================================
+        const PrintState = {
+            settings: {
+                outputFormat: 'barcode',
+                barcodeType: 'numeric',
+                boxPrefix: 'RTO',
+                boxOutputFormat: 'barcode'
+            },
+            printMode: 'single',
+            csvData: [],
+            isProcessing: false
+        };
+
+        function loadPrintSettings() {
+            const saved = Storage.getJSON('print_settings');
+            if (saved) PrintState.settings = { ...PrintState.settings, ...saved };
+        }
+
+        function savePrintSettings() {
+            Storage.setJSON('print_settings', PrintState.settings);
+        }
+
+        // ============================================
+        // ITEM BARCODE - INITIALIZATION
+        // ============================================
+        function initItemBarcode() {
+            loadPrintSettings();
+            updateItemDisplaySettings();
+            setupItemBarcodeListeners();
+        }
+
+        function setupItemBarcodeListeners() {
+            // Mode toggle
+            document.getElementById('itemModeSingle').addEventListener('click', () => setItemPrintMode('single'));
+            document.getElementById('itemModeBulk').addEventListener('click', () => setItemPrintMode('bulk'));
+            
+            // Barcode input
+            document.getElementById('itemBarcodeInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleItemBarcodeEnter();
+            });
+            document.getElementById('itemBarcodeInput').addEventListener('input', updateItemPreview);
+            
+            // Quantity input
+            document.getElementById('itemQtyInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') printItemLabel();
+            });
+            
+            // CSV
+            document.getElementById('downloadTemplateBtn').addEventListener('click', downloadTemplate);
+            document.getElementById('uploadCsvBtn').addEventListener('click', () => document.getElementById('csvFileInput').click());
+            document.getElementById('csvFileInput').addEventListener('change', handleFileUpload);
+            document.getElementById('printCsvBtn').addEventListener('click', printFromCSV);
+            document.getElementById('cancelCsvBtn').addEventListener('click', cancelCSV);
+            
+            // Print button
+            document.getElementById('printItemBtn').addEventListener('click', printItemLabel);
+            
+            // Settings
+            document.getElementById('openItemSettingsBtn').addEventListener('click', openItemSettings);
+            document.getElementById('cancelItemSettingsBtn').addEventListener('click', closeItemSettings);
+            document.getElementById('saveItemSettingsBtn').addEventListener('click', saveItemSettings);
+            document.getElementById('testPrintBtn').addEventListener('click', testPrint);
+        }
+
+        function updateItemDisplaySettings() {
+            document.getElementById('itemDisplayMode').textContent = PrintState.settings.outputFormat === 'barcode' ? 'Barcode' : 'QR Code';
+            document.getElementById('itemDisplayType').textContent = PrintState.settings.barcodeType === 'numeric' ? 'Numeric' : 'Alphanumeric';
+        }
+
+        function setItemPrintMode(mode) {
+            PrintState.printMode = mode;
+            document.getElementById('itemModeSingle').classList.toggle('active', mode === 'single');
+            document.getElementById('itemModeBulk').classList.toggle('active', mode === 'bulk');
+            document.getElementById('itemQtyGroup').classList.toggle('show', mode === 'bulk');
+            document.getElementById('itemBarcodeInput').focus();
+        }
+
+        function handleItemBarcodeEnter() {
+            const input = document.getElementById('itemBarcodeInput').value.trim();
+            if (!input) return;
+            
+            if (input.includes(',')) {
+                const barcodes = input.split(',').map(b => b.trim()).filter(b => b);
+                if (barcodes.length > 0) {
+                    PrintState.csvData = barcodes.map(barcode => ({ barcode, qty: 1 }));
+                    showCSVPreview();
+                    return;
+                }
+            }
+            
+            if (PrintState.printMode === 'bulk') {
+                document.getElementById('itemQtyInput').focus();
+                document.getElementById('itemQtyInput').select();
+            } else {
+                printItemLabel();
+            }
+        }
+
+        function updateItemPreview() {
+            const input = document.getElementById('itemBarcodeInput').value.trim();
+            const previewArea = document.getElementById('itemPreviewArea');
+            
+            if (!input) {
+                previewArea.innerHTML = '<h4>Label Preview</h4><p style="color: var(--ak-text-light);">Scan a barcode to see preview</p>';
+                return;
+            }
+            
+            let barcode = input.includes(',') ? input.split(',')[0].trim() : input;
+            
+            previewArea.innerHTML = '<h4>Label Preview</h4><div class="preview-label" id="previewLabel"></div>';
+            
+            if (PrintState.settings.outputFormat === 'barcode') {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.id = 'previewBarcode';
+                document.getElementById('previewLabel').appendChild(svg);
+                try {
+                    const format = PrintState.settings.barcodeType === 'numeric' ? 'CODE128C' : 'CODE128B';
+                    JsBarcode('#previewBarcode', barcode, { format: format, width: 2, height: 60, displayValue: true, fontSize: 14, margin: 5 });
+                } catch (e) {
+                    JsBarcode('#previewBarcode', barcode, { format: 'CODE128', width: 2, height: 60, displayValue: true, fontSize: 14, margin: 5 });
+                }
+            } else {
+                const qrDiv = document.createElement('div');
+                qrDiv.id = 'previewQR';
+                document.getElementById('previewLabel').appendChild(qrDiv);
+                new QRCode(qrDiv, { text: barcode, width: 100, height: 100, colorDark: '#000000', colorLight: '#ffffff' });
+                const textDiv = document.createElement('div');
+                textDiv.className = 'barcode-text';
+                textDiv.textContent = barcode;
+                document.getElementById('previewLabel').appendChild(textDiv);
+            }
+        }
+
+        // ============================================
+        // ITEM BARCODE - PRINT FUNCTIONS
+        // ============================================
+        async function printItemLabel() {
+            if (PrintState.isProcessing) return;
+            
+            const barcode = document.getElementById('itemBarcodeInput').value.trim();
+            if (!barcode) {
+                showItemStatus('error', 'Please enter a barcode');
+                return;
+            }
+            
+            let qty = PrintState.printMode === 'bulk' ? parseInt(document.getElementById('itemQtyInput').value) || 1 : 1;
+            if (qty < 1) qty = 1;
+            if (qty > 200) qty = 200;
+            
+            PrintState.isProcessing = true;
+            showItemStatus('processing', `Generating ${qty} label(s)...`);
+            
+            try {
+                const printContainer = document.getElementById('printContainer');
+                printContainer.innerHTML = '';
+                
+                for (let i = 0; i < qty; i++) {
+                    const labelDiv = document.createElement('div');
+                    labelDiv.className = 'print-label';
+                    
+                    if (PrintState.settings.outputFormat === 'barcode') {
+                        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                        svg.id = `printBarcode_${i}`;
+                        labelDiv.appendChild(svg);
+                        printContainer.appendChild(labelDiv);
+                        try {
+                            const format = PrintState.settings.barcodeType === 'numeric' ? 'CODE128C' : 'CODE128B';
+                            JsBarcode(`#printBarcode_${i}`, barcode, { format: format, width: 2, height: 80, displayValue: true, fontSize: 16, margin: 5 });
+                        } catch (e) {
+                            JsBarcode(`#printBarcode_${i}`, barcode, { format: 'CODE128', width: 2, height: 80, displayValue: true, fontSize: 16, margin: 5 });
+                        }
+                    } else {
+                        const qrCanvas = await createQRWithText(barcode, 150);
+                        labelDiv.appendChild(qrCanvas);
+                        printContainer.appendChild(labelDiv);
+                    }
+                }
+                
+                await sleep(100);
+                window.print();
+                
+                showItemStatus('success', `✓ ${qty} label(s) sent to printer`);
+                document.getElementById('itemBarcodeInput').value = '';
+                document.getElementById('itemQtyInput').value = '1';
+                updateItemPreview();
+                
+                setTimeout(() => hideItemStatus(), 2000);
+            } catch (error) {
+                showItemStatus('error', `Error: ${error.message}`);
+                setTimeout(() => hideItemStatus(), 3000);
+            } finally {
+                PrintState.isProcessing = false;
+            }
+        }
+
+        // ============================================
+        // ITEM BARCODE - CSV FUNCTIONS
+        // ============================================
+        function downloadTemplate() {
+            const csvContent = "Barcode,Qty\n,,\n,,\n,,\n,,\n,,";
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'AK_Print_Template.csv';
+            link.click();
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => parseCSV(e.target.result);
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function parseCSV(content) {
+            const lines = content.split('\n').filter(line => line.trim());
+            PrintState.csvData = [];
+            for (let i = 1; i < lines.length; i++) {
+                const parts = lines[i].split(',');
+                const barcode = parts[0] ? parts[0].trim() : '';
+                const qty = parts[1] ? parseInt(parts[1].trim()) || 1 : 1;
+                if (barcode) PrintState.csvData.push({ barcode, qty });
+            }
+            if (PrintState.csvData.length === 0) {
+                showItemStatus('error', 'No valid barcodes found in CSV');
+                setTimeout(() => hideItemStatus(), 2000);
+                return;
+            }
+            showCSVPreview();
+        }
+
+        function showCSVPreview() {
+            const previewContent = document.getElementById('itemCsvPreviewContent');
+            const previewSummary = document.getElementById('itemCsvPreviewSummary');
+            let html = '';
+            const showCount = Math.min(PrintState.csvData.length, 10);
+            for (let i = 0; i < showCount; i++) {
+                html += `<div class="csv-preview-row">${PrintState.csvData[i].barcode} × ${PrintState.csvData[i].qty}</div>`;
+            }
+            if (PrintState.csvData.length > 10) html += `<div class="csv-preview-row">... and ${PrintState.csvData.length - 10} more</div>`;
+            previewContent.innerHTML = html;
+            const totalLabels = PrintState.csvData.reduce((sum, item) => sum + item.qty, 0);
+            previewSummary.textContent = `Total: ${PrintState.csvData.length} unique barcodes, ${totalLabels} labels`;
+            document.getElementById('itemCsvPreview').classList.add('show');
+        }
+
+        function cancelCSV() {
+            PrintState.csvData = [];
+            document.getElementById('itemCsvPreview').classList.remove('show');
+        }
+
+        async function printFromCSV() {
+            if (PrintState.isProcessing || PrintState.csvData.length === 0) return;
+            PrintState.isProcessing = true;
+            document.getElementById('itemCsvPreview').classList.remove('show');
+            const totalLabels = PrintState.csvData.reduce((sum, item) => sum + item.qty, 0);
+            
+            try {
+                showItemStatus('processing', `Generating ${totalLabels} labels...`);
+                const printContainer = document.getElementById('printContainer');
+                printContainer.innerHTML = '';
+                let labelCount = 0;
+                
+                for (const item of PrintState.csvData) {
+                    for (let q = 0; q < item.qty; q++) {
+                        const labelDiv = document.createElement('div');
+                        labelDiv.className = 'print-label';
+                        
+                        if (PrintState.settings.outputFormat === 'barcode') {
+                            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                            svg.id = `printBarcode_${labelCount}`;
+                            labelDiv.appendChild(svg);
+                            printContainer.appendChild(labelDiv);
+                            try {
+                                const format = PrintState.settings.barcodeType === 'numeric' ? 'CODE128C' : 'CODE128B';
+                                JsBarcode(`#printBarcode_${labelCount}`, item.barcode, { format: format, width: 2, height: 80, displayValue: true, fontSize: 16, margin: 5 });
+                            } catch (e) {
+                                JsBarcode(`#printBarcode_${labelCount}`, item.barcode, { format: 'CODE128', width: 2, height: 80, displayValue: true, fontSize: 16, margin: 5 });
+                            }
+                        } else {
+                            const qrCanvas = await createQRWithText(item.barcode, 150);
+                            labelDiv.appendChild(qrCanvas);
+                            printContainer.appendChild(labelDiv);
+                        }
+                        labelCount++;
+                    }
+                }
+                
+                await sleep(100);
+                window.print();
+                showItemStatus('success', `✓ ${totalLabels} labels sent to printer`);
+                PrintState.csvData = [];
+                setTimeout(() => hideItemStatus(), 2000);
+            } catch (error) {
+                showItemStatus('error', `Error: ${error.message}`);
+                setTimeout(() => hideItemStatus(), 3000);
+            } finally {
+                PrintState.isProcessing = false;
+            }
+        }
+
+        // ============================================
+        // ITEM BARCODE - SETTINGS
+        // ============================================
+        function openItemSettings() {
+            document.getElementById('settingOutputFormat').value = PrintState.settings.outputFormat;
+            document.getElementById('settingBarcodeType').value = PrintState.settings.barcodeType;
+            document.getElementById('itemSettingsModal').classList.add('active');
+        }
+
+        function closeItemSettings() {
+            document.getElementById('itemSettingsModal').classList.remove('active');
+        }
+
+        function saveItemSettings() {
+            PrintState.settings.outputFormat = document.getElementById('settingOutputFormat').value;
+            PrintState.settings.barcodeType = document.getElementById('settingBarcodeType').value;
+            savePrintSettings();
+            updateItemDisplaySettings();
+            closeItemSettings();
+            updateItemPreview();
+        }
+
+        async function testPrint() {
+            const printContainer = document.getElementById('printContainer');
+            printContainer.innerHTML = '';
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'print-label';
+            
+            if (PrintState.settings.outputFormat === 'barcode') {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.id = 'testBarcode';
+                labelDiv.appendChild(svg);
+                printContainer.appendChild(labelDiv);
+                JsBarcode('#testBarcode', 'TEST-12345', { format: 'CODE128', width: 2, height: 80, displayValue: true, fontSize: 16, margin: 10 });
+            } else {
+                const qrCanvas = await createQRWithText('TEST-12345', 150);
+                labelDiv.appendChild(qrCanvas);
+                printContainer.appendChild(labelDiv);
+            }
+            
+            setTimeout(() => window.print(), 200);
+        }
+
+        function showItemStatus(type, message) {
+            const container = document.getElementById('itemStatus');
+            container.className = `print-status show ${type}`;
+            document.getElementById('itemStatusText').textContent = message;
+        }
+
+        function hideItemStatus() {
+            document.getElementById('itemStatus').classList.remove('show');
+        }
+
+        // ============================================
+        // BOX CODE - INITIALIZATION
+        // ============================================
+        function initBoxCode() {
+            loadPrintSettings();
+            updateBoxDisplaySettings();
+            setupBoxCodeListeners();
+        }
+
+        function setupBoxCodeListeners() {
+            document.getElementById('trnInput').addEventListener('input', updateBoxPreview);
+            document.getElementById('boxStartFrom').addEventListener('input', updateBoxPreview);
+            document.getElementById('boxQtyInput').addEventListener('input', updateBoxPreview);
+            
+            document.getElementById('trnInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') document.getElementById('boxStartFrom').focus();
+            });
+            document.getElementById('boxStartFrom').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') document.getElementById('boxQtyInput').focus();
+            });
+            document.getElementById('boxQtyInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') printBoxLabels();
+            });
+            
+            document.getElementById('printBoxBtn').addEventListener('click', printBoxLabels);
+            document.getElementById('openBoxSettingsBtn').addEventListener('click', openBoxSettings);
+            document.getElementById('cancelBoxSettingsBtn').addEventListener('click', closeBoxSettings);
+            document.getElementById('saveBoxSettingsBtn').addEventListener('click', saveBoxSettings);
+        }
+
+        function updateBoxDisplaySettings() {
+            document.getElementById('boxDisplayPrefix').textContent = PrintState.settings.boxPrefix || 'RTO';
+            document.getElementById('boxDisplayMode').textContent = PrintState.settings.boxOutputFormat === 'barcode' ? 'Barcode' : 'QR Code';
+        }
+
+        function updateBoxPreview() {
+            const trn = document.getElementById('trnInput').value.trim();
+            const previewArea = document.getElementById('boxPreviewArea');
+            
+            if (!trn) {
+                previewArea.innerHTML = '<h4>First Label Preview</h4><p style="color: var(--ak-text-light);">Enter TRN to see preview</p>';
+                return;
+            }
+            
+            const startFrom = parseInt(document.getElementById('boxStartFrom').value) || 1;
+            const prefix = PrintState.settings.boxPrefix;
+            const code1 = prefix ? `${prefix}-${trn}-${String(startFrom).padStart(2, '0')}` : `${trn}-${String(startFrom).padStart(2, '0')}`;
+            
+            previewArea.innerHTML = '<h4>First Label Preview</h4><div class="preview-label" id="boxPreviewLabel"></div>';
+            
+            if (PrintState.settings.boxOutputFormat === 'barcode') {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.id = 'boxPreviewBarcode';
+                document.getElementById('boxPreviewLabel').appendChild(svg);
+                try {
+                    JsBarcode('#boxPreviewBarcode', code1, { format: 'CODE128', width: 2, height: 60, displayValue: true, fontSize: 12, margin: 5 });
+                } catch (e) {
+                    console.error('Barcode error:', e);
+                }
+            } else {
+                const qrDiv = document.createElement('div');
+                qrDiv.id = 'boxPreviewQR';
+                document.getElementById('boxPreviewLabel').appendChild(qrDiv);
+                new QRCode(qrDiv, { text: code1, width: 100, height: 100, colorDark: '#000000', colorLight: '#ffffff' });
+                const textDiv = document.createElement('div');
+                textDiv.className = 'barcode-text';
+                textDiv.textContent = code1;
+                document.getElementById('boxPreviewLabel').appendChild(textDiv);
+            }
+        }
+
+        // ============================================
+        // BOX CODE - PRINT FUNCTION
+        // ============================================
+        async function printBoxLabels() {
+            if (PrintState.isProcessing) return;
+            
+            const trn = document.getElementById('trnInput').value.trim();
+            if (!trn) {
+                showBoxStatus('error', 'Please enter a TRN number');
+                setTimeout(() => hideBoxStatus(), 2000);
+                return;
+            }
+            
+            let startFrom = parseInt(document.getElementById('boxStartFrom').value) || 1;
+            if (startFrom < 1) startFrom = 1;
+            let qty = parseInt(document.getElementById('boxQtyInput').value) || 1;
+            if (qty < 1) qty = 1;
+            if (qty > 100) qty = 100;
+            
+            const prefix = PrintState.settings.boxPrefix;
+            const physicalLabels = Math.ceil(qty / 2);
+            
+            PrintState.isProcessing = true;
+            showBoxStatus('processing', `Generating ${qty} codes on ${physicalLabels} label(s)...`);
+            
+            try {
+                const printContainer = document.getElementById('printContainer');
+                printContainer.innerHTML = '';
+                
+                for (let i = 0; i < qty; i += 2) {
+                    const num1 = startFrom + i;
+                    const code1 = prefix ? `${prefix}-${trn}-${String(num1).padStart(2, '0')}` : `${trn}-${String(num1).padStart(2, '0')}`;
+                    let code2 = null;
+                    if (i + 1 < qty) {
+                        const num2 = startFrom + i + 1;
+                        code2 = prefix ? `${prefix}-${trn}-${String(num2).padStart(2, '0')}` : `${trn}-${String(num2).padStart(2, '0')}`;
+                    }
+                    
+                    const labelDiv = document.createElement('div');
+                    labelDiv.className = 'print-label';
+                    
+                    if (PrintState.settings.boxOutputFormat === 'barcode') {
+                        const canvas = await createDoubleBoxBarcode(code1, code2);
+                        labelDiv.appendChild(canvas);
+                    } else {
+                        const canvas = await createDoubleBoxQR(code1, code2, 180);
+                        labelDiv.appendChild(canvas);
+                    }
+                    
+                    printContainer.appendChild(labelDiv);
+                    await sleep(10);
+                }
+                
+                await sleep(100);
+                window.print();
+                
+                showBoxStatus('success', `✓ ${qty} codes on ${physicalLabels} label(s) sent to printer`);
+                document.getElementById('trnInput').value = '';
+                document.getElementById('boxStartFrom').value = '1';
+                document.getElementById('boxQtyInput').value = '1';
+                updateBoxPreview();
+                
+                setTimeout(() => {
+                    hideBoxStatus();
+                    document.getElementById('trnInput').focus();
+                }, 2000);
+            } catch (error) {
+                showBoxStatus('error', `Error: ${error.message}`);
+                setTimeout(() => hideBoxStatus(), 3000);
+            } finally {
+                PrintState.isProcessing = false;
+            }
+        }
+
+        // ============================================
+        // BOX CODE - CANVAS FUNCTIONS (4x6 inch labels)
+        // ============================================
+        function createDoubleBoxBarcode(text1, text2) {
+            return new Promise((resolve) => {
+                const padding = 20;
+                const barcodeHeight = 100;
+                const fontSize = 28;
+                const textHeight = fontSize + 10;
+                const lineHeight = 2;
+                const sectionHeight = barcodeHeight + textHeight + lineHeight + 30;
+                
+                const tempSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                tempSvg.id = 'tempBarcode';
+                tempSvg.style.position = 'absolute';
+                tempSvg.style.left = '-9999px';
+                document.body.appendChild(tempSvg);
+                
+                JsBarcode('#tempBarcode', text1, { format: 'CODE128', width: 3, height: barcodeHeight, displayValue: false, margin: 0 });
+                
+                const barcodeWidth = tempSvg.getBBox().width;
+                document.body.removeChild(tempSvg);
+                
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.font = `bold ${fontSize}px Arial`;
+                const textWidth1 = tempCtx.measureText(text1).width;
+                const textWidth2 = text2 ? tempCtx.measureText(text2).width : 0;
+                const maxTextWidth = Math.max(textWidth1, textWidth2);
+                
+                const canvasWidth = Math.max(barcodeWidth, maxTextWidth) + (padding * 2);
+                const labelHeight = 576;
+                const canvasHeight = text2 ? labelHeight : sectionHeight + padding;
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = canvasWidth;
+                canvas.height = canvasHeight;
+                canvas.style.display = 'block';
+                canvas.style.margin = '0 auto';
+                
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const svg1 = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg1.id = 'barcode1';
+                svg1.style.position = 'absolute';
+                svg1.style.left = '-9999px';
+                document.body.appendChild(svg1);
+                
+                JsBarcode('#barcode1', text1, { format: 'CODE128', width: 3, height: barcodeHeight, displayValue: false, margin: 0 });
+                
+                const svgData1 = new XMLSerializer().serializeToString(svg1);
+                const img1 = new Image();
+                
+                img1.onload = function() {
+                    const barcodeX = (canvasWidth - barcodeWidth) / 2;
+                    ctx.drawImage(img1, barcodeX, padding);
+                    
+                    const line1Y = padding + barcodeHeight + 15;
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = lineHeight;
+                    ctx.beginPath();
+                    ctx.moveTo(padding, line1Y);
+                    ctx.lineTo(canvasWidth - padding, line1Y);
+                    ctx.stroke();
+                    
+                    const text1Y = line1Y + fontSize + 5;
+                    ctx.fillStyle = '#000000';
+                    ctx.font = `bold ${fontSize}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.fillText(text1, canvasWidth / 2, text1Y);
+                    
+                    document.body.removeChild(svg1);
+                    
+                    if (text2) {
+                        const svg2 = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                        svg2.id = 'barcode2';
+                        svg2.style.position = 'absolute';
+                        svg2.style.left = '-9999px';
+                        document.body.appendChild(svg2);
+                        
+                        JsBarcode('#barcode2', text2, { format: 'CODE128', width: 3, height: barcodeHeight, displayValue: false, margin: 0 });
+                        
+                        const svgData2 = new XMLSerializer().serializeToString(svg2);
+                        const img2 = new Image();
+                        
+                        img2.onload = function() {
+                            const section2Start = canvasHeight - sectionHeight - padding;
+                            ctx.drawImage(img2, barcodeX, section2Start);
+                            
+                            const line2Y = section2Start + barcodeHeight + 15;
+                            ctx.beginPath();
+                            ctx.moveTo(padding, line2Y);
+                            ctx.lineTo(canvasWidth - padding, line2Y);
+                            ctx.stroke();
+                            
+                            const text2Y = line2Y + fontSize + 5;
+                            ctx.fillText(text2, canvasWidth / 2, text2Y);
+                            
+                            document.body.removeChild(svg2);
+                            resolve(canvas);
+                        };
+                        
+                        img2.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData2)));
+                    } else {
+                        resolve(canvas);
+                    }
+                };
+                
+                img1.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData1)));
+            });
+        }
+
+        function createDoubleBoxQR(text1, text2, qrSize) {
+            return new Promise((resolve) => {
+                const tempDiv1 = document.createElement('div');
+                tempDiv1.style.position = 'absolute';
+                tempDiv1.style.left = '-9999px';
+                document.body.appendChild(tempDiv1);
+                
+                const tempDiv2 = document.createElement('div');
+                tempDiv2.style.position = 'absolute';
+                tempDiv2.style.left = '-9999px';
+                document.body.appendChild(tempDiv2);
+                
+                new QRCode(tempDiv1, { text: text1, width: qrSize, height: qrSize, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+                
+                if (text2) {
+                    new QRCode(tempDiv2, { text: text2, width: qrSize, height: qrSize, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+                }
+                
+                setTimeout(() => {
+                    const qrImg1 = tempDiv1.querySelector('img') || tempDiv1.querySelector('canvas');
+                    const qrImg2 = text2 ? (tempDiv2.querySelector('img') || tempDiv2.querySelector('canvas')) : null;
+                    
+                    const fontSize = 32;
+                    const padding = 20;
+                    const lineHeight = 2;
+                    const textHeight = fontSize + 15;
+                    const sectionHeight = qrSize + padding + lineHeight + textHeight;
+                    
+                    const tempCanvas = document.createElement('canvas');
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.font = `bold ${fontSize}px Arial`;
+                    const textWidth1 = tempCtx.measureText(text1).width;
+                    const textWidth2 = text2 ? tempCtx.measureText(text2).width : 0;
+                    const maxTextWidth = Math.max(textWidth1, textWidth2);
+                    
+                    const canvasWidth = Math.max(qrSize, maxTextWidth) + (padding * 2);
+                    const labelHeight = 558;
+                    const canvasHeight = text2 ? labelHeight : sectionHeight + padding;
+                    
+                    const canvas = document.createElement('canvas');
+                    canvas.width = canvasWidth;
+                    canvas.height = canvasHeight;
+                    canvas.style.display = 'block';
+                    canvas.style.margin = '0 auto';
+                    
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    const qrX = (canvasWidth - qrSize) / 2;
+                    if (qrImg1) {
+                        ctx.drawImage(qrImg1, qrX, padding, qrSize, qrSize);
+                    }
+                    
+                    const line1Y = padding + qrSize + 10;
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = lineHeight;
+                    ctx.beginPath();
+                    ctx.moveTo(padding, line1Y);
+                    ctx.lineTo(canvasWidth - padding, line1Y);
+                    ctx.stroke();
+                    
+                    const text1Y = line1Y + fontSize + 10;
+                    ctx.fillStyle = '#000000';
+                    ctx.font = `bold ${fontSize}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.fillText(text1, canvasWidth / 2, text1Y);
+                    
+                    if (text2 && qrImg2) {
+                        const section2Start = canvasHeight - sectionHeight - padding;
+                        ctx.drawImage(qrImg2, qrX, section2Start, qrSize, qrSize);
+                        
+                        const line2Y = section2Start + qrSize + 10;
+                        ctx.beginPath();
+                        ctx.moveTo(padding, line2Y);
+                        ctx.lineTo(canvasWidth - padding, line2Y);
+                        ctx.stroke();
+                        
+                        const text2Y = line2Y + fontSize + 10;
+                        ctx.fillText(text2, canvasWidth / 2, text2Y);
+                    }
+                    
+                    document.body.removeChild(tempDiv1);
+                    document.body.removeChild(tempDiv2);
+                    resolve(canvas);
+                }, 200);
+            });
+        }
+
+        // ============================================
+        // BOX CODE - SETTINGS
+        // ============================================
+        function openBoxSettings() {
+            document.getElementById('settingBoxOutputFormat').value = PrintState.settings.boxOutputFormat;
+            document.getElementById('settingBoxPrefix').value = PrintState.settings.boxPrefix;
+            document.getElementById('boxSettingsModal').classList.add('active');
+        }
+
+        function closeBoxSettings() {
+            document.getElementById('boxSettingsModal').classList.remove('active');
+        }
+
+        function saveBoxSettings() {
+            PrintState.settings.boxOutputFormat = document.getElementById('settingBoxOutputFormat').value;
+            PrintState.settings.boxPrefix = document.getElementById('settingBoxPrefix').value.trim();
+            savePrintSettings();
+            updateBoxDisplaySettings();
+            closeBoxSettings();
+            updateBoxPreview();
+        }
+
+        function showBoxStatus(type, message) {
+            const container = document.getElementById('boxStatus');
+            container.className = `print-status show ${type}`;
+            document.getElementById('boxStatusText').textContent = message;
+        }
+
+        function hideBoxStatus() {
+            document.getElementById('boxStatus').classList.remove('show');
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+// ============================================
+        // PHOTO CAPTURE APP
+        // ============================================
+        
+        const PhotoState = {
+            mode: 'single',
+            photos: [],
+            skuCounts: {},
+            stream: null,
+            downloadType: 'session'
+        };
+        
+        function initPhotoCapture() {
+            loadPhotoSettings();
+            updatePhotoDisplay();
+            startCamera();
+            
+            document.getElementById('skuInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    capturePhoto();
+                }
+            });
+            
+            document.getElementById('downloadType').addEventListener('change', function() {
+                PhotoState.downloadType = this.value;
+                savePhotoSettings();
+            });
+        }
+        
+        function loadPhotoSettings() {
+            const saved = localStorage.getItem('aku_photo_settings');
+            if (saved) {
+                const settings = JSON.parse(saved);
+                PhotoState.mode = settings.mode || 'single';
+                PhotoState.downloadType = settings.downloadType || 'session';
+            }
+            
+            document.getElementById('downloadType').value = PhotoState.downloadType;
+            updateModeUI();
+        }
+        
+        function savePhotoSettings() {
+            localStorage.setItem('aku_photo_settings', JSON.stringify({
+                mode: PhotoState.mode,
+                downloadType: PhotoState.downloadType
+            }));
+        }
+        
+        function setPhotoMode(mode) {
+            PhotoState.mode = mode;
+            updateModeUI();
+            savePhotoSettings();
+        }
+        
+        function updateModeUI() {
+            document.getElementById('singleModeBtn').classList.toggle('active', PhotoState.mode === 'single');
+            document.getElementById('multiModeBtn').classList.toggle('active', PhotoState.mode === 'multi');
+            
+            const hint = document.getElementById('skuHint');
+            if (PhotoState.mode === 'single') {
+                hint.textContent = 'Single mode: 1 photo per SKU';
+            } else {
+                hint.textContent = 'Multi mode: up to 8 photos per SKU (_1, _2, _3...)';
+            }
+            
+            updateSkuPhotoCount();
+        }
+        
+        async function startCamera() {
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }
+                };
+                
+                PhotoState.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = document.getElementById('cameraVideo');
+                video.srcObject = PhotoState.stream;
+            } catch (error) {
+                console.error('Camera error:', error);
+                alert('Unable to access camera. Please ensure camera permissions are granted.');
+            }
+        }
+        
+        function stopCamera() {
+            if (PhotoState.stream) {
+                PhotoState.stream.getTracks().forEach(track => track.stop());
+                PhotoState.stream = null;
+            }
+        }
+        
+        function updateSkuPhotoCount() {
+            const sku = document.getElementById('skuInput').value.trim();
+            const count = PhotoState.skuCounts[sku] || 0;
+            document.getElementById('skuPhotoCount').textContent = count;
+        }
+function capturePhoto() {
+            const sku = document.getElementById('skuInput').value.trim();
+            
+            if (!sku) {
+                alert('Please enter a SKU first');
+                document.getElementById('skuInput').focus();
+                return;
+            }
+            
+            if (!/^\d+$/.test(sku)) {
+                alert('SKU must be numeric only');
+                document.getElementById('skuInput').focus();
+                return;
+            }
+            
+            const currentCount = PhotoState.skuCounts[sku] || 0;
+            
+            if (PhotoState.mode === 'single' && currentCount >= 1) {
+                alert('SKU already captured. Switch to Multi mode for multiple photos.');
+                return;
+            }
+            
+            if (PhotoState.mode === 'multi' && currentCount >= 8) {
+                alert('Maximum 8 photos per SKU reached.');
+                return;
+            }
+            
+            const video = document.getElementById('cameraVideo');
+            const canvas = document.getElementById('cameraCanvas');
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            const imageData = canvas.toDataURL('image/jpeg', 0.95);
+            
+            let fileName;
+            if (PhotoState.mode === 'single') {
+                fileName = `${sku}.jpg`;
+            } else {
+                const photoNum = currentCount + 1;
+                fileName = `${sku}_${photoNum}.jpg`;
+            }
+            
+            const photo = {
+                sku: sku,
+                fileName: fileName,
+                data: imageData,
+                timestamp: new Date().toISOString()
+            };
+            
+            PhotoState.photos.push(photo);
+            PhotoState.skuCounts[sku] = currentCount + 1;
+            
+            updateSkuPhotoCount();
+            updatePhotoDisplay();
+            updatePhotoStats();
+            
+            if (PhotoState.mode === 'single') {
+                document.getElementById('skuInput').value = '';
+                document.getElementById('skuInput').focus();
+            }
+        }
+        
+        function updatePhotoDisplay() {
+            const grid = document.getElementById('photoGrid');
+            
+            if (PhotoState.photos.length === 0) {
+                grid.innerHTML = '<p style="color: var(--ak-text-light); text-align: center; grid-column: 1/-1; padding: 20px;">No photos captured yet</p>';
+                return;
+            }
+            
+            grid.innerHTML = PhotoState.photos.map((photo, index) => `
+                <div class="photo-thumb">
+                    <img src="${photo.data}" alt="${photo.fileName}">
+                    <button class="delete-photo" onclick="deletePhoto(${index})">×</button>
+                    <div class="photo-name">${photo.fileName}</div>
+                </div>
+            `).join('');
+        }
+        
+        function updatePhotoStats() {
+            const uniqueSkus = Object.keys(PhotoState.skuCounts).length;
+            const totalPhotos = PhotoState.photos.length;
+            
+            let totalSize = 0;
+            PhotoState.photos.forEach(photo => {
+                const base64Length = photo.data.length - 'data:image/jpeg;base64,'.length;
+                totalSize += (base64Length * 0.75);
+            });
+            
+            const sizeMB = (totalSize / (1024 * 1024)).toFixed(1);
+            
+            document.getElementById('totalSkus').textContent = uniqueSkus;
+            document.getElementById('totalPhotos').textContent = totalPhotos;
+            document.getElementById('sessionSize').textContent = `${sizeMB} MB`;
+        }
+        
+        function deletePhoto(index) {
+            const photo = PhotoState.photos[index];
+            const sku = photo.sku;
+            
+            PhotoState.photos.splice(index, 1);
+            PhotoState.skuCounts[sku]--;
+            
+            if (PhotoState.skuCounts[sku] <= 0) {
+                delete PhotoState.skuCounts[sku];
+            }
+            
+            updateSkuPhotoCount();
+            updatePhotoDisplay();
+            updatePhotoStats();
+        }
+        
+        function clearPhotoSession() {
+            if (PhotoState.photos.length === 0) return;
+            
+            if (!confirm('Clear all captured photos?')) return;
+            
+            PhotoState.photos = [];
+            PhotoState.skuCounts = {};
+            
+            document.getElementById('skuInput').value = '';
+            updateSkuPhotoCount();
+            updatePhotoDisplay();
+            updatePhotoStats();
+        }
+        
+        async function downloadPhotos() {
+            if (PhotoState.photos.length === 0) {
+                alert('No photos to download');
+                return;
+            }
+            
+            const downloadType = document.getElementById('downloadType').value;
+            
+            if (downloadType === 'session') {
+                await downloadAsSessionZip();
+            } else {
+                await downloadAsSkuZips();
+            }
+        }
+        
+        async function downloadAsSessionZip() {
+            const zip = new JSZip();
+            
+            PhotoState.photos.forEach(photo => {
+                const base64Data = photo.data.split(',')[1];
+                zip.file(photo.fileName, base64Data, { base64: true });
+            });
+            
+            const content = await zip.generateAsync({ type: 'blob' });
+            const timestamp = new Date().toISOString().slice(0, 10);
+            const fileName = `photos_${timestamp}.zip`;
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = fileName;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+        
+        async function downloadAsSkuZips() {
+            const skuGroups = {};
+            
+            PhotoState.photos.forEach(photo => {
+                if (!skuGroups[photo.sku]) {
+                    skuGroups[photo.sku] = [];
+                }
+                skuGroups[photo.sku].push(photo);
+            });
+            
+            for (const sku in skuGroups) {
+                const zip = new JSZip();
+                
+                skuGroups[sku].forEach(photo => {
+                    const base64Data = photo.data.split(',')[1];
+                    zip.file(photo.fileName, base64Data, { base64: true });
+                });
+                
+                const content = await zip.generateAsync({ type: 'blob' });
+                const fileName = `${sku}.zip`;
+                
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(content);
+                link.download = fileName;
+                link.click();
+                URL.revokeObjectURL(link.href);
+                
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+        function createQRWithText(text, size) {
+            return new Promise((resolve) => {
+                const tempDiv = document.createElement('div');
+                tempDiv.style.position = 'absolute';
+                tempDiv.style.left = '-9999px';
+                document.body.appendChild(tempDiv);
+
+                new QRCode(tempDiv, {
+                    text: text,
+                    width: size,
+                    height: size,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+
+                setTimeout(() => {
+                    const qrImg = tempDiv.querySelector('img') || tempDiv.querySelector('canvas');
+                    
+                    const canvas = document.createElement('canvas');
+                    const padding = 10;
+                    const textHeight = 30;
+                    canvas.width = size + (padding * 2);
+                    canvas.height = size + textHeight + (padding * 2);
+                    canvas.style.display = 'block';
+                    canvas.style.margin = '0 auto';
+                    
+                    const ctx = canvas.getContext('2d');
+                    
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    if (qrImg) {
+                        ctx.drawImage(qrImg, padding, padding, size, size);
+                    }
+                    
+                    const maxTextWidth = canvas.width - (padding * 2);
+                    let fontSize = 14;
+                    const minFontSize = 8;
+                    
+                    ctx.fillStyle = '#000000';
+                    ctx.font = `bold ${fontSize}px Courier New`;
+                    
+                    while (ctx.measureText(text).width > maxTextWidth && fontSize > minFontSize) {
+                        fontSize--;
+                        ctx.font = `bold ${fontSize}px Courier New`;
+                    }
+                    
+                    ctx.textAlign = 'center';
+                    ctx.fillText(text, canvas.width / 2, size + padding + 20);
+                    
+                    document.body.removeChild(tempDiv);
+                    resolve(canvas);
+                }, 150);
+            });
+        }
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+        function setupEventListeners() {
+            document.getElementById('storeIdInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') lookupStore(); });
+            document.getElementById('lookupStoreBtn').addEventListener('click', lookupStore);
+            document.getElementById('confirmYesBtn').addEventListener('click', () => confirmStore(true));
+            document.getElementById('confirmNoBtn').addEventListener('click', () => confirmStore(false));
+            document.getElementById('appBackBtn').addEventListener('click', goToHome);
+            document.getElementById('goToSessionBtn').addEventListener('click', () => { if (AppState.activeSessionApp) openApp(AppState.activeSessionApp); });
+        }
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        async function initApp() {
+            updateOnlineStatus();
+            setupEventListeners();
+            const storedStoreId = Storage.get('store_id');
+            if (storedStoreId) {
+                AppState.storeId = storedStoreId;
+                AppState.storeName = Storage.get('store_name') || '';
+                AppState.storeLocation = Storage.get('store_location') || '';
+                updateHeaderStore();
+                checkExistingSession();
+                showScreen('homeScreen');
+                renderAppGrid();
+            } else {
+                showScreen('loginScreen');
+            }
+        }
+
+        // ============================================
+        // BOX SEGREGATE MODULE
+        // ============================================
+        const BS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQuSptPsV8PGAdrNKzrrQJN4l_PKOoqrrYTZ7Wf6wJXFcH5YOKCRWnyzmXvQ44d_fo1uWrWwD-a7oep/pub?gid=244472051&single=true&output=csv';
+        const BS_DATA_KEY  = 'segregate_data';
+        const BS_TS_KEY    = 'segregate_ts';
+
+        let bsMap = new Map();
+        let bsListenerAdded = false;
+        let bsHtml5Qr = null;
+        let bsCameraActive = false;
+
+        function initBoxSegregate() {
+            buildBsMap(Storage.getJSON(BS_DATA_KEY) || []);
+            updateBsTimestamp();
+
+            if (!bsListenerAdded) {
+                const input = document.getElementById('bsBarcodeInput');
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') { e.preventDefault(); lookupSegregateBox(); resetBsKeyboard(); }
+                });
+                input.addEventListener('blur', resetBsKeyboard);
+                bsListenerAdded = true;
+            }
+
+            if (navigator.onLine) refreshBsFromSheets(true);
+            setTimeout(() => document.getElementById('bsBarcodeInput').focus(), 150);
+        }
+
+        function toggleBsKeyboard() {
+            const input = document.getElementById('bsBarcodeInput');
+            const btn = document.getElementById('bsKbdBtn');
+            input.removeAttribute('readonly');
+            input.inputMode = 'text';
+            input.classList.add('bs-kbd-active');
+            btn.classList.add('active');
+            input.focus();
+        }
+
+        function resetBsKeyboard() {
+            const input = document.getElementById('bsBarcodeInput');
+            const btn = document.getElementById('bsKbdBtn');
+            input.inputMode = 'none';
+            input.classList.remove('bs-kbd-active');
+            if (btn) btn.classList.remove('active');
+        }
+
+        async function toggleBsCamera() {
+            if (bsCameraActive) { stopBsCamera(); return; }
+            if (typeof Html5Qrcode === 'undefined') {
+                alert('Scanner library not loaded yet — please wait a moment and try again.');
+                return;
+            }
+            const camBtn = document.getElementById('bsCamBtn');
+            camBtn.classList.add('active');
+            camBtn.textContent = '✕';
+            document.getElementById('bsCamOverlay').style.display = 'block';
+            bsCameraActive = true;
+
+            try {
+                bsHtml5Qr = new Html5Qrcode('bsQrReader');
+                await bsHtml5Qr.start(
+                    { facingMode: 'environment' },
+                    { fps: 10, qrbox: { width: 240, height: 120 } },
+                    function(decodedText) {
+                        document.getElementById('bsBarcodeInput').value = decodedText;
+                        stopBsCamera();
+                        lookupSegregateBox();
+                    }
+                );
+            } catch (err) {
+                alert('Camera error: ' + err);
+                stopBsCamera();
+            }
+        }
+
+        async function stopBsCamera() {
+            if (bsHtml5Qr) {
+                try { await bsHtml5Qr.stop(); bsHtml5Qr.clear(); } catch(e) {}
+                bsHtml5Qr = null;
+            }
+            bsCameraActive = false;
+            document.getElementById('bsCamOverlay').style.display = 'none';
+            const camBtn = document.getElementById('bsCamBtn');
+            if (camBtn) { camBtn.classList.remove('active'); camBtn.textContent = '📷'; }
+        }
+
+        function buildBsMap(rows) {
+            bsMap = new Map();
+            rows.forEach(r => {
+                const key = String(r.Box_Number || '').toLowerCase().trim();
+                if (key) bsMap.set(key, r);
+            });
+        }
+
+        function lookupSegregateBox() {
+            const input = document.getElementById('bsBarcodeInput');
+            const barcode = input.value.trim();
+            if (!barcode) return;
+            const row = bsMap.get(barcode.toLowerCase());
+            if (row) showBsResult(row); else showBsNotFound(barcode);
+            input.select();
+        }
+
+        function showBsResult(row) {
+            const fields = [
+                { label: 'TRN',              value: row.TRN },
+                { label: 'Increff Order ID', value: row.Increff_OrderID },
+                { label: 'Store Name',       value: row.Store_Name },
+                { label: 'Region',           value: row.Region },
+                { label: 'Store Code',       value: row.Store_Code },
+                { label: 'Brand',            value: row.Brand }
+            ];
+            document.getElementById('bsResultCard').innerHTML =
+                `<div class="bs-result-title">📦 ${escapeHtml(row.Box_Number || '')}</div>` +
+                fields.map(f =>
+                    `<div class="bs-field">
+                        <span class="bs-label">${f.label}</span>
+                        <span class="bs-value${!f.value ? ' empty' : ''}">${f.value ? escapeHtml(String(f.value)) : '—'}</span>
+                    </div>`
+                ).join('');
+            document.getElementById('bsResultCard').style.display = 'block';
+            document.getElementById('bsNotFound').style.display = 'none';
+        }
+
+        function showBsNotFound(barcode) {
+            document.getElementById('bsNotFound').innerHTML =
+                `❌ Box not found<span>${escapeHtml(barcode)}</span>`;
+            document.getElementById('bsNotFound').style.display = 'block';
+            document.getElementById('bsResultCard').style.display = 'none';
+        }
+
+        async function refreshBsFromSheets(silent = false) {
+            if (!navigator.onLine) { if (!silent) alert('You are offline. Using cached data.'); return; }
+            const btn = document.getElementById('bsRefreshBtn');
+            if (btn) { btn.textContent = '⏳ Syncing...'; btn.disabled = true; }
+            try {
+                const resp = await fetch(BS_SHEET_URL);
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const rows = parseBsCsv(await resp.text());
+                Storage.setJSON(BS_DATA_KEY, rows);
+                Storage.set(BS_TS_KEY, new Date().toLocaleString());
+                buildBsMap(rows);
+                updateBsTimestamp();
+                if (!silent) alert('✅ Synced — ' + rows.length + ' boxes loaded.');
+            } catch (err) {
+                if (!silent) {
+                    const isLocal = location.protocol === 'file:';
+                    alert(isLocal
+                        ? 'Sync blocked — browser blocks Google Sheets when opening as a local file.\nDeploy to Netlify and it will work automatically.'
+                        : 'Sync failed: ' + err.message);
+                }
+            } finally {
+                if (btn) { btn.textContent = '↻ Sync Data'; btn.disabled = false; }
+            }
+        }
+
+        function parseBsCsv(text) {
+            const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+            if (lines.length < 2) return [];
+            const headers = parseBsCsvLine(lines[0]).map(h =>
+                h.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '')
+            );
+            const rows = [];
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                const vals = parseBsCsvLine(line);
+                const obj = {};
+                headers.forEach((h, idx) => { obj[h] = (vals[idx] || '').trim(); });
+                if (obj.Box_Number) rows.push(obj);
+            }
+            return rows;
+        }
+
+        function parseBsCsvLine(line) {
+            const result = [];
+            let cur = '', inQuote = false;
+            for (let i = 0; i < line.length; i++) {
+                const ch = line[i];
+                if (ch === '"') {
+                    if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
+                    else { inQuote = !inQuote; }
+                } else if (ch === ',' && !inQuote) {
+                    result.push(cur); cur = '';
+                } else { cur += ch; }
+            }
+            result.push(cur);
+            return result;
+        }
+
+        function updateBsTimestamp() {
+            const ts = Storage.get(BS_TS_KEY);
+            const count = (Storage.getJSON(BS_DATA_KEY) || []).length;
+            const el = document.getElementById('bsTimestamp');
+            if (!el) return;
+            if (ts) { el.innerHTML = count + ' boxes<br>' + ts; }
+            else { el.textContent = count ? count + ' cached' : 'No data'; }
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>

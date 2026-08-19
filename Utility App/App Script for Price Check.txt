@@ -1,0 +1,163 @@
+// =============================================
+// AK PRICE CHECK / YEAR-SEASON - GOOGLE APPS SCRIPT (v2)
+// =============================================
+//
+// The dedupKey logic here was already correct - this sheet does NOT duplicate.
+// v2 is a SPEED fix only:
+//   - read only the dedupKey column instead of the entire YSScans sheet
+//   - one batched write instead of appendRow() per item
+//   - flush before releasing the lock (the old code could lose rows)
+//   - shorter lock wait so the client's 45s timeout is never the thing that fires
+//
+// This matters because slow writes make every device queue behind the lock, and a
+// client that times out resends - which is exactly how the Box Scanner sheet ended
+// up with duplicates. Keeping this fast keeps that from starting here.
+//
+// AFTER PASTING: Deploy > Manage deployments > edit > New version > Deploy.
+// =============================================
+
+var SS_ID = '1lI4oXU5Riy6XzhqLq_eV9vc8XaAY0EMj-BNGCpVuG9k';
+var YS_COLUMNS = 15;          // 14 data columns + dedupKey
+var YS_DEDUP_COL = 15;        // column O
+var LOCK_WAIT_MS = 20000;     // must stay well under the client's 45s timeout
+
+function doGet(e) {
+  try {
+    var action = e.parameter.action;
+    var ss = SpreadsheetApp.openById(SS_ID);
+
+    if (action === 'getItemMaster') {
+      var sheet = ss.getSheetByName('ItemMaster');
+      var data  = sheet.getDataRange().getValues();
+      var headers = data[0];
+      var rows = data.slice(1)
+        .filter(function(r) { return r[0]; })
+        .map(function(r) {
+          var obj = {};
+          headers.forEach(function(h, i) { obj[h] = r[i]; });
+          return obj;
+        });
+      return jsonOut({ success: true, data: rows });
+    }
+
+    if (action === 'getHUConfig') {
+      var sheet = ss.getSheetByName('HUConfig');
+      var data  = sheet.getDataRange().getValues();
+      var headers = data[0];
+      var rows = data.slice(1)
+        .filter(function(r) { return r[0]; })
+        .map(function(r) {
+          var obj = {};
+          headers.forEach(function(h, i) { obj[h] = r[i]; });
+          return obj;
+        });
+      return jsonOut({ success: true, data: rows });
+    }
+
+    return jsonOut({ success: false, error: 'Unknown action' });
+  } catch(err) {
+    return jsonOut({ success: false, error: err.message });
+  }
+}
+
+function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+
+    if (data.action === 'getPriceCsv') {
+      var ss     = SpreadsheetApp.openById(SS_ID);
+      var sheet  = ss.getSheetByName('Sheet1');
+      var values = sheet.getDataRange().getValues();
+      var csv = values.map(function(row) {
+        return row.map(function(cell) {
+          var s = String(cell);
+          if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1) {
+            return '"' + s.replace(/"/g, '""') + '"';
+          }
+          return s;
+        }).join(',');
+      }).join('\n');
+      return ContentService.createTextOutput(csv)
+        .setMimeType(ContentService.MimeType.TEXT);
+    }
+
+    if (data.action === 'addYSScans') {
+      var lock = LockService.getScriptLock();
+      var haveLock = lock.tryLock(LOCK_WAIT_MS);
+      if (!haveLock) {
+        // Say plainly that this is worth retrying rather than looking like a data error.
+        return jsonOut({ success: false, retryable: true, error: 'Server busy, try again' });
+      }
+      try {
+        var ss    = SpreadsheetApp.openById(SS_ID);
+        var sheet = ss.getSheetByName('YSScans');
+
+        // Read ONLY the dedupKey column. The old code read every column of every row
+        // on every single write, which gets slower as the sheet grows.
+        var lastRow = sheet.getLastRow();
+        var existingKeys = {};
+        if (lastRow > 1) {
+          var keyValues = sheet.getRange(2, YS_DEDUP_COL, lastRow - 1, 1).getValues();
+          for (var i = 0; i < keyValues.length; i++) {
+            var existingKey = keyValues[i][0];
+            if (existingKey !== '' && existingKey !== null) existingKeys[String(existingKey)] = true;
+          }
+        }
+
+        var scans = data.scans || [];
+        var rows = [];
+        var acceptedKeys = [];
+        var skipped = 0;
+
+        scans.forEach(function(s) {
+          var key = s.dedupKey
+            ? s.dedupKey
+            : (s.storeId + '_' + s.ptlNumber + '_' + s.boxBarcode + '_' + s.barcode + '_' + s.scanTimestamp);
+          if (existingKeys[key]) {
+            // Already written by an earlier attempt. Confirm it so the client stops
+            // resending, but do not write it again.
+            skipped++;
+            acceptedKeys.push(key);
+            return;
+          }
+          existingKeys[key] = true;
+          acceptedKeys.push(key);
+          rows.push([
+            s.storeId, s.storeName, s.staffName, s.purpose, s.remark,
+            s.ptlNumber, s.season, s.year, s.brand,
+            s.barcode, s.qty || 1, s.boxBarcode, s.boxStatus, s.scanTimestamp,
+            key
+          ]);
+        });
+
+        if (rows.length > 0) {
+          // One batched write instead of one API round-trip per item.
+          sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, YS_COLUMNS).setValues(rows);
+        }
+
+        return jsonOut({
+          success: true,
+          added: rows.length,      // kept for the existing client
+          written: rows.length,
+          skipped: skipped,
+          acceptedKeys: acceptedKeys
+        });
+      } finally {
+        // Sheet writes are buffered. Without this flush the lock can be released before
+        // the rows land, letting the next execution read a stale getLastRow() and
+        // overwrite them. That silently LOSES scans.
+        try { SpreadsheetApp.flush(); } catch (flushErr) {}
+        lock.releaseLock();
+      }
+    }
+
+    return jsonOut({ success: false, error: 'Unknown action' });
+  } catch(err) {
+    return jsonOut({ success: false, error: err.message });
+  }
+}
+
+function jsonOut(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}

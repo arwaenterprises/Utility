@@ -1,0 +1,322 @@
+// =============================================
+// AK BOX SCANNER - GOOGLE APPS SCRIPT (v5)
+// =============================================
+//
+// COLUMNS: StoreID | StoreName | Staff | Purpose | Remark | BoxNumber | Barcode | Qty | BoxStatus | Timestamp | ScanUID
+//                                                                                                                ^^^^^^^
+//                                                                                        NEW in v5 - column 11
+//
+// WHY v5:
+// The tablet gives up waiting after a while and resends the batch. Under load this
+// script can take longer than that to REPLY even though it already wrote the rows,
+// so the resent batch used to be appended a second time - the duplicate rows.
+// Every scan now carries a ScanUID. We skip any UID already in the sheet, so a
+// resend writes nothing. Retrying is now harmless.
+//
+// SETUP AFTER PASTING:
+//   1. Save, then Deploy > Manage deployments > edit > New version > Deploy.
+//      (Editing the code alone does NOT update the live /exec URL.)
+//   2. Put "ScanUID" in cell K1 of the Scans sheet. ensureScanUidColumn() also
+//      does this automatically on the first write.
+//
+// =============================================
+
+var SCAN_COLUMNS = 11;          // 10 data columns + ScanUID
+var SCAN_UID_COL = 11;          // column K
+var LOCK_WAIT_MS = 20000;       // must stay well under the client's 45s timeout
+
+function doGet(e) {
+  var action = e.parameter.action;
+  var storeId = e.parameter.storeId;
+
+  if (action === 'getStore') {
+    return getStore(storeId);
+  }
+
+  if (action === 'ping') {
+    return jsonResponse({ success: true, message: 'API is working!', version: 'v5' });
+  }
+
+  return jsonResponse({ success: false, error: 'Invalid action' });
+}
+
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  var haveLock = false;
+  try {
+    haveLock = lock.tryLock(LOCK_WAIT_MS);
+    if (!haveLock) {
+      // Tell the client this is worth retrying rather than looking like a data error.
+      return jsonResponse({ success: false, retryable: true, error: 'Server busy, try again' });
+    }
+
+    var data = JSON.parse(e.postData.contents);
+    if (data.action === 'addScans') {
+      return addScans(data.scans);
+    }
+    return jsonResponse({ success: false, error: 'Invalid action' });
+  } catch (err) {
+    return jsonResponse({ success: false, error: err.toString() });
+  } finally {
+    if (haveLock) {
+      // Sheet writes are buffered. Without this flush the lock can be released before
+      // the rows actually land, letting the next execution read a stale getLastRow()
+      // and overwrite them. That silently LOSES scans.
+      try { SpreadsheetApp.flush(); } catch (flushErr) {}
+      lock.releaseLock();
+    }
+  }
+}
+
+function getStore(storeId) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Stores');
+  var data = sheet.getDataRange().getValues();
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] && data[i][0].toString().toUpperCase() === storeId.toUpperCase()) {
+      return jsonResponse({
+        success: true,
+        store: {
+          storeId: data[i][0].toString(),
+          storeName: data[i][1].toString(),
+          location: data[i][2].toString()
+        }
+      });
+    }
+  }
+  return jsonResponse({ success: false, error: 'Store not found' });
+}
+
+// Adds the ScanUID header once, so an existing sheet upgrades itself.
+function ensureScanUidColumn(sheet) {
+  if (sheet.getMaxColumns() < SCAN_COLUMNS) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), SCAN_COLUMNS - sheet.getMaxColumns());
+  }
+  if (String(sheet.getRange(1, SCAN_UID_COL).getValue()).trim() === '') {
+    sheet.getRange(1, SCAN_UID_COL).setValue('ScanUID');
+  }
+}
+
+// Reads ONLY the ScanUID column, never the whole sheet. Reading every column on
+// every write is what makes these scripts crawl as the sheet grows.
+function readExistingUids(sheet) {
+  var lastRow = sheet.getLastRow();
+  var seen = {};
+  if (lastRow < 2) return seen;
+
+  var values = sheet.getRange(2, SCAN_UID_COL, lastRow - 1, 1).getValues();
+  for (var i = 0; i < values.length; i++) {
+    var uid = values[i][0];
+    if (uid !== '' && uid !== null) seen[String(uid)] = true;
+  }
+  return seen;
+}
+
+function addScans(scans) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Scans');
+  ensureScanUidColumn(sheet);
+
+  scans = scans || [];
+  var seen = readExistingUids(sheet);
+
+  var rows = [];
+  var acceptedUids = [];   // everything the sheet now holds, whether we just wrote it or not
+  var skipped = 0;
+
+  for (var i = 0; i < scans.length; i++) {
+    var scan = scans[i];
+    var uid = String(scan.scanUid || '');
+
+    if (uid === '') {
+      // A tablet still running the OLD cached app sends no ID. Write the row anyway
+      // with a server-made ID - never drop it. Such a row cannot be protected from
+      // duplication (there is nothing stable to match on), but silently discarding a
+      // real scan would be far worse. This clears itself once every tablet reloads.
+      uid = Utilities.getUuid();
+    }
+
+    if (seen[uid]) {
+      // Already written by an earlier attempt of this same batch. Confirm it to the
+      // client so it stops resending, but do not write it again.
+      skipped++;
+      acceptedUids.push(uid);
+      continue;
+    }
+
+    seen[uid] = true;   // guards against the same UID appearing twice within one payload
+    acceptedUids.push(uid);
+    rows.push([
+      scan.storeId || '',
+      scan.storeName || '',
+      scan.staffName || '',
+      scan.purpose || '',
+      scan.remark || '',
+      scan.boxNumber || '',
+      String(scan.barcode || ''),
+      scan.qty || 1,
+      scan.boxStatus || 'Open',
+      scan.timestamp || new Date().toISOString(),
+      uid
+    ]);
+  }
+
+  if (rows.length > 0) {
+    // One batched write, not appendRow in a loop.
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, SCAN_COLUMNS).setValues(rows);
+  }
+
+  return jsonResponse({
+    success: true,
+    count: rows.length,      // kept for older clients
+    written: rows.length,
+    skipped: skipped,
+    acceptedUids: acceptedUids
+  });
+}
+
+function jsonResponse(data) {
+  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// =============================================
+// ONE-OFF CLEANUP OF EXISTING DUPLICATES
+// =============================================
+// Run these THREE FUNCTIONS IN ORDER from the Apps Script editor (Run button).
+// Nothing is deleted until you have looked at the review sheet and run step 3.
+//
+// IMPORTANT - why we match on the timestamp and not just the barcode:
+// Scanning two identical items into the same box is REAL data and must be kept.
+// Only rows sharing Barcode + Box + Timestamp down to the millisecond can be a
+// replay, because a person cannot scan twice in the same millisecond.
+// =============================================
+
+// STEP 1 - always run this first.
+function backupScansSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Scans');
+  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmm');
+  var copy = sheet.copyTo(ss);
+  copy.setName('Scans_backup_' + stamp);
+  SpreadsheetApp.getUi().alert('Backup created: ' + copy.getName());
+}
+
+// STEP 2 - finds duplicates and lists them. CHANGES NOTHING.
+function findDuplicates() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Scans');
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  var values = sheet.getRange(2, 1, lastRow - 1, 10).getValues();
+  var groups = {};
+
+  for (var i = 0; i < values.length; i++) {
+    var r = values[i];
+    var box = String(r[5]);
+    var barcode = String(r[6]);
+    var ts = r[9] instanceof Date ? r[9].toISOString() : String(r[9]);
+    var key = box + '|' + barcode + '|' + ts;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(i + 2);  // sheet row number
+  }
+
+  var out = [['Box', 'Barcode', 'Timestamp', 'Copies', 'Keep row', 'Delete rows']];
+  var totalExtra = 0;
+
+  for (var k in groups) {
+    var rowsForKey = groups[k];
+    if (rowsForKey.length < 2) continue;
+    var parts = k.split('|');
+    totalExtra += rowsForKey.length - 1;
+    out.push([
+      parts[0], parts[1], parts[2],
+      rowsForKey.length,
+      rowsForKey[0],
+      rowsForKey.slice(1).join(', ')
+    ]);
+  }
+
+  var review = ss.getSheetByName('_DuplicateReview');
+  if (review) review.clear(); else review = ss.insertSheet('_DuplicateReview');
+  review.getRange(1, 1, out.length, 6).setValues(out);
+  review.getRange(1, 1, 1, 6).setFontWeight('bold');
+  review.autoResizeColumns(1, 6);
+
+  SpreadsheetApp.getUi().alert(
+    'Found ' + (out.length - 1) + ' duplicated groups, ' + totalExtra + ' extra rows.\n\n' +
+    'Check the _DuplicateReview sheet. Nothing has been deleted.\n' +
+    'If it looks right, run removeConfirmedDuplicates().'
+  );
+}
+
+// STEP 3 - only after you have reviewed _DuplicateReview and taken a backup.
+// Deletes bottom-up so row numbers stay valid, keeps the first copy of each group,
+// and fills in ScanUID on the surviving rows.
+function removeConfirmedDuplicates() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  var review = ss.getSheetByName('_DuplicateReview');
+  if (!review) {
+    ui.alert('Run findDuplicates() first.');
+    return;
+  }
+
+  var answer = ui.alert(
+    'Delete duplicate rows?',
+    'This permanently deletes the rows listed in _DuplicateReview. ' +
+    'Have you run backupScansSheet()?',
+    ui.ButtonSet.YES_NO
+  );
+  if (answer !== ui.Button.YES) return;
+
+  var sheet = ss.getSheetByName('Scans');
+  var reviewLast = review.getLastRow();
+  var toDelete = [];
+
+  for (var i = 2; i <= reviewLast; i++) {
+    var cell = String(review.getRange(i, 6).getValue());
+    if (!cell) continue;
+    cell.split(',').forEach(function (n) {
+      var num = parseInt(n.trim(), 10);
+      if (!isNaN(num)) toDelete.push(num);
+    });
+  }
+
+  toDelete.sort(function (a, b) { return b - a; });   // bottom-up
+  for (var j = 0; j < toDelete.length; j++) {
+    sheet.deleteRow(toDelete[j]);
+  }
+  SpreadsheetApp.flush();
+
+  var filled = backfillScanUids();
+  ui.alert('Deleted ' + toDelete.length + ' duplicate rows.\nFilled ScanUID on ' + filled + ' rows.');
+}
+
+// Gives historical rows a ScanUID so the dedup check covers them too.
+function backfillScanUids() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Scans');
+  ensureScanUidColumn(sheet);
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 0;
+
+  var range = sheet.getRange(2, SCAN_UID_COL, lastRow - 1, 1);
+  var values = range.getValues();
+  var filled = 0;
+
+  for (var i = 0; i < values.length; i++) {
+    if (String(values[i][0]).trim() === '') {
+      values[i][0] = Utilities.getUuid();
+      filled++;
+    }
+  }
+
+  if (filled > 0) {
+    range.setValues(values);
+    SpreadsheetApp.flush();
+  }
+  return filled;
+}
