@@ -220,11 +220,39 @@ function setupEventListeners() {
 }
 
 // ============================================
+// SERVICE WORKER
+// ============================================
+// Registers sw.js so every browser/tablet checks for and picks up the latest
+// deployed files, with an offline fallback to the last-known-good copy.
+function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+
+    // A controller already present means an earlier visit's service worker is
+    // running this page. If that flips to a different one later, it's a real
+    // update. On a first-ever visit there's no controller yet, so a claim
+    // right after install isn't an update - don't reload for that one.
+    const hadController = !!navigator.serviceWorker.controller;
+
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch((err) => console.error('SW registration failed:', err));
+    });
+
+    let swRefreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!hadController) return;
+        if (swRefreshing) return;
+        swRefreshing = true;
+        window.location.reload();
+    });
+}
+
+// ============================================
 // INITIALIZATION
 // ============================================
 async function initApp() {
     updateOnlineStatus();
     setupEventListeners();
+    registerServiceWorker();
     const storedStoreId = Storage.get('store_id');
     if (storedStoreId) {
         AppState.storeId = storedStoreId;
