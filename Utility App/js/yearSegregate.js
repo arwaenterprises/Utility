@@ -3,7 +3,6 @@
 // ============================================
 var YSState = {
     staffName: '',
-    purpose: '',
     remark: '',
     inputMode: 'Nu',
     huStates: [],
@@ -153,7 +152,6 @@ async function ysCloseBoxScans(ptlNumber, boxBarcode) {
 function saveYsSession() {
     Storage.setJSON('ys_session', {
         staffName: YSState.staffName,
-        purpose: YSState.purpose,
         remark: YSState.remark,
         inputMode: YSState.inputMode
     });
@@ -164,7 +162,6 @@ function loadYsSession() {
     const session = Storage.getJSON('ys_session');
     if (session && session.staffName) {
         YSState.staffName = session.staffName;
-        YSState.purpose = session.purpose || '';
         YSState.remark = session.remark || '';
         YSState.inputMode = session.inputMode || 'AlNu';
         return true;
@@ -184,7 +181,6 @@ function clearYsSession() {
     Storage.remove('ys_hu_states');
     Storage.remove('active_session');
     YSState.staffName = '';
-    YSState.purpose = '';
     YSState.remark = '';
     YSState.huStates = [];
     YSState.scanStep = 'item';
@@ -574,7 +570,6 @@ async function handleBoxBarcodeScan(barcode) {
         storeId: AppState.storeId,
         storeName: AppState.storeName,
         staffName: YSState.staffName,
-        purpose: YSState.purpose,
         remark: YSState.remark,
         ptlNumber: hu.ptlNumber,
         season: normaliseSeason(hu.season),
@@ -765,7 +760,7 @@ async function ysRunAutoSync() {
 async function ysDownloadExcel() {
     const scans = await ysDbGetAll(YS_SCANS_STORE);
     const headers = [
-        'Store ID', 'Store Name', 'Staff', 'Purpose', 'Remark',
+        'Store ID', 'Store Name', 'Staff', 'Remark',
         'PTL Number', 'Season', 'Year', 'Brand',
         'Barcode', 'Qty', 'Box Barcode', 'Box Status', 'Scan Timestamp'
     ];
@@ -782,7 +777,6 @@ async function ysDownloadExcel() {
         'Store ID': s.storeId,
         'Store Name': s.storeName,
         'Staff': s.staffName,
-        'Purpose': s.purpose,
         'Remark': s.remark,
         'PTL Number': s.ptlNumber,
         'Season': s.season,
@@ -1217,15 +1211,12 @@ function ysToggleKeyboard() {
 // ============================================
 async function ysStartSession() {
     const staff = document.getElementById('ysStaffInput').value.trim();
-    const purpose = document.getElementById('ysPurposeSelect').value;
     const remark = document.getElementById('ysRemarkInput').value.trim();
 
     if (!staff) { alert('Please enter your name.'); document.getElementById('ysStaffInput').focus(); return; }
-    if (!purpose) { alert('Please select a purpose.'); document.getElementById('ysPurposeSelect').focus(); return; }
     if (!remark) { alert('Please enter a remark.'); document.getElementById('ysRemarkInput').focus(); return; }
 
     YSState.staffName = staff;
-    YSState.purpose = purpose;
     YSState.remark = remark;
 
     // Show sync status
