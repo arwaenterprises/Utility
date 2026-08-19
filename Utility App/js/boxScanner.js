@@ -7,7 +7,7 @@ const ScannerState = {
     currentBox: null,
     boxScanning: false,
     language: 'en',
-    inputMode: 'AlNu',
+    inputMode: 'Nu',
     uniqueMode: false,
     scans: [],
     pendingDeleteId: null,
@@ -45,7 +45,9 @@ const ScannerT = {
         errModeLockedDuringBox: "Close the current box before changing Nu/AlNu mode",
         errDuplicateBarcode: "This barcode was already scanned in this box",
         errUniqueLockedDuringBox: "Close the current box before changing the No Dup setting",
-        lblUniqueToggle: "No Dup"
+        lblUniqueToggle: "No Dup",
+        lblModeNu: "Nu",
+        lblModeAlphanumeric: "Alphanumeric"
     },
     ar: {
         lblStaffName: "اسمك", lblRemark: "ملاحظة", lblStartSession: "بدء الجلسة",
@@ -65,7 +67,9 @@ const ScannerT = {
         errModeLockedDuringBox: "أغلق الصندوق الحالي قبل تغيير وضع Nu/AlNu",
         errDuplicateBarcode: "تم مسح هذا الباركود مسبقًا في هذا الصندوق",
         errUniqueLockedDuringBox: "أغلق الصندوق الحالي قبل تغيير إعداد منع التكرار",
-        lblUniqueToggle: "بدون تكرار"
+        lblUniqueToggle: "بدون تكرار",
+        lblModeNu: "أرقام",
+        lblModeAlphanumeric: "أرقام وحروف"
     }
 };
 
@@ -179,7 +183,7 @@ function loadScannerSession() {
         ScannerState.currentBox = session.currentBox || null;
         ScannerState.boxScanning = session.boxScanning || false;
         ScannerState.language = session.language || 'en';
-        ScannerState.inputMode = session.inputMode || 'AlNu';
+        ScannerState.inputMode = session.inputMode || 'Nu';
         ScannerState.uniqueMode = session.uniqueMode || false;
         ScannerState.completedBoxes = new Set(session.completedBoxes || []);
         return true;
@@ -224,9 +228,9 @@ function applyScannerTranslations() {
     document.getElementById('boxIdInput').placeholder = scannerT('boxIdPlaceholder');
     document.getElementById('barcodeInput').placeholder = scannerT('barcodePlaceholder');
     document.body.classList.toggle('rtl', ScannerState.language === 'ar');
-    document.getElementById('modeNuBtn').checked = ScannerState.inputMode === 'Nu';
-    document.getElementById('modeAlNuBtn').checked = ScannerState.inputMode === 'AlNu';
-    document.getElementById('modeRadioToggle').classList.toggle('locked', ScannerState.boxScanning);
+    document.getElementById('modeToggleBtn').checked = ScannerState.inputMode === 'AlNu';
+    document.getElementById('modeToggleLabel').textContent = ScannerState.inputMode === 'AlNu' ? scannerT('lblModeAlphanumeric') : scannerT('lblModeNu');
+    document.getElementById('modeToggleWrap').classList.toggle('locked', ScannerState.boxScanning);
     document.getElementById('uniqueToggleBtn').checked = ScannerState.uniqueMode;
     document.getElementById('uniqueToggleWrap').classList.toggle('locked', ScannerState.boxScanning);
     document.getElementById('langEnBtn').classList.toggle('active', ScannerState.language === 'en');
@@ -244,8 +248,8 @@ function setScannerLanguage(lang) {
 
 function setScannerInputMode(mode) {
     ScannerState.inputMode = mode;
-    document.getElementById('modeNuBtn').checked = mode === 'Nu';
-    document.getElementById('modeAlNuBtn').checked = mode === 'AlNu';
+    document.getElementById('modeToggleBtn').checked = mode === 'AlNu';
+    document.getElementById('modeToggleLabel').textContent = mode === 'AlNu' ? scannerT('lblModeAlphanumeric') : scannerT('lblModeNu');
     saveScannerSession();
 }
 
@@ -257,7 +261,7 @@ function guardScannerModeToggle(e) {
 }
 
 function syncScannerModeLock() {
-    document.getElementById('modeRadioToggle').classList.toggle('locked', ScannerState.boxScanning);
+    document.getElementById('modeToggleWrap').classList.toggle('locked', ScannerState.boxScanning);
 }
 
 function setScannerUniqueMode(enabled) {
@@ -694,10 +698,8 @@ function setupScannerEventListeners() {
     scannerListenersAdded = true;
     document.getElementById('langEnBtn').addEventListener('click', () => setScannerLanguage('en'));
     document.getElementById('langArBtn').addEventListener('click', () => setScannerLanguage('ar'));
-    document.getElementById('modeNuBtn').addEventListener('click', guardScannerModeToggle);
-    document.getElementById('modeAlNuBtn').addEventListener('click', guardScannerModeToggle);
-    document.getElementById('modeNuBtn').addEventListener('change', () => setScannerInputMode('Nu'));
-    document.getElementById('modeAlNuBtn').addEventListener('change', () => setScannerInputMode('AlNu'));
+    document.getElementById('modeToggleBtn').addEventListener('click', guardScannerModeToggle);
+    document.getElementById('modeToggleBtn').addEventListener('change', (e) => setScannerInputMode(e.target.checked ? 'AlNu' : 'Nu'));
     document.getElementById('uniqueToggleBtn').addEventListener('click', guardScannerUniqueToggle);
     document.getElementById('uniqueToggleBtn').addEventListener('change', (e) => setScannerUniqueMode(e.target.checked));
     document.getElementById('settingsLangEnBtn').addEventListener('click', () => setScannerLanguage('en'));
