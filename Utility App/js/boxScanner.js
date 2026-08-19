@@ -296,10 +296,7 @@ function startScannerSession() {
     
     setActiveSession('boxScanner', true);
     saveScannerSession();
-    
-    document.getElementById('dispScannerStore').textContent = `${AppState.storeId} - ${AppState.storeName}`;
-    document.getElementById('dispScannerStaff').textContent = ScannerState.staffName;
-    
+
     showScannerScreen('scannerScanScreen');
     document.getElementById('boxIdInput').focus();
     loadAndDisplayScans();
@@ -738,8 +735,6 @@ async function initBoxScanner() {
     applyScannerTranslations();
     
     if (hasSession && ScannerState.staffName && ScannerState.remark) {
-        document.getElementById('dispScannerStore').textContent = `${AppState.storeId} - ${AppState.storeName}`;
-        document.getElementById('dispScannerStaff').textContent = ScannerState.staffName;
         setActiveSession('boxScanner', true);
         if (ScannerState.boxScanning && ScannerState.currentBox) {
             document.getElementById('boxIdGroup').classList.add('hidden');
