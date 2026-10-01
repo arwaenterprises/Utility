@@ -212,6 +212,9 @@
                             <button class="close-box-btn" id="closeBoxBtn">
                                 ✕ <span id="lblCloseBox">Close Box</span> <span id="closeBoxBtnId"></span>
                             </button>
+                            <button class="view-box-btn" id="viewBoxBtn" type="button">
+                                🔍 <span id="lblViewBox">View Box</span>
+                            </button>
                             <button class="scanner-kbd-btn" id="scannerKbdBtn" onclick="toggleScannerKeyboard()" title="Show/hide keyboard">⌨️</button>
                         </div>
                         
@@ -278,6 +281,23 @@
                     </div>
                 </div>
                 
+                <!-- View Box Modal: scan any box ID to see what was scanned into it -->
+                <div class="modal-overlay" id="viewBoxModal">
+                    <div class="modal">
+                        <h3 class="modal-title" id="lblViewBoxTitle">View Box</h3>
+                        <div class="modal-body" style="text-align: left;">
+                            <div class="view-box-scan-row">
+                                <input type="text" id="viewBoxScanInput" class="modal-input" inputmode="none" autocomplete="off" placeholder="Scan box ID...">
+                                <button type="button" class="scanner-kbd-btn view-box-kbd" id="viewBoxKbdBtn" title="Show/hide keyboard">⌨️</button>
+                            </div>
+                            <div id="viewBoxResult"></div>
+                        </div>
+                        <div class="modal-buttons">
+                            <button class="btn view-box-close-btn" id="viewBoxCloseBtn" type="button"><span id="lblViewBoxClose">Close</span></button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Reset Modal -->
                 <div class="modal-overlay" id="resetModal">
                     <div class="modal">
@@ -948,16 +968,16 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=27"></script>
-    <script src="js/supabaseClient.js?v=27"></script>
-    <script src="js/lists.js?v=27"></script>
-    <script src="js/usage.js?v=27"></script>
-    <script src="js/app.js?v=27"></script>
-    <script src="js/boxScanner.js?v=27"></script>
-    <script src="js/itemBarcode.js?v=27"></script>
-    <script src="js/boxCode.js?v=27"></script>
-    <script src="js/boxSegregate.js?v=27"></script>
-    <script src="js/priceCheck.js?v=27"></script>
-    <script src="js/yearSegregate.js?v=27"></script>
+    <script src="js/config.js?v=28"></script>
+    <script src="js/supabaseClient.js?v=28"></script>
+    <script src="js/lists.js?v=28"></script>
+    <script src="js/usage.js?v=28"></script>
+    <script src="js/app.js?v=28"></script>
+    <script src="js/boxScanner.js?v=28"></script>
+    <script src="js/itemBarcode.js?v=28"></script>
+    <script src="js/boxCode.js?v=28"></script>
+    <script src="js/boxSegregate.js?v=28"></script>
+    <script src="js/priceCheck.js?v=28"></script>
+    <script src="js/yearSegregate.js?v=28"></script>
 </body>
 </html>

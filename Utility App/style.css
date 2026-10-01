@@ -2303,3 +2303,41 @@ body.ads-on .ad-slot {
     margin: 8px 0;
     text-align: center;
 }
+
+/* ---- Box Scanner: Close Box (40%) + View Box button row, View Box pop-up ---- */
+.close-box-row { display: flex; }                         /* always shown now: View Box works with or without an open box */
+.close-box-row:not(.show) .close-box-btn,
+.close-box-row:not(.show) .scanner-kbd-btn { display: none; }
+.close-box-btn { flex: 0 1 40%; min-width: 0; }
+.view-box-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 10px;
+    background: linear-gradient(135deg, var(--ak-maroon) 0%, var(--ak-maroon-dark) 100%);
+    color: var(--ak-white);
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: var(--shadow-md);
+}
+.close-box-row.show .view-box-btn { flex: 0 1 40%; }      /* with a box open: Close Box 40% | View Box 40% | keyboard */
+.close-box-row.show .scanner-kbd-btn { flex: 1 1 0; min-width: 40px; }
+.view-box-scan-row { display: flex; gap: 6px; margin-bottom: 10px; }
+.view-box-scan-row .modal-input { flex: 1; min-width: 0; margin: 0; }
+.view-box-kbd { flex: 0 0 44px; }
+.view-box-summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px; }
+.view-box-summary .view-box-id { font-weight: 700; color: var(--ak-maroon); font-size: 16px; word-break: break-all; }
+.view-box-status { padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.view-box-status.open { background: #fff3e0; color: #e65100; }
+.view-box-status.closed { background: #e8f5e9; color: #2e7d32; }
+.view-box-list { max-height: 38vh; overflow-y: auto; border: 1px solid var(--ak-gray-200); border-radius: 10px; }
+.view-box-list .scans-table { margin: 0; }
+.view-box-empty { text-align: center; color: var(--ak-danger); font-weight: 600; padding: 12px 6px; }
+.view-box-close-btn { background: var(--ak-danger); color: var(--ak-white); width: 100%; }

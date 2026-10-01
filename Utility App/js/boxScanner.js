@@ -41,7 +41,10 @@ const ScannerT = {
         errLoadFailed: "Could not load your scans, please try again",
         lblUniqueToggle: "No Dup",
         lblModeNu: "Nu",
-        lblModeAlphanumeric: "ALNU"
+        lblModeAlphanumeric: "ALNU",
+        lblViewBox: "View Box", lblViewBoxTitle: "View Box", lblViewBoxClose: "Close",
+        viewBoxPlaceholder: "Scan box ID...", errViewBoxNone: "No scans found for this box",
+        lblStatusOpen: "Open", lblStatusClosed: "Closed", lblViewBoxItems: "items"
     },
     ar: {
         lblRemark: "ملاحظة", lblStartSession: "بدء الجلسة",
@@ -67,7 +70,10 @@ const ScannerT = {
         errLoadFailed: "تعذر تحميل المسح، حاول مرة أخرى",
         lblUniqueToggle: "بدون تكرار",
         lblModeNu: "Nu",
-        lblModeAlphanumeric: "ALNU"
+        lblModeAlphanumeric: "ALNU",
+        lblViewBox: "عرض الصندوق", lblViewBoxTitle: "عرض الصندوق", lblViewBoxClose: "إغلاق",
+        viewBoxPlaceholder: "امسح رقم الصندوق...", errViewBoxNone: "لا توجد عمليات مسح لهذا الصندوق",
+        lblStatusOpen: "مفتوح", lblStatusClosed: "مغلق", lblViewBoxItems: "قطعة"
     }
 };
 
@@ -287,6 +293,7 @@ function applyScannerTranslations() {
     document.getElementById('scannerRemarkInput').placeholder = scannerT('remarkPlaceholder');
     document.getElementById('boxIdInput').placeholder = scannerT('boxIdPlaceholder');
     document.getElementById('barcodeInput').placeholder = scannerT('barcodePlaceholder');
+    document.getElementById('viewBoxScanInput').placeholder = scannerT('viewBoxPlaceholder');
     document.body.classList.toggle('rtl', ScannerState.language === 'ar');
     document.getElementById('modeToggleBtn').checked = ScannerState.inputMode === 'AlNu';
     document.getElementById('modeToggleLabel').textContent = ScannerState.inputMode === 'AlNu' ? scannerT('lblModeAlphanumeric') : scannerT('lblModeNu');
@@ -594,6 +601,71 @@ function updateScansTable() {
 }
 
 // ============================================
+// BOX SCANNER - VIEW BOX
+// ============================================
+// "View Box" is available at any time (with or without an open box). Scan any box ID to see what
+// was scanned into it; closing the pop-up returns to the scan field so work continues where it was.
+function openViewBox() {
+    document.getElementById('viewBoxScanInput').value = '';
+    document.getElementById('viewBoxResult').innerHTML = '';
+    document.getElementById('viewBoxModal').classList.add('active');
+    setTimeout(() => document.getElementById('viewBoxScanInput').focus(), 100);
+}
+
+function closeViewBox() {
+    document.getElementById('viewBoxModal').classList.remove('active');
+    const input = document.getElementById('viewBoxScanInput');
+    input.inputMode = 'none';
+    document.getElementById('viewBoxKbdBtn').classList.remove('active');
+    // back to the scan field the user was on
+    document.getElementById(ScannerState.boxScanning ? 'barcodeInput' : 'boxIdInput').focus();
+}
+
+async function handleViewBoxScan(e) {
+    if (e.key !== 'Enter') return;
+    const input = document.getElementById('viewBoxScanInput');
+    const boxId = input.value.trim();
+    if (!boxId) return;
+    input.value = '';
+    let scans;
+    try { scans = await getAllScans(); } catch (err) { scans = ScannerState.scans; }
+    renderViewBoxResult(boxId, scans);
+    input.focus();
+}
+
+function renderViewBoxResult(boxId, allScans) {
+    const out = document.getElementById('viewBoxResult');
+    const key = boxId.toLowerCase();
+    const scans = allScans
+        .filter(s => String(s.box_number).toLowerCase() === key)
+        .sort((a, b) => (a.scanned_at < b.scanned_at ? -1 : a.scanned_at > b.scanned_at ? 1 : 0));
+    if (scans.length === 0) {
+        out.innerHTML = `<div class="view-box-empty">❌ ${escapeHtml(scannerT('errViewBoxNone'))}<br><span class="view-box-id">${escapeHtml(boxId)}</span></div>`;
+        return;
+    }
+    const closed = scans.every(s => s.box_status === 'Closed');
+    const qty = scans.reduce((n, s) => n + (s.qty || 1), 0);
+    const rows = scans.map((s, i) => {
+        const time = new Date(s.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return `<tr><td>${i + 1}</td><td>${escapeHtml(s.barcode)}</td><td>${time}</td></tr>`;
+    }).join('');
+    out.innerHTML =
+        `<div class="view-box-summary">
+            <div><span class="view-box-id">📦 ${escapeHtml(scans[0].box_number)}</span><br>${qty} ${escapeHtml(scannerT('lblViewBoxItems'))}</div>
+            <span class="view-box-status ${closed ? 'closed' : 'open'}">${escapeHtml(scannerT(closed ? 'lblStatusClosed' : 'lblStatusOpen'))}</span>
+        </div>
+        <div class="view-box-list"><table class="scans-table"><thead><tr><th>#</th><th>${escapeHtml(scannerT('thBarcode'))}</th><th>${escapeHtml(scannerT('thTime'))}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function toggleViewBoxKeyboard() {
+    const input = document.getElementById('viewBoxScanInput');
+    const btn = document.getElementById('viewBoxKbdBtn');
+    const on = btn.classList.toggle('active');
+    input.inputMode = on ? 'text' : 'none';
+    input.focus();
+}
+
+// ============================================
 // BOX SCANNER - DELETE SCAN
 // ============================================
 function showDeleteModal(id, barcode) {
@@ -754,6 +826,11 @@ function setupScannerEventListeners() {
     document.getElementById('closeBoxCancelBtn').addEventListener('click', cancelCloseBox);
     document.getElementById('closeBoxBackBtn').addEventListener('click', cancelCloseBox);
     document.getElementById('closeBoxScanInput').addEventListener('keypress', handleCloseBoxScan);
+    document.getElementById('viewBoxBtn').addEventListener('click', openViewBox);
+    document.getElementById('viewBoxCloseBtn').addEventListener('click', closeViewBox);
+    document.getElementById('viewBoxScanInput').addEventListener('keypress', handleViewBoxScan);
+    document.getElementById('viewBoxKbdBtn').addEventListener('click', toggleViewBoxKeyboard);
+    document.getElementById('viewBoxModal').addEventListener('keydown', (e) => { if (e.key === 'Escape') closeViewBox(); });
     document.getElementById('scansTableBody').addEventListener('click', (e) => {
         if (e.target.classList.contains('delete-scan-btn')) {
             showDeleteModal(e.target.dataset.id, e.target.dataset.barcode);
