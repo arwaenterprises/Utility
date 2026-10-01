@@ -215,6 +215,15 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('active invite has no resend', /new@x.com — pending/.test(html) && !/data-resend-invite="new"/.test(html));
     await resendInvite('old', 'old@x.com'); await loadPendingInvitesList();
     ok('resend replaces expired invite with a fresh pending one', __db.enterprise_invites.filter(i => i.invited_email === 'old@x.com').length === 1 && /old@x.com — pending/.test(document.getElementById('pendingInvitesList').innerHTML));
+    // removing a teammate also clears their old "accepted" invite; any invite row can be cleared by hand
+    __db.enterprise_invites.push({ id: 'acc1', enterprise_id: 'E1', invited_email: 'gone@x.com', status: 'accepted', expires_at: new Date(Date.now() + 864e5).toISOString() },
+                                 { id: 'acc2', enterprise_id: 'E1', invited_email: 'stays@x.com', status: 'accepted', expires_at: new Date(Date.now() + 864e5).toISOString() });
+    await loadPendingInvitesList();
+    ok('an accepted invite can be cleared by hand (has a remove button)', /gone@x.com — accepted/.test(document.getElementById('pendingInvitesList').innerHTML) && /data-cancel-invite="acc1"/.test(document.getElementById('pendingInvitesList').innerHTML));
+    teamMemberStatsCache = [{ user_id: 'u-gone', email: 'Gone@X.com', display_name: 'Gone', boxes_closed: 0, total_qty: 0 }];
+    window.confirm = () => true; AppState.profile.enterprise_id = 'E1';
+    await removeMember('u-gone');
+    ok('removing a teammate calls the server and clears their accepted invite', window.__removedMember === 'u-gone' && !/gone@x.com/.test(document.getElementById('pendingInvitesList').innerHTML) && /stays@x.com — accepted/.test(document.getElementById('pendingInvitesList').innerHTML), document.getElementById('pendingInvitesList').textContent);
     await refreshTeamMemberStats(); await refreshTeamTitle();
     ok('team title shows name + member count', document.getElementById('teamModalTitle').textContent === '👥 Acme (2 members)', document.getElementById('teamModalTitle').textContent);
     window.prompt = () => '  Acme Corp  '; await renameEnterprise();

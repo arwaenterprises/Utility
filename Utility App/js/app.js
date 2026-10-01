@@ -145,7 +145,8 @@ async function loadPendingInvitesList() {
     listEl.innerHTML = data.map(inv => {
         const expired = inv.status === 'pending' && new Date(inv.expires_at) < new Date();
         const label = expired ? 'expired' : inv.status;
-        const actions = inv.status !== 'pending' ? '' :
+        // Every row can be cleared (an accepted invite is just history, e.g. of someone since removed).
+        const actions =
             (expired ? `<button class="icon-btn" data-resend-invite="${inv.id}" data-email="${escapeHtml(inv.invited_email)}" title="Send a new invite">↻</button>` : '') +
             `<button class="delete-scan-btn" data-cancel-invite="${inv.id}" title="Remove invite">✕</button>`;
         return `
@@ -670,10 +671,19 @@ async function removeMember(memberId) {
         alert(error.message);
         return;
     }
+    // The person's old "accepted" invite would otherwise stay in the list for ever.
+    const removed = teamMemberStatsCache.find(m => m.user_id === memberId);
+    if (removed && removed.email) {
+        await supabaseClient.from('enterprise_invites').delete()
+            .eq('enterprise_id', AppState.profile.enterprise_id)
+            .eq('status', 'accepted')
+            .ilike('invited_email', removed.email);
+    }
     selectedMemberIds.delete(memberId);
     expandedMemberIds.delete(memberId);
     teamMemberBoxesCache.delete(memberId);
     await refreshTeamMemberStats();
+    await loadPendingInvitesList();
 }
 
 async function checkForMyPendingInvite() {

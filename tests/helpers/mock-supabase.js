@@ -10,6 +10,7 @@ window.__rpcCalls = [];
     const b = {
       select() { return b; },
       eq(c, v) { st.filters.push(r => r[c] === v); return b; },
+      ilike(c, v) { st.filters.push(r => String(r[c] == null ? '' : r[c]).toLowerCase() === String(v).toLowerCase()); return b; },
       is(c, v) { st.filters.push(r => (r[c] == null) === (v === null)); return b; },
       in(c, vs) { st.filters.push(r => vs.includes(r[c])); return b; },
       order(c, o) { st.order.push([c, !(o && o.ascending === false)]); return b; },
@@ -43,6 +44,7 @@ window.__rpcCalls = [];
     return b;
   }
   const rpcs = {
+    remove_enterprise_member: ({ member_user_id }) => { window.__removedMember = member_user_id; return true; },
     begin_list_upload: ({ p_list_type }) => { db.reference_chunks = db.reference_chunks.filter(r => !(r.list_type === p_list_type && !r.is_active && owned(r))); },
     append_list_chunk: ({ p_list_type, p_seq, p_rows }) => {
       if (window.__failSeq === p_seq) throw { message: 'chunk failed (test)' };
