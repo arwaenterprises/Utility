@@ -65,7 +65,7 @@ A running, numbered backlog of everything discussed for this app, so it isn't ju
 37. App needs ad placements designed in; exact placement/timing strategy TBD beyond the two specifics below
 38. Box Scanner: show an ad after a box is closed, during the natural ~5–10 second gap while the user tapes/places the box before scanning the next one — **not** a gate blocking the close-box action itself
 39. Desktop layout: the app renders as a centered mobile-width card with empty space on both sides on wide screens — use that space for display ads
-40. **AdSense — ON HOLD (user decision):** not pursuing it now; the priority is a solid, well-tested app that operators use daily. The groundwork stays in place and costs nothing: compact layout, the hidden `.ad-slot` placeholder (item 55), and the analysis of what an approval needs (public content pages — Privacy, Terms, Contact/About, Help; ads only on public content pages, never beside scanning controls; ads.txt + AdSense snippet; CSP update; consent banner for EU/UK). Items 36–39 and the ad-after-box-close idea (38) are parked. If revisited later, put ads on public content pages only.
+40. **AdSense — now planned for the MAIN DOMAIN only (`arwaenterprises.com`), not the Utility app.** Decision (user, 2026-10-01): the app stays ad-free; ads go on public content pages of the main site. The complete briefing, phased plan (discovery → trust/legal pages → real content → technical readiness → apply → after approval), risks, checklist of what is needed from the user, and a kickoff prompt for a new session are in **`docs/ADSENSE_PLAN.md`**. The main site is **outside this repo** (its platform/hosting are unknown — first job of the new session). Items 36–39 (ads inside the app: after-box-close ad, desktop side ads) are **cancelled**; the empty hidden `.ad-slot` placeholder in the app can be deleted when this is settled.
 
 ## G. Domain compliance (outside this repo)
 
@@ -137,7 +137,7 @@ All three tools are off Google Sheets / Apps Script and on Supabase. **Built and
 
 **Open engineering work (not started):**
 - Automatic database migrations (today `schema.sql` is re-run by hand in the Supabase SQL editor); the tests already prove it is safe to re-run.
-- AdSense (items 36–40) — **on hold by the user's decision**; nothing to do now.
+- AdSense for the main domain (item 40) — start a new session using `docs/ADSENSE_PLAN.md`; nothing to build in this repo except deleting the unused `.ad-slot` placeholder later.
 - Seat limits / billing (item 33) — only when pricing is decided.
 
 **Done recently:** automated tests + CI (13), offline Box Scanner (32), role-based Reset (22/43), Phase 3 migration + Pallet mode (section I), compact UI + template icons (61–63), security headers (11), delete-rule fix (45), invite expiry / rename / member count (33), Photo Capture removed (20), publish folder cleaned (64).
