@@ -90,7 +90,14 @@ const toml = fs.readFileSync(path.join(ROOT, 'netlify.toml'), 'utf8');
 check('netlify.toml: X-Frame-Options', /X-Frame-Options\s*=\s*"DENY"/.test(toml));
 check('netlify.toml: manifest served as application/manifest+json', /for = "\/manifest\.webmanifest"[\s\S]*?application\/manifest\+json/.test(toml));
 check('netlify.toml: nosniff', /X-Content-Type-Options\s*=\s*"nosniff"/.test(toml));
-check('netlify.toml: Content-Security-Policy present', /Content-Security-Policy(-Report-Only)?\s*=/.test(toml));
+check('netlify.toml: Content-Security-Policy is ENFORCED (not report-only)', /Content-Security-Policy\s*=/.test(toml) && !/Report-Only\s*=/.test(toml));
+check('index.html loads no script from another site (libraries are self-hosted)', !/<script[^>]+src=["']https?:/i.test(fs.readFileSync(path.join(APP, 'index.html'), 'utf8')));
+for (const pg of ['about.html', 'privacy.html', 'terms.html', 'security.html']) {
+  check(`public page ${pg} exists, is cached offline and linked from the login page`, fs.existsSync(path.join(APP, pg)) && sw.includes(`./${pg}`) && fs.readFileSync(path.join(APP, 'index.html'), 'utf8').includes(`href="${pg}"`));
+}
+check('public pages show the contact email', ['about.html', 'privacy.html', 'security.html'].every(pg => fs.readFileSync(path.join(APP, pg), 'utf8').includes('connect.arwaenterprises@gmail.com')));
+check('security.txt present', fs.existsSync(path.join(APP, '.well-known', 'security.txt')));
+check('CSP script-src allows only this site', !/script-src[^;]*https?:/.test(toml));
 
 // 6. Cache version bump: any change inside "Utility App/" (other than sw.js itself) needs a new CACHE_VERSION,
 //    otherwise tablets keep running the old files.

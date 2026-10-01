@@ -2372,3 +2372,24 @@ body.rtl .form-select {
 .item-text-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 .item-text-row .unique-toggle { flex: 0 0 auto; }
 .item-text-row .form-input { flex: 1; min-width: 0; margin: 0; }
+
+/* Login page info + public pages (privacy, terms, about, security) */
+.login-info { margin-top: 14px; text-align: left; }
+.login-info h3 { font-size: 15px; color: var(--ak-maroon); margin: 4px 0 6px; }
+.login-info h3:not(:first-child) { margin-top: 14px; }
+.login-info p, .login-info li { font-size: 13px; color: var(--ak-text); line-height: 1.5; }
+.login-info ul { list-style: none; margin: 6px 0 0; padding: 0; }
+.login-info li { padding: 2px 0; }
+.login-info .login-links { margin-top: 14px; text-align: center; color: var(--ak-text-light); }
+.login-info a, .legal-page a { color: var(--ak-maroon); }
+
+.legal-page { max-width: 760px; margin: 0 auto; padding: 20px 16px 40px; line-height: 1.6; color: var(--ak-text); }
+.legal-page h1 { font-size: 26px; color: var(--ak-maroon); margin-bottom: 4px; }
+.legal-page h2 { font-size: 18px; color: var(--ak-maroon); margin: 22px 0 6px; }
+.legal-page p, .legal-page li { font-size: 15px; }
+.legal-page ul { margin: 6px 0 6px 22px; }
+.legal-page li { margin: 4px 0; }
+.legal-meta { color: var(--ak-text-light); font-size: 13px !important; margin-bottom: 12px; }
+.legal-note { background: var(--ak-white); border-left: 4px solid var(--ak-maroon); padding: 8px 12px; border-radius: 6px; font-size: 13px !important; color: var(--ak-text-light); }
+.legal-back { margin-bottom: 12px; }
+.legal-nav { margin-top: 32px; padding-top: 14px; border-top: 1px solid var(--ak-gray-300); text-align: center; font-size: 14px !important; }

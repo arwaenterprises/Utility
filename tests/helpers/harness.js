@@ -25,6 +25,8 @@ async function start() {
     let f = path.join(APP, decodeURIComponent(req.url.split('?')[0]));
     if (f.endsWith(path.sep)) f += 'index.html';
     if (!f.startsWith(APP)) { res.writeHead(403); return res.end(); }
+    // The real Supabase library is replaced by the in-memory mock (injected before the page loads).
+    if (f.endsWith(path.join('vendor', 'supabase.js'))) { res.writeHead(200, { 'Content-Type': 'text/javascript' }); return res.end(''); }
     fs.readFile(f, (err, data) => {
       if (err) { res.writeHead(404); return res.end(); }
       const types = { '.js': 'text/javascript', '.html': 'text/html', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png',

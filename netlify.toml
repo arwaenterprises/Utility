@@ -11,14 +11,11 @@
 #   Referrer-Policy                    : do not leak full URLs to other sites
 #   Permissions-Policy                 : camera only for this site (barcode scanner); no microphone, location, payment
 #
-# Content-Security-Policy is sent in REPORT-ONLY mode first: it never blocks anything,
-# it only logs violations in the browser console (F12 -> Console). After the app has been
-# used on every device for a day with no "Content Security Policy" warnings, rename the
-# header below from Content-Security-Policy-Report-Only to Content-Security-Policy to
-# start enforcing it. Any new CDN / API host the app starts using must be added here.
+# Content-Security-Policy is ENFORCED: scripts may only come from this site (all libraries are
+# self-hosted in "Utility App/vendor/", so no external script host is allowed at all), and
+# connections only go to this site and the Supabase project. Any new API host must be added here.
 #
-# script-src keeps 'unsafe-inline' because index.html uses inline onclick="..." handlers
-# and a small inline <script>; the policy still blocks scripts from any host not listed.
+# script-src keeps 'unsafe-inline' because index.html uses inline onclick="..." handlers.
 [[headers]]
   for = "/*"
   [headers.values]
@@ -26,7 +23,7 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(self), microphone=(), geolocation=(), payment=()"
-    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.sheetjs.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://pacqjqjigmepkycfjapa.supabase.co wss://pacqjqjigmepkycfjapa.supabase.co; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://pacqjqjigmepkycfjapa.supabase.co wss://pacqjqjigmepkycfjapa.supabase.co; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 
 [[headers]]
   for = "/index.html"

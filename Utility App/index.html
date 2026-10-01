@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="vendor/xlsx.full.min.js?v=38"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=38"></script>
+    <script src="vendor/qrcode.min.js?v=38"></script>
+    <script src="vendor/html5-qrcode.min.js?v=38"></script>
+    <script src="vendor/supabase.js?v=38"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -134,6 +134,27 @@
                 <button class="btn btn-primary btn-block" id="googleSignInBtn">
                     <span id="googleSignInBtnText">Sign in with Google</span>
                 </button>
+            </div>
+
+            <div class="card login-info">
+                <h3>What is Utility?</h3>
+                <p>Simple warehouse and store tools that work on phones, tablets and computers &mdash; even when the internet drops. Built and run by <strong>Arwa Enterprises</strong> (India &amp; GCC).</p>
+                <ul>
+                    <li>&#128230; <strong>Box Scanner</strong> &ndash; scan items into boxes</li>
+                    <li>&#128269; <strong>Box Segregate</strong> &ndash; look up boxes, check pallets</li>
+                    <li>&#128176; <strong>Price Check</strong> &ndash; scan an item, see its price</li>
+                    <li>&#128450;&#65039; <strong>Year/Season Sort</strong> &ndash; sort items into boxes</li>
+                    <li>&#127991;&#65039; <strong>Item Barcode</strong> &amp; &#128424;&#65039; <strong>Box Labels</strong> &ndash; print labels</li>
+                </ul>
+                <h3>Your data and security</h3>
+                <ul>
+                    <li>You sign in on Google's own page &mdash; we never see your password.</li>
+                    <li>Connection is HTTPS only; you see only your own data (and your team's, if you join one).</li>
+                    <li>No ads or tracking in the app. Your data stays until you delete it.</li>
+                </ul>
+                <p class="login-links">
+                    <a href="about.html">About &amp; Contact</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="terms.html">Terms</a> &middot; <a href="security.html">Security</a>
+                </p>
             </div>
         </div>
 
@@ -993,17 +1014,17 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=37"></script>
-    <script src="js/supabaseClient.js?v=37"></script>
-    <script src="js/lists.js?v=37"></script>
-    <script src="js/usage.js?v=37"></script>
-    <script src="js/syncstatus.js?v=37"></script>
-    <script src="js/app.js?v=37"></script>
-    <script src="js/boxScanner.js?v=37"></script>
-    <script src="js/itemBarcode.js?v=37"></script>
-    <script src="js/boxCode.js?v=37"></script>
-    <script src="js/boxSegregate.js?v=37"></script>
-    <script src="js/priceCheck.js?v=37"></script>
-    <script src="js/yearSegregate.js?v=37"></script>
+    <script src="js/config.js?v=38"></script>
+    <script src="js/supabaseClient.js?v=38"></script>
+    <script src="js/lists.js?v=38"></script>
+    <script src="js/usage.js?v=38"></script>
+    <script src="js/syncstatus.js?v=38"></script>
+    <script src="js/app.js?v=38"></script>
+    <script src="js/boxScanner.js?v=38"></script>
+    <script src="js/itemBarcode.js?v=38"></script>
+    <script src="js/boxCode.js?v=38"></script>
+    <script src="js/boxSegregate.js?v=38"></script>
+    <script src="js/priceCheck.js?v=38"></script>
+    <script src="js/yearSegregate.js?v=38"></script>
 </body>
 </html>

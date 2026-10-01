@@ -6,13 +6,17 @@
 //
 // BUMP CACHE_VERSION every time you deploy a change to index.html/js/css,
 // same as the ?v= numbers in index.html's script tags.
-const CACHE_VERSION = 'ak-utility-v37';
+const CACHE_VERSION = 'ak-utility-v38';
 
 const APP_SHELL = [
     './',
     './index.html',
     './style.css',
     './manifest.webmanifest',
+    './about.html',
+    './privacy.html',
+    './terms.html',
+    './security.html',
     './icons/icon.svg',
     './icons/logo-light.svg',
     './icons/favicon.svg',
@@ -21,6 +25,11 @@ const APP_SHELL = [
     './icons/icon-512.png',
     './icons/icon-maskable-512.png',
     './icons/apple-touch-icon.png',
+    './vendor/xlsx.full.min.js',
+    './vendor/JsBarcode.all.min.js',
+    './vendor/qrcode.min.js',
+    './vendor/html5-qrcode.min.js',
+    './vendor/supabase.js',
     './js/config.js',
     './js/supabaseClient.js',
     './js/lists.js',
