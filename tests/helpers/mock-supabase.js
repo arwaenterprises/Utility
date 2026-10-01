@@ -73,7 +73,7 @@ window.__rpcCalls = [];
     },
     rename_enterprise: ({ new_name }) => { db.enterprises[0].name = new_name.trim(); },
     team_member_stats: () => [{ user_id: 'u1', display_name: 'Ann', email: 'a@b.c', boxes_closed: 0, total_qty: 0 }, { user_id: 'u2', display_name: 'Bob', email: 'b@b.c', boxes_closed: 0, total_qty: 0 }],
-    team_ys_member_stats: () => [{ user_id: 'u1', display_name: 'Ann', email: 'a@b.c', boxes_closed: 1, total_qty: db.ys_scans.length }]
+    team_ys_member_stats: () => [{ user_id: 'u1', display_name: 'Ann', email: 'a@b.c', boxes_closed: 1, total_qty: db.ys_scans.length }, { user_id: 'u2', display_name: 'Bob', email: 'b@b.c', boxes_closed: 0, total_qty: 0 }]
   };
   window.supabase = { createClient: () => ({
     auth: { getSession: async () => ({ data: { session: null } }), onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; }, signOut: async () => {} },

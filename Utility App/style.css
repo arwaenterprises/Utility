@@ -2478,3 +2478,14 @@ button, [title], .sync-badge { -webkit-touch-callout: none; -webkit-user-select:
 .login-hero .applang-toggle, .home-header .applang-toggle { max-width: 160px; }
 .home-header .applang-toggle { margin-top: 8px; }
 body.rtl .app-back-btn { transform: scaleX(-1); }
+
+/* Team window: tabs, folded invite, close ✕ */
+.team-title { display: flex; align-items: center; justify-content: center; gap: 8px; position: relative; padding: 0 36px; }
+.team-close-x { position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--ak-gray-300); background: var(--ak-white); color: var(--ak-text-light); font-size: 16px; cursor: pointer; }
+.team-close-x:hover { background: var(--ak-gray-100); color: var(--ak-text); }
+.team-invite-toggle { width: 100%; margin-bottom: 10px; }
+.team-tabs { display: flex; gap: 6px; margin: 4px 0 12px; border-bottom: 2px solid var(--ak-gray-200); }
+.team-tab { flex: 1; padding: 10px 8px; border: none; background: none; font-size: 14px; font-weight: 600; color: var(--ak-text-light); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+.team-tab.active { color: var(--ak-maroon); border-bottom-color: var(--ak-maroon); }
+.team-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.team-actions .btn { flex: 1 1 140px; }

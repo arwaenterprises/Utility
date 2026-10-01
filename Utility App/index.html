@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=47"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=47"></script>
-    <script src="vendor/qrcode.min.js?v=47"></script>
-    <script src="vendor/html5-qrcode.min.js?v=47"></script>
-    <script src="vendor/supabase.js?v=47"></script>
+    <script src="vendor/xlsx.full.min.js?v=48"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=48"></script>
+    <script src="vendor/qrcode.min.js?v=48"></script>
+    <script src="vendor/html5-qrcode.min.js?v=48"></script>
+    <script src="vendor/supabase.js?v=48"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -91,39 +91,50 @@
     <!-- TEAM MODAL (unified management + scans, scales to thousands of rows) -->
     <div class="modal-overlay" id="teamModal">
         <div class="modal" style="max-width: 720px;">
-            <h3 class="modal-title"><span id="teamModalTitle">👥 Team</span> <button class="icon-btn" id="renameEnterpriseBtn" title="Rename enterprise" aria-label="Rename enterprise" style="font-size:14px;">✏️</button></h3>
-            <div class="modal-body" style="text-align: left; max-height: 75vh; overflow-y: auto;">
-                <div class="settings-section" id="teamInviteSection">
-                    <h4>Invite a Teammate</h4>
+            <h3 class="modal-title team-title"><span id="teamModalTitle">👥 Team</span> <button class="icon-btn" id="renameEnterpriseBtn" title="Rename enterprise" aria-label="Rename enterprise" style="font-size:14px;">✏️</button>
+                <button class="team-close-x" id="closeTeamBtn" type="button" title="Close" aria-label="Close">✕</button></h3>
+            <div class="modal-body" style="text-align: left; max-height: 78vh; overflow-y: auto;">
+                <button class="btn btn-secondary team-invite-toggle" id="inviteToggleBtn" type="button" aria-expanded="false">✉️ Invite a teammate</button>
+                <div class="settings-section" id="teamInviteSection" style="display:none;">
                     <input type="email" id="inviteEmailInput" class="form-input" placeholder="teammate@email.com" style="margin-bottom: 10px;">
                     <button class="btn btn-primary btn-block" id="sendInviteBtn">Send Invite</button>
                     <div id="pendingInvitesList" style="margin-top: 12px;"></div>
                 </div>
 
-                <div class="settings-section">
-                    <input type="text" id="teamSearchInput" class="form-input" placeholder="🔍 Search box number, user, or item...">
+                <div class="team-tabs" role="tablist">
+                    <button class="team-tab active" id="teamTabBs" type="button" role="tab" data-team-tab="bs">📦 Box Scanner</button>
+                    <button class="team-tab" id="teamTabYs" type="button" role="tab" data-team-tab="ys">🗂️ Year/Season</button>
                 </div>
 
-                <div class="settings-section" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
+                <!-- Tab 1: Box Scanner scans -->
+                <div id="teamPanelBs" class="team-panel">
+                    <div class="settings-section">
+                        <input type="text" id="teamSearchInput" class="form-input" placeholder="🔍 Search box number, user, or item...">
+                    </div>
+                    <div class="settings-section" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
+                        <label style="display:flex; align-items:center; gap:8px; margin-bottom: 8px; font-weight: 600; font-size: 13px;">
+                            <input type="checkbox" id="teamSelectAllCheckbox"> <span>Select All</span>
+                        </label>
+                        <div id="teamMemberList"></div>
+                        <div id="teamSearchResults" style="display:none;"></div>
+                    </div>
+                    <div class="team-actions">
+                        <button class="btn btn-secondary" id="downloadTeamSelectedBtn">⬇ Download Selected</button>
+                        <button class="btn btn-secondary" id="resetTeamSelectedBtn" style="background: var(--ak-danger); color: white; border: none;">Reset Selected</button>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Year/Season Sort scans -->
+                <div id="teamPanelYs" class="team-panel" style="display:none;">
                     <label style="display:flex; align-items:center; gap:8px; margin-bottom: 8px; font-weight: 600; font-size: 13px;">
-                        <input type="checkbox" id="teamSelectAllCheckbox"> <span>Select All</span>
+                        <input type="checkbox" id="teamYsSelectAll"> <span>Select All</span>
                     </label>
-                    <div id="teamMemberList"></div>
-                    <div id="teamSearchResults" style="display:none;"></div>
+                    <div id="teamYsList"><p style="font-size:13px; color: var(--ak-text-light);">Loading...</p></div>
+                    <div class="team-actions">
+                        <button class="btn btn-secondary" id="downloadTeamYsBtn">⬇ Download Selected</button>
+                        <button class="btn btn-secondary" id="resetTeamYsBtn" style="background: var(--ak-danger); color: white; border: none;">Reset Selected</button>
+                    </div>
                 </div>
-            <div class="settings-section" id="teamYsSection" style="border-top:1px solid var(--ak-gray-200); padding-top:12px; margin-top:12px; text-align:left;">
-                <h4>Year/Season Sort scans</h4>
-                <div id="teamYsList"><p style="font-size:13px; color: var(--ak-text-light);">Loading...</p></div>
-                <div style="display:flex; gap:8px; margin-top:8px;">
-                    <button class="btn btn-secondary" id="downloadTeamYsBtn">⬇ Download Selected</button>
-                    <button class="btn btn-secondary" id="resetTeamYsBtn" style="background: var(--ak-danger); color: white; border: none;">Reset Selected</button>
-                </div>
-            </div>
-            </div>
-            <div class="modal-buttons">
-                <button class="btn btn-secondary" id="downloadTeamSelectedBtn">⬇ Download Selected</button>
-                <button class="btn btn-secondary" id="resetTeamSelectedBtn" style="background: var(--ak-danger); color: white; border: none;">Reset Selected</button>
-                <button class="btn btn-primary" id="closeTeamBtn">Close</button>
             </div>
         </div>
     </div>
@@ -1067,20 +1078,20 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=47"></script>
-    <script src="js/lang.js?v=47"></script>
-    <script src="js/supabaseClient.js?v=47"></script>
-    <script src="js/lists.js?v=47"></script>
-    <script src="js/usage.js?v=47"></script>
-    <script src="js/syncstatus.js?v=47"></script>
-    <script src="js/help.js?v=47"></script>
-    <script src="js/tooltip.js?v=47"></script>
-    <script src="js/app.js?v=47"></script>
-    <script src="js/boxScanner.js?v=47"></script>
-    <script src="js/itemBarcode.js?v=47"></script>
-    <script src="js/boxCode.js?v=47"></script>
-    <script src="js/boxSegregate.js?v=47"></script>
-    <script src="js/priceCheck.js?v=47"></script>
-    <script src="js/yearSegregate.js?v=47"></script>
+    <script src="js/config.js?v=48"></script>
+    <script src="js/lang.js?v=48"></script>
+    <script src="js/supabaseClient.js?v=48"></script>
+    <script src="js/lists.js?v=48"></script>
+    <script src="js/usage.js?v=48"></script>
+    <script src="js/syncstatus.js?v=48"></script>
+    <script src="js/help.js?v=48"></script>
+    <script src="js/tooltip.js?v=48"></script>
+    <script src="js/app.js?v=48"></script>
+    <script src="js/boxScanner.js?v=48"></script>
+    <script src="js/itemBarcode.js?v=48"></script>
+    <script src="js/boxCode.js?v=48"></script>
+    <script src="js/boxSegregate.js?v=48"></script>
+    <script src="js/priceCheck.js?v=48"></script>
+    <script src="js/yearSegregate.js?v=48"></script>
 </body>
 </html>

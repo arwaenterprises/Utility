@@ -33,6 +33,7 @@ const TIP_AR = {
     'Back to Home': 'العودة إلى الرئيسية',
     'Account': 'الحساب',
     'Later': 'لاحقًا',
+    'Close': 'إغلاق',
     'Complete or reset session to go back': 'أكمل الجلسة أو أعدها للرجوع',
     'Delete this scan': 'حذف هذا المسح',
     'Show / hide details': 'إظهار / إخفاء التفاصيل',

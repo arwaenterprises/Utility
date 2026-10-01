@@ -239,8 +239,26 @@ function exportScansToExcel(rows, filenamePrefix) {
     XLSX.writeFile(wb, `${filenamePrefix}_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
+// The invite form stays folded away until the admin asks for it.
+function setInviteOpen(open) {
+    document.getElementById('teamInviteSection').style.display = open ? 'block' : 'none';
+    document.getElementById('inviteToggleBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) document.getElementById('inviteEmailInput').focus();
+}
+
+// Two tabs: Box Scanner scans | Year/Season Sort scans (each has its own list, Select All, Download and Reset).
+function showTeamTab(tab) {
+    const ys = tab === 'ys';
+    document.getElementById('teamPanelBs').style.display = ys ? 'none' : 'block';
+    document.getElementById('teamPanelYs').style.display = ys ? 'block' : 'none';
+    document.getElementById('teamTabBs').classList.toggle('active', !ys);
+    document.getElementById('teamTabYs').classList.toggle('active', ys);
+}
+
 async function openTeamModal() {
     closeAccountModal();
+    setInviteOpen(false);
+    showTeamTab('bs');
 
     document.getElementById('teamSearchInput').value = '';
     document.getElementById('teamSearchResults').style.display = 'none';
@@ -286,6 +304,7 @@ const selectedYsMemberIds = new Set();
 async function refreshTeamYsStats() {
     const el = document.getElementById('teamYsList');
     selectedYsMemberIds.clear();
+    document.getElementById('teamYsSelectAll').checked = false;
     const { data, error } = await supabaseClient.rpc('team_ys_member_stats');
     if (error) { el.innerHTML = '<p style="font-size:13px;">Could not load Year/Season stats.</p>'; return; }
     teamYsStatsCache = (data || []).sort((a, b) => teamMemberDisplayName(a).localeCompare(teamMemberDisplayName(b)));
@@ -841,6 +860,14 @@ function setupEventListeners() {
     document.getElementById('acceptInviteBtn').addEventListener('click', acceptMyInvite);
     document.getElementById('openTeamModalBtn').addEventListener('click', openTeamModal);
     document.getElementById('closeTeamBtn').addEventListener('click', closeTeamModal);
+    document.getElementById('inviteToggleBtn').addEventListener('click', () => setInviteOpen(document.getElementById('teamInviteSection').style.display === 'none'));
+    document.querySelectorAll('[data-team-tab]').forEach(t => t.addEventListener('click', () => showTeamTab(t.dataset.teamTab)));
+    document.getElementById('teamYsSelectAll').addEventListener('change', (e) => {
+        document.querySelectorAll('.team-ys-checkbox').forEach(cb => {
+            cb.checked = e.target.checked;
+            if (e.target.checked) selectedYsMemberIds.add(cb.dataset.ysMember); else selectedYsMemberIds.delete(cb.dataset.ysMember);
+        });
+    });
     document.getElementById('pendingInvitesList').addEventListener('click', (e) => {
         const id = e.target.dataset.cancelInvite;
         if (id) cancelInvite(id);
