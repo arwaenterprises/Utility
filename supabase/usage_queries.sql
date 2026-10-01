@@ -11,6 +11,12 @@
 --   To change the period, edit the two dates in the first lines of the query
 --   (current_date - 7 means "the last 7 days"; use date '2026-10-01' for a fixed day).
 --
+-- IF YOU SEE:  relation "usage_report" does not exist
+--   The usage tables are not in your database yet. Run supabase/schema.sql once in the SQL editor
+--   (paste the whole file, Run; it is safe to re-run), then come back here.
+--   If a query runs but returns no rows: nobody has used the new app version yet - counting starts
+--   the day the version with usage tracking went live.
+--
 -- WHAT THE NUMBERS MEAN                      events                    qty
 --   box_scanner / year_season  box_closed    boxes closed              items in those boxes
 --   item_barcode / box_code    print_job     print jobs                labels / codes printed
