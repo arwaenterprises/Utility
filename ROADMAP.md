@@ -25,10 +25,10 @@ A running, numbered backlog of everything discussed for this app, so it isn't ju
 15. Custom subdomain: `utility.arwaenterprises.com` — live; HTTPS cert status last noted as deferred, **not reconfirmed since** — verify this is actually issued, don't assume
 16. Prove out the new architecture on a clone of the app before touching the live one — current Netlify app (`utilityy.netlify.app`, backed by Google Apps Script) stays untouched and operational as a safety net until the new version is fully proven, then gets retired
 
-## D. SaaS / multi-tenancy — ✅ done (Box Scanner only; other tools still TBD)
+## D. SaaS / multi-tenancy — ✅ done (Box Scanner built first; the other tools followed in Phase 3, section I)
 
 17. Convert to multi-tenant SaaS — support ~100–200 users initially, scaling to ~500 — **built**, live on branch `saas-pilot`
-18. Migrate database from Google Sheets to Supabase — **done for Box Scanner**: it now reads/writes Supabase directly, no more IndexedDB-then-sync-to-Sheets dual-write. Other tools (Item Barcode, Box Code, Photo Capture, Box Segregate, Price Check, Year/Season Sort) are unchanged, still on the old Apps Script backend — see Phase 3.
+18. Migrate database from Google Sheets to Supabase — **done for Box Scanner**: it now reads/writes Supabase directly, no more IndexedDB-then-sync-to-Sheets dual-write. The other data tools (Box Segregate, Price Check, Year/Season Sort) were migrated afterwards — see section I. Item Barcode, Box Code and Photo Capture need no backend.
 19. Two account tiers — **built**: self-serve at signup (Individual vs. Enterprise), enterprise admin invites sub-users by email (invitee clicks link, signs in with Google, auto-joins), admin can cancel a pending invite or remove an active member. An Individual can upgrade to Enterprise via the same "Create an Enterprise" flow.
 20. Home screen — **all 7 tiles visible** (Box Scanner, Item Barcode, Print Box Label, Photo Capture, Box Segregate, Price Check, Year/Season Sort). Item Barcode, Box Code and Photo Capture run fully in the browser (settings on-device). Box Segregate, Price Check and Year/Season Sort are now **migrated to Supabase** (section I).
 21. Data-isolation gap — **fixed**: `profiles`/`enterprises`/`enterprise_invites`/`scans` tables in `supabase/schema.sql`, with Row-Level Security scoping every table to the caller's own rows or their enterprise's rows. Verified against a local Postgres instance including simulated attacks (privilege escalation via direct column UPDATE, forged `enterprise_id` on insert, cross-tenant reads) — all correctly blocked.
@@ -97,6 +97,39 @@ All three tools are off Google Sheets / Apps Script and on Supabase. **Built and
 57. **Download for AWB generation** — the user's "error table" is **AWB Generation**. The Pallet-mode download is one sheet, one row per scanned box, sorted by document number then store: *Document Number, Store Name, Box Number, Scanned At*. (Which boxes were never scanned is not in the download; add if needed.)
 58. **Bug fixed while here:** the Team console's Box Scanner downloads / Reset Selected fetched rows without paging, and Supabase returns at most ~1000 rows per request — a large Reset Selected could have deleted rows that were never exported. Both now page through all rows (`fetchAllPages`).
 59. **Behavior notes to test:** (a) Pallet mode scans live on the device (per user) until Reset — they are not uploaded; (b) Year/Season: closed PTL boxes sync to Supabase, enterprise-member Reset clears the device only and is blocked until everything has synced; individual Reset clears device + server; (c) enterprise members cannot delete `ys_scans` rows (RLS), unlike Box Scanner's `scans` table whose `scans_delete_own` policy still allows it (item 45, still open); (d) the Year/Season Store ID / Store Name in exports now come from the signed-in Google account; (e) data in the old per-device Year/Season / Price Check databases is not carried over (new per-user databases).
+
+60. **Upload file format (CSV or Excel)** — first sheet only, **row 1 = column headers**, one record per row. Header names are matched loosely (capitals, spaces, `_` and `-` are ignored: `Box Number` = `box_number` = `BoxNumber`); extra columns are ignored; a row missing a *required* value is skipped (the upload tells you how many). Values are read exactly as written, so barcodes / box numbers with leading zeros survive. Columns:
+
+| List (where uploaded) | Required columns | Optional columns |
+|---|---|---|
+| Box list (Box Segregate, Pallet mode off) | `Box Number` | `TRN`, `Increff Order ID`, `Store Name`, `Region`, `Store Code`, `Brand` |
+| Document / box list (Box Segregate, Pallet mode on) | `Document Number`, `Box Number`, `Store Name` | — |
+| Price list (Price Check) | `Barcode` | `Current Price`, `Original Price`, `Style`, `Color`, `Size`, `Year`, `Season` |
+| Item master (Year/Season Sort) | `Barcode` | `Year`, `Season`, `Brand` |
+| PTL config (Year/Season Sort) | `PTL Number` | `Season`, `Year`, `Year Logic` |
+
+    Notes: Year/Season `Season` is `SS` or `FW` (Spring/Summer/Fall/Winter spellings are understood); PTL `Year Logic` is **`lte`** (items up to and including that year) or **`exact`** (that year only); `PTL Number` is padded to two digits (`1` → `01`). A new upload **replaces the whole list** and deletes the old rows.
+61. **Compact top bar (AdSense space)** — Box Segregate and Price Check use small round ↻ Sync and ⬆ Upload icon buttons (the percentage shows inside the button while syncing/uploading) and a small "Pallet" checkbox toggle like Nu/AlNu, so the screen uses as little vertical space as possible for future ads. Year/Season upload buttons shortened to "⬆ Items" / "⬆ PTL". Cache version `v23`.
+
+## J. What is pending (summary — keep this section current)
+
+**Needs the user (testing / decisions):**
+- Real-device test of everything together on live Supabase: list uploads (all 5 formats in item 60), sync + offline lookups, Pallet mode + AWB download, Year/Season scans → Team console, Reset behaviors (items 43, 59) — item 44.
+- Decide go-live date for `saas-pilot` to pilot users — item 44.
+- Confirm Netlify auto-deploys `saas-pilot` and the HTTPS cert for `utility.arwaenterprises.com` is issued — item 15.
+- Decide whether the Pallet download should also list never-scanned / unknown boxes — item 57.
+- Google OAuth consent-screen verification and Privacy Policy / Terms of Service pages on `arwaenterprises.com` — items 41, 46 (user believes 100 users is not an issue; verify in Google Cloud console).
+
+**Open engineering work (not started):**
+- Item 45 — restrict `scans_delete_own` so enterprise members cannot delete their own Box Scanner rows through the API (the new `ys_scans` table already blocks this).
+- Item 11 — security headers (CSP, X-Frame-Options, ...) on Netlify.
+- Item 13 — automated tests (headless tests used during development exist only locally; turn them into CI) and CI/migration automation.
+- Item 33 — five admin-management gaps (multiple admins, audit trail, invite expiry, enterprise rename/settings, billing/seat hooks), deferred by the user.
+- Items 36–40 — Google AdSense (account, placements, ad after box close, desktop side ads); keep the space free meanwhile (items 55, 61).
+- Phase 5 — retire the old Netlify + Apps Script app (`utilityy.netlify.app`) once everything is proven; the Apps Script `.txt` files in `Utility App/` can then be deleted.
+- Tighten other screens' vertical space where needed for ads (card padding, Year/Season screens).
+
+**Done recently:** offline Box Scanner (32), role-based Reset (22/43), Phase 3 migration + Pallet mode (section I), compact UI (61).
 
 ## Phasing (agreed approach)
 
