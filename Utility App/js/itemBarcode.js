@@ -30,6 +30,9 @@ function savePrintSettings() {
 // Bar height is 70 (it used to be 80: about 12% shorter). The preview is scaled the same way.
 const ITEM_BAR_HEIGHT = 70;
 const ITEM_PREVIEW_BAR_HEIGHT = 52;
+// The number under the bars (was 16) and the optional text above them are the same, larger size.
+const ITEM_NUMBER_FONT = 22;
+const ITEM_PREVIEW_NUMBER_FONT = 19;
 
 // The text to print above the barcode, or '' when "Add text" is off.
 function itemLabelText() {
@@ -40,9 +43,21 @@ function itemLabelText() {
 //   Apparel
 //   |||| ||| |||||
 //   300100010265
+// The text for one CSV row: its own Text, else the default text box; nothing when "Add text" is off.
+function csvRowText(row) {
+    if (!PrintState.settings.labelTextOn) return '';
+    return (row.text || '').trim() || itemLabelText();
+}
+
+function csvRowsWithoutText() {
+    return PrintState.csvData.filter(r => !(r.text || '').trim()).length;
+}
+
 // "Add text" is on but nothing is typed: stop before printing a label without the text the user asked for.
-function itemTextMissing() {
-    if (PrintState.settings.labelTextOn && !itemLabelText()) {
+function itemTextMissing(rows) {
+    // rows (CSV print): fine when every row has its own text or a default text exists
+    const needsDefault = rows ? rows.some(r => !(r.text || '').trim()) : true;
+    if (PrintState.settings.labelTextOn && needsDefault && !itemLabelText()) {
         showItemStatus('error', 'Enter the text for the label, or turn off "Add text"');
         document.getElementById('itemLabelText').focus();
         setTimeout(() => hideItemStatus(), 2500);
@@ -51,12 +66,12 @@ function itemTextMissing() {
     return false;
 }
 
-function addTextAboveBarcode(svg, text) {
+function addTextAboveBarcode(svg, text, size) {
     const NS = 'http://www.w3.org/2000/svg';
     const width = parseFloat(svg.getAttribute('width')) || 200;
     const height = parseFloat(svg.getAttribute('height')) || 100;
     const margin = 5;
-    let fontSize = 18;
+    let fontSize = size || ITEM_NUMBER_FONT;
     // shrink long text so it never runs past the end of the bars
     const approxWidth = (size) => text.length * size * 0.6;
     while (fontSize > 9 && approxWidth(fontSize) > width - margin * 2) fontSize--;
@@ -90,24 +105,25 @@ function addTextAboveBarcode(svg, text) {
 
 // Draws the barcode for `value` into the <svg id=svgId> that is already in the page, with the optional text on top.
 function drawItemBarcode(svgId, value, opts) {
-    const o = { height: ITEM_BAR_HEIGHT, fontSize: 16, margin: 5, ...(opts || {}) };
+    const o = { height: ITEM_BAR_HEIGHT, fontSize: ITEM_NUMBER_FONT, margin: 5, ...(opts || {}) };
     try {
         const format = PrintState.settings.barcodeType === 'numeric' ? 'CODE128C' : 'CODE128B';
         JsBarcode('#' + svgId, value, { format: format, width: 2, height: o.height, displayValue: true, fontSize: o.fontSize, margin: o.margin });
     } catch (e) {
         JsBarcode('#' + svgId, value, { format: 'CODE128', width: 2, height: o.height, displayValue: true, fontSize: o.fontSize, margin: o.margin });
     }
-    const text = itemLabelText();
-    if (text) addTextAboveBarcode(document.getElementById(svgId), text);
+    // o.text lets a CSV row bring its own text; otherwise the text box (or nothing when "Add text" is off)
+    const text = o.text !== undefined ? o.text : itemLabelText();
+    if (text) addTextAboveBarcode(document.getElementById(svgId), text, o.fontSize);
 }
 
 // QR labels get the same text as a bold line above the code.
-function itemQrHeaderElement() {
-    const text = itemLabelText();
+function itemQrHeaderElement(textOverride) {
+    const text = textOverride !== undefined ? textOverride : itemLabelText();
     if (!text) return null;
     const div = document.createElement('div');
     div.className = 'item-label-text';
-    div.style.cssText = 'font: 700 18px Arial, Helvetica, sans-serif; text-align: left; width: 100%; padding: 0 4px 4px;';
+    div.style.cssText = `font: 700 ${ITEM_NUMBER_FONT}px Arial, Helvetica, sans-serif; text-align: left; width: 100%; padding: 0 4px 4px;`;
     div.textContent = text;
     return div;
 }
@@ -137,12 +153,14 @@ function handleItemTextToggle(e) {
     syncItemTextControls();
     if (e.target.checked) document.getElementById('itemLabelText').focus();
     updateItemPreview();
+    if (PrintState.csvData.length && document.getElementById('itemCsvPreview').classList.contains('show')) showCSVPreview();
 }
 
 function handleItemTextInput(e) {
     PrintState.settings.labelText = e.target.value;
     savePrintSettings();
     updateItemPreview();
+    if (PrintState.csvData.length && document.getElementById('itemCsvPreview').classList.contains('show')) showCSVPreview();
 }
 
 function setupItemBarcodeListeners() {
@@ -206,7 +224,7 @@ function handleItemBarcodeEnter() {
     if (input.includes(',')) {
         const barcodes = input.split(',').map(b => b.trim()).filter(b => b);
         if (barcodes.length > 0) {
-            PrintState.csvData = barcodes.map(barcode => ({ barcode, qty: 1 }));
+            PrintState.csvData = barcodes.map(barcode => ({ barcode, qty: 1, text: '' }));
             showCSVPreview();
             return;
         }
@@ -237,7 +255,7 @@ function updateItemPreview() {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.id = 'previewBarcode';
         document.getElementById('previewLabel').appendChild(svg);
-        drawItemBarcode('previewBarcode', barcode, { height: ITEM_PREVIEW_BAR_HEIGHT, fontSize: 14 });
+        drawItemBarcode('previewBarcode', barcode, { height: ITEM_PREVIEW_BAR_HEIGHT, fontSize: ITEM_PREVIEW_NUMBER_FONT });
     } else {
         const qrHeader = itemQrHeaderElement();
         if (qrHeader) document.getElementById('previewLabel').appendChild(qrHeader);
@@ -317,7 +335,8 @@ async function printItemLabel() {
 // ITEM BARCODE - CSV FUNCTIONS
 // ============================================
 function downloadTemplate() {
-    const csvContent = "Barcode,Qty\n,,\n,,\n,,\n,,\n,,";
+    // Text is optional: with "Add text" on, a row's Text is printed above its barcode (empty = the default text box).
+    const csvContent = "Barcode,Qty,Text\n,,\n,,\n,,\n,,\n,,";
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -340,14 +359,39 @@ function handleFileUpload(event) {
     event.target.value = '';
 }
 
+// One CSV line -> cells. Understands "quoted, values" and "" inside quotes (so text like "Men, Apparel" stays whole).
+function splitCsvLine(line) {
+    const cells = [];
+    let cur = '', quoted = false;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+            if (quoted && line[i + 1] === '"') { cur += '"'; i++; }
+            else quoted = !quoted;
+        } else if (ch === ',' && !quoted) {
+            cells.push(cur); cur = '';
+        } else {
+            cur += ch;
+        }
+    }
+    cells.push(cur);
+    return cells.map(c => c.trim());
+}
+
 function parseCSV(content) {
-    const lines = content.split('\n').filter(line => line.trim());
+    const lines = content.replace(/^\uFEFF/, '').split(/\r?\n/).filter(line => line.trim());
     PrintState.csvData = [];
+    // The first line is the header. Columns are found by name (Barcode, Qty, Text, any order); files with only
+    // Barcode and Qty - the old template - keep working, their Text is simply empty.
+    const header = lines.length ? splitCsvLine(lines[0]).map(h => h.toLowerCase()) : [];
+    const col = (name, fallback) => { const i = header.indexOf(name); return i >= 0 ? i : fallback; };
+    const iBarcode = col('barcode', 0), iQty = col('qty', 1), iText = col('text', 2);
     for (let i = 1; i < lines.length; i++) {
-        const parts = lines[i].split(',');
-        const barcode = parts[0] ? parts[0].trim() : '';
-        const qty = parts[1] ? parseInt(parts[1].trim()) || 1 : 1;
-        if (barcode) PrintState.csvData.push({ barcode, qty });
+        const parts = splitCsvLine(lines[i]);
+        const barcode = parts[iBarcode] || '';
+        const qty = parts[iQty] ? parseInt(parts[iQty]) || 1 : 1;
+        const text = (parts[iText] || '').slice(0, 40);
+        if (barcode) PrintState.csvData.push({ barcode, qty, text });
     }
     if (PrintState.csvData.length === 0) {
         showItemStatus('error', 'No valid barcodes found in CSV');
@@ -363,12 +407,18 @@ function showCSVPreview() {
     let html = '';
     const showCount = Math.min(PrintState.csvData.length, 10);
     for (let i = 0; i < showCount; i++) {
-        html += `<div class="csv-preview-row">${PrintState.csvData[i].barcode} × ${PrintState.csvData[i].qty}</div>`;
+        const row = PrintState.csvData[i];
+        const text = csvRowText(row);
+        html += `<div class="csv-preview-row">${escapeHtml(row.barcode)} × ${row.qty}` + (text ? ` — <strong>${escapeHtml(text)}</strong>` : '') + `</div>`;
     }
     if (PrintState.csvData.length > 10) html += `<div class="csv-preview-row">... and ${PrintState.csvData.length - 10} more</div>`;
     previewContent.innerHTML = html;
     const totalLabels = PrintState.csvData.reduce((sum, item) => sum + item.qty, 0);
     previewSummary.textContent = `Total: ${PrintState.csvData.length} unique barcodes, ${totalLabels} labels`;
+    const missing = csvRowsWithoutText();
+    if (PrintState.settings.labelTextOn && missing > 0 && !itemLabelText()) {
+        previewSummary.textContent += ` · ${missing} row(s) have no text - type a default text above or fill the Text column`;
+    }
     document.getElementById('itemCsvPreview').classList.add('show');
 }
 
@@ -379,7 +429,7 @@ function cancelCSV() {
 
 async function printFromCSV() {
     if (PrintState.isProcessing || PrintState.csvData.length === 0) return;
-    if (itemTextMissing()) return;
+    if (itemTextMissing(PrintState.csvData)) return;
     PrintState.isProcessing = true;
     document.getElementById('itemCsvPreview').classList.remove('show');
     const totalLabels = PrintState.csvData.reduce((sum, item) => sum + item.qty, 0);
@@ -400,10 +450,10 @@ async function printFromCSV() {
                     svg.id = `printBarcode_${labelCount}`;
                     labelDiv.appendChild(svg);
                     printContainer.appendChild(labelDiv);
-                    drawItemBarcode(`printBarcode_${labelCount}`, item.barcode);
+                    drawItemBarcode(`printBarcode_${labelCount}`, item.barcode, { text: csvRowText(item) });
                 } else {
                     const qrCanvas = await createQRWithText(item.barcode, 150);
-                    const qrHeader = itemQrHeaderElement();
+                    const qrHeader = itemQrHeaderElement(csvRowText(item));
                     if (qrHeader) labelDiv.appendChild(qrHeader);
                     labelDiv.appendChild(qrCanvas);
                     printContainer.appendChild(labelDiv);
@@ -459,8 +509,8 @@ async function testPrint() {
         svg.id = 'testBarcode';
         labelDiv.appendChild(svg);
         printContainer.appendChild(labelDiv);
-        JsBarcode('#testBarcode', 'TEST-12345', { format: 'CODE128', width: 2, height: ITEM_BAR_HEIGHT, displayValue: true, fontSize: 16, margin: 10 });
-        if (itemLabelText()) addTextAboveBarcode(document.getElementById('testBarcode'), itemLabelText());
+        JsBarcode('#testBarcode', 'TEST-12345', { format: 'CODE128', width: 2, height: ITEM_BAR_HEIGHT, displayValue: true, fontSize: ITEM_NUMBER_FONT, margin: 10 });
+        if (itemLabelText()) addTextAboveBarcode(document.getElementById('testBarcode'), itemLabelText(), ITEM_NUMBER_FONT);
     } else {
         const qrCanvas = await createQRWithText('TEST-12345', 150);
         labelDiv.appendChild(qrCanvas);

@@ -29,13 +29,15 @@ const { start, openApp, report, stop } = require('./helpers/harness');
 
     // ---------- toggle off: today's label ----------
     ok('toggle off: no extra text, label is just bars + number', !off.querySelector('.item-label-text') && /300100010265/.test(off.textContent));
-    ok('toggle off: label height is the old one minus the 10px shorter bars', parseFloat(old.getAttribute('height')) - parseFloat(off.getAttribute('height')) === 10, parseFloat(old.getAttribute('height')) + ' vs ' + parseFloat(off.getAttribute('height')));
+    const numFont = (svg) => (svg.querySelector('text').getAttribute('style') || '').match(/(\d+)px/)?.[1];
+    ok('the number under the bars is bigger (16px -> 22px)', numFont(old) === '16' && numFont(off) === '22', numFont(old) + ' -> ' + numFont(off));
 
     // ---------- toggle on: text above the bars ----------
     const on = draw('on', 'Apparel');
     const t = on.querySelector('.item-label-text');
     ok('toggle on: the text is drawn above the barcode, bold, left-aligned with the bars', !!t && t.textContent === 'Apparel' && t.getAttribute('font-weight') === '700' && Number(t.getAttribute('x')) === 5, t && t.outerHTML);
     ok('toggle on: the number is still printed under the bars', /300100010265/.test(on.textContent));
+    ok('toggle on: the text above is the same size as the number (22)', t.getAttribute('font-size') === '22' && numFont(on) === '22');
     ok('toggle on: the label grew by the header height only; bars unchanged (70)', parseFloat(on.getAttribute('height')) > parseFloat(off.getAttribute('height')) && Math.max(...barHeights(on)) === 70);
     ok('toggle on: the text sits above the bars (smaller y than the first bar)', Number(t.getAttribute('y')) < 30 && on.querySelector('g').getAttribute('transform').startsWith('translate(0 '), on.querySelector('g').getAttribute('transform'));
     const long = draw('long', 'A very long line of label text 1234567890');
@@ -78,12 +80,58 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     await printFromCSV(); await sleep(500);
     const csvLabels = [...document.querySelectorAll('#printContainer .print-label')];
     ok('CSV print: every label carries the same text', prints === 1 && csvLabels.length === 3 && csvLabels.every(l => l.querySelector('.item-label-text')?.textContent === 'Footwear'), csvLabels.length + ' labels');
+
+    // ---------- bulk (CSV) upload with a Text column ----------
+    PrintState.settings.outputFormat = 'barcode';
+    const origClick = HTMLAnchorElement.prototype.click; let tplBlob = null;
+    URL.createObjectURL = (b) => { tplBlob = b; return 'blob:test'; }; HTMLAnchorElement.prototype.click = () => {};
+    downloadTemplate(); HTMLAnchorElement.prototype.click = origClick;
+    const tpl = await tplBlob.text();
+    ok('CSV template has the columns Barcode, Qty, Text', tpl.split('\n')[0] === 'Barcode,Qty,Text', tpl.split('\n')[0]);
+    parseCSV('Barcode,Qty,Text\r\n111,2,Apparel\r\n222,1,"Men, Apparel"\r\n333,1,\r\n444,3\r\n,,\r\n555,1,"He said ""hi"""\r\n');
+    const rows = PrintState.csvData;
+    ok('CSV: text column is read per row, incl. commas inside quotes and doubled quotes', rows.length === 5 && rows[0].text === 'Apparel' && rows[1].text === 'Men, Apparel' && rows[2].text === '' && rows[3].text === '' && rows[4].text === 'He said "hi"', JSON.stringify(rows.map(r => r.text)));
+    ok('CSV: quantities still read', rows.map(r => r.qty).join() === '2,1,1,3,1');
+    parseCSV('Barcode,Qty\n111,2\n222,1\n');
+    ok('CSV: an old two-column file (Barcode,Qty) still works, text empty', PrintState.csvData.length === 2 && PrintState.csvData.every(r => r.text === '') && PrintState.csvData[0].qty === 2);
+    parseCSV('Text,Qty,Barcode\nShoes,4,777\n');
+    ok('CSV: columns are found by name, in any order', PrintState.csvData[0].barcode === '777' && PrintState.csvData[0].qty === 4 && PrintState.csvData[0].text === 'Shoes');
+    parseCSV('﻿Barcode,Qty,Text\n888,1,x\n');
+    ok('CSV: a file saved by Excel with a byte-order mark is read correctly', PrintState.csvData.length === 1 && PrintState.csvData[0].barcode === '888');
+
+    const csv = 'Barcode,Qty,Text\n111,2,Apparel\n222,1,"Men, Apparel"\n333,1,\n444,3\n';
+    // toggle ON + a default text: rows with their own text use it, the others use the default
+    toggle.checked = true; toggle.dispatchEvent(new Event('change')); box.value = 'Default'; box.dispatchEvent(new Event('input'));
+    parseCSV(csv);
+    ok('CSV preview shows each row\'s text (own or default)', /111 × 2 — <strong>Apparel/.test(document.getElementById('itemCsvPreviewContent').innerHTML) && /333 × 1 — <strong>Default/.test(document.getElementById('itemCsvPreviewContent').innerHTML), document.getElementById('itemCsvPreviewContent').textContent);
+    prints = 0; await printFromCSV(); await sleep(600);
+    let texts = [...document.querySelectorAll('#printContainer .print-label')].map(l => l.querySelector('.item-label-text')?.textContent);
+    ok('CSV print: every label carries its own row text, or the default for rows without', prints === 1 && texts.join('|') === 'Apparel|Apparel|Men, Apparel|Default|Default|Default|Default', texts.join('|'));
+    // toggle ON, no default text, but every row has its own text: prints fine
+    box.value = ''; box.dispatchEvent(new Event('input'));
+    PrintState.csvData = [{ barcode: '1', qty: 1, text: 'A' }, { barcode: '2', qty: 1, text: 'B' }];
+    prints = 0; await printFromCSV(); await sleep(500);
+    ok('CSV print: no default text needed when every row has its own', prints === 1 && [...document.querySelectorAll('#printContainer .item-label-text')].map(x => x.textContent).join() === 'A,B');
+    // toggle ON, no default, a row without text: stopped with a message
+    PrintState.csvData = [{ barcode: '1', qty: 1, text: 'A' }, { barcode: '2', qty: 1, text: '' }];
+    prints = 0; await printFromCSV(); await sleep(150);
+    ok('CSV print: a row without text and no default stops the print with a message', prints === 0 && /Enter the text for the label/.test(statusText()), statusText());
+    // toggle OFF: the Text column is ignored
+    toggle.checked = false; toggle.dispatchEvent(new Event('change'));
+    PrintState.csvData = [{ barcode: '1', qty: 1, text: 'A' }, { barcode: '2', qty: 2, text: 'B' }];
+    prints = 0; await printFromCSV(); await sleep(500);
+    ok('CSV print with Add text off: plain labels, the Text column is ignored', prints === 1 && document.querySelectorAll('#printContainer .print-label').length === 3 && document.querySelectorAll('#printContainer .item-label-text').length === 0);
+    // comma-separated barcodes typed in the box use the default text
+    toggle.checked = true; toggle.dispatchEvent(new Event('change')); box.value = 'Typed'; box.dispatchEvent(new Event('input'));
+    document.getElementById('itemBarcodeInput').value = '10,20,30'; handleItemBarcodeEnter();
+    ok('comma-separated barcodes: one label each, all with the default text', PrintState.csvData.length === 3 && PrintState.csvData.every(r => csvRowText(r) === 'Typed'));
+
     // QR labels get the text as a header above the code
     PrintState.settings.outputFormat = 'qr';
     window.createQRWithText = async () => { const c = document.createElement('canvas'); c.width = 10; c.height = 10; return c; };
     document.getElementById('itemBarcodeInput').value = '999'; prints = 0; await printItemLabel(); await sleep(400);
     const qrLabel = document.querySelector('#printContainer .print-label');
-    ok('QR label: the text is a header above the code', !!qrLabel && qrLabel.firstElementChild.classList.contains('item-label-text') && qrLabel.firstElementChild.textContent === 'Footwear' && qrLabel.lastElementChild.tagName === 'CANVAS');
+    ok('QR label: the text is a header above the code', !!qrLabel && qrLabel.firstElementChild.classList.contains('item-label-text') && qrLabel.firstElementChild.textContent === 'Typed' && qrLabel.lastElementChild.tagName === 'CANVAS');
     PrintState.settings.outputFormat = 'barcode';
     return log;
   });
