@@ -589,8 +589,8 @@
                 <div class="card">
                 <div class="bs-wrap">
                     <div class="bs-top-bar">
-                        <button class="bs-sync-btn" id="pcRefreshBtn" onclick="refreshPcData()">↻ Sync Data</button>
-                        <button class="bs-sync-btn bs-upload-btn" id="pcUploadBtn" onclick="uploadPcList()" style="display:none;">⬆ Upload List</button>
+                        <button class="bs-round-btn" id="pcRefreshBtn" onclick="refreshPcData()" title="Sync data" aria-label="Sync data">↻</button>
+                        <button class="bs-round-btn bs-upload-btn" id="pcUploadBtn" onclick="uploadPcList()" title="Upload list" aria-label="Upload list" style="display:none;">⬆</button>
                         <span id="pcTimestamp" class="bs-ts">No data</span>
                     </div>
                     <div class="bs-search-row">
@@ -613,12 +613,12 @@
                 <div class="card">
                 <div class="bs-wrap">
                     <div class="bs-top-bar">
-                        <button class="bs-sync-btn" id="bsRefreshBtn" onclick="refreshBsData()">↻ Sync Data</button>
-                        <button class="bs-sync-btn bs-upload-btn" id="bsUploadBtn" onclick="uploadBsList()" style="display:none;">⬆ Upload List</button>
+                        <button class="bs-round-btn" id="bsRefreshBtn" onclick="refreshBsData()" title="Sync data" aria-label="Sync data">↻</button>
+                        <button class="bs-round-btn bs-upload-btn" id="bsUploadBtn" onclick="uploadBsList()" title="Upload list" aria-label="Upload list" style="display:none;">⬆</button>
+                        <div class="unique-toggle bs-pallet-toggle" title="Pallet mode: sort boxes by document / store">
+                            <label><input type="checkbox" id="bsPalletToggle"> <span>Pallet</span></label>
+                        </div>
                         <span id="bsTimestamp" class="bs-ts">No data</span>
-                    </div>
-                    <div class="unique-toggle bs-pallet-toggle">
-                        <label><input type="checkbox" id="bsPalletToggle"> <span>Pallet mode (document list)</span></label>
                     </div>
                     <div class="bs-search-row">
                         <input type="text" id="bsBarcodeInput" inputmode="none" placeholder="Point camera or HHT scan…" autocomplete="off" autocorrect="off" spellcheck="false">
@@ -663,8 +663,8 @@
                             <input type="text" id="ysRemarkInput" class="form-input" placeholder="e.g., FW2025 returns sorting" autocomplete="off">
                         </div>
                         <div id="ysUploadRow" class="ys-upload-row" style="display:none;">
-                            <button class="bs-sync-btn bs-upload-btn" id="ysUploadItemsBtn" type="button">⬆ Upload Item Master</button>
-                            <button class="bs-sync-btn bs-upload-btn" id="ysUploadPtlBtn" type="button">⬆ Upload PTL Config</button>
+                            <button class="bs-sync-btn bs-upload-btn bs-small-btn" id="ysUploadItemsBtn" type="button" title="Upload item master">⬆ Items</button>
+                            <button class="bs-sync-btn bs-upload-btn bs-small-btn" id="ysUploadPtlBtn" type="button" title="Upload PTL config">⬆ PTL</button>
                         </div>
                         <div id="ysSyncStatus" class="ys-sync-status" style="display:none;">
                             <span class="spinner"></span> <span id="ysSyncMsg">Syncing item data...</span>
@@ -1012,16 +1012,16 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=22"></script>
-    <script src="js/supabaseClient.js?v=22"></script>
-    <script src="js/lists.js?v=22"></script>
-    <script src="js/app.js?v=22"></script>
-    <script src="js/boxScanner.js?v=22"></script>
-    <script src="js/itemBarcode.js?v=22"></script>
-    <script src="js/boxCode.js?v=22"></script>
-    <script src="js/photoCapture.js?v=22"></script>
-    <script src="js/boxSegregate.js?v=22"></script>
-    <script src="js/priceCheck.js?v=22"></script>
-    <script src="js/yearSegregate.js?v=22"></script>
+    <script src="js/config.js?v=23"></script>
+    <script src="js/supabaseClient.js?v=23"></script>
+    <script src="js/lists.js?v=23"></script>
+    <script src="js/app.js?v=23"></script>
+    <script src="js/boxScanner.js?v=23"></script>
+    <script src="js/itemBarcode.js?v=23"></script>
+    <script src="js/boxCode.js?v=23"></script>
+    <script src="js/photoCapture.js?v=23"></script>
+    <script src="js/boxSegregate.js?v=23"></script>
+    <script src="js/priceCheck.js?v=23"></script>
+    <script src="js/yearSegregate.js?v=23"></script>
 </body>
 </html>

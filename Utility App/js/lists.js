@@ -100,7 +100,8 @@ function refProgress(anchorEl, baseLabel) {
             const p = Math.max(0, Math.min(100, Math.round(pct)));
             ensureBar();
             if (bar) bar.firstChild.style.width = p + '%';
-            if (btn) { btn.disabled = true; btn.textContent = (text || baseLabel) + ' ' + p + '%'; }
+            // Round icon buttons are too small for a label: they show just the percentage.
+            if (btn) { btn.disabled = true; btn.textContent = btn.classList.contains('bs-round-btn') ? p + '%' : (text || baseLabel) + ' ' + p + '%'; }
             return p;
         },
         done() {
@@ -336,5 +337,5 @@ async function refSync(listType, opts) {
 async function refStatusText(listType, noun) {
     const meta = await refMetaGet(listType);
     if (!meta || !meta.syncedAt) return 'No data';
-    return meta.count + ' ' + noun + '<br>' + new Date(meta.syncedAt).toLocaleString();
+    return meta.count + ' ' + noun + '<br>' + new Date(meta.syncedAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }

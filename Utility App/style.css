@@ -2361,6 +2361,30 @@ body.rtl .form-select {
 
 /* ---- Reference lists: upload button, % progress bar, Pallet mode ---- */
 .bs-upload-btn { background: var(--ak-gray-700, #555); }
+/* Compact round icon buttons (Sync / Upload) - keeps the top bar to one slim row. */
+.bs-round-btn {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--ak-maroon);
+    color: var(--ak-white);
+    font-size: 17px;
+    line-height: 1;
+    font-family: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.bs-round-btn:disabled { font-size: 10px; font-weight: 700; opacity: 0.85; cursor: default; }
+.bs-round-btn.bs-upload-btn { background: var(--ak-gray-700, #555); }
+.bs-small-btn { padding: 6px 12px; font-size: 12px; }
+.bs-top-bar { gap: 8px; }
+.bs-top-bar .bs-pallet-toggle { margin: 0 0 0 2px; }
+.bs-top-bar .bs-ts { font-size: 10px; }
 .ys-upload-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .ref-progress {
     height: 6px;
@@ -2375,7 +2399,6 @@ body.rtl .form-select {
     background: var(--ak-maroon);
     transition: width 0.2s;
 }
-.bs-pallet-toggle { margin: 6px 0 10px; }
 .bs-doc-result {
     border-radius: 12px;
     padding: 16px;
