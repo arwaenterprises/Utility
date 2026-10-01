@@ -2438,3 +2438,16 @@ a.trust-badge:hover { box-shadow: var(--shadow-md); }
 .tb-check svg { stroke: #fff; stroke-width: 3; }
 .tb-ico.tb-noads { background: rgba(139, 26, 50, 0.12); }
 .tb-noads svg { stroke: #8B1A32; }
+
+/* v41: data promise replaces the tool list on the login page */
+.dp-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.dp-list li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--ak-gray-200); text-align: left; }
+.dp-list li:last-child { border-bottom: none; }
+.dp-list b { display: block; font-size: 14px; }
+.dp-list small { display: block; font-size: 12px; color: var(--ak-text-light); line-height: 1.4; }
+.dp-tick { flex: 0 0 26px; width: 26px; height: 26px; border-radius: 50%; background: #1e8e3e; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+.dp-tick svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.dp-links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; }
+.dp-links a { padding: 7px 12px; border: 1px solid var(--ak-maroon); border-radius: 20px; font-size: 13px; font-weight: 600; text-decoration: none; color: var(--ak-maroon); }
+.login-teaser { text-align: center; font-size: 13px; color: var(--ak-text-light); margin: 12px 0; }
+.trust-badge { padding: 14px 8px; }
