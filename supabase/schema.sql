@@ -283,9 +283,13 @@ as $$
       and public.current_user_is_enterprise_admin();
 $$;
 
+-- Return type gained `remark`, and CREATE OR REPLACE cannot change a function's
+-- return type, so drop the old version first.
+drop function if exists public.search_team_scans(text, int);
 create or replace function public.search_team_scans(search_term text, limit_count int default 100)
 returns table (
     id uuid,
+    remark text,
     barcode text,
     box_number text,
     box_status text,
@@ -300,7 +304,7 @@ security definer
 set search_path = public
 stable
 as $$
-    select s.id, s.barcode, s.box_number, s.box_status, s.qty, s.scanned_at, s.user_id, p.display_name, p.email
+    select s.id, s.remark, s.barcode, s.box_number, s.box_status, s.qty, s.scanned_at, s.user_id, p.display_name, p.email
     from public.scans s
     join public.profiles p on p.id = s.user_id
     where s.enterprise_id = public.current_user_enterprise_id()

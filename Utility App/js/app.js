@@ -207,6 +207,7 @@ function exportScansToExcel(rows, filenamePrefix) {
     }
     const sheetRows = rows.map(s => ({
         'Scanned By': s.display_name || s.email || s.profiles?.display_name || s.profiles?.email || '—',
+        'Remark': s.remark || '',
         'Box Number': s.box_number,
         'Barcode': s.barcode,
         'Qty': s.qty,
@@ -214,7 +215,7 @@ function exportScansToExcel(rows, filenamePrefix) {
         'Scanned At': new Date(s.scanned_at).toLocaleString()
     }));
     const ws = XLSX.utils.json_to_sheet(sheetRows);
-    ws['!cols'] = [{wch:20},{wch:12},{wch:20},{wch:5},{wch:8},{wch:18}];
+    ws['!cols'] = [{wch:20},{wch:20},{wch:12},{wch:20},{wch:5},{wch:8},{wch:18}];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Team Scans');
     XLSX.writeFile(wb, `${filenamePrefix}_${new Date().toISOString().slice(0,10)}.xlsx`);
@@ -365,7 +366,7 @@ async function toggleMemberExpand(userId) {
     if (!teamMemberBoxesCache.has(userId)) {
         const { data, error } = await supabaseClient
             .from('scans')
-            .select('id, barcode, box_number, box_status, qty, scanned_at')
+            .select('id, remark, barcode, box_number, box_status, qty, scanned_at')
             .eq('enterprise_id', AppState.profile.enterprise_id)
             .eq('user_id', userId)
             .order('scanned_at', { ascending: false })
@@ -420,7 +421,7 @@ function downloadMemberData(userId) {
     // Not expanded yet (nothing cached) - fetch fresh for the download.
     supabaseClient
         .from('scans')
-        .select('id, barcode, box_number, box_status, qty, scanned_at')
+        .select('id, remark, barcode, box_number, box_status, qty, scanned_at')
         .eq('enterprise_id', AppState.profile.enterprise_id)
         .eq('user_id', userId)
         .limit(5000)
@@ -489,7 +490,7 @@ async function fetchSelectedTeamScans() {
     const ids = Array.from(selectedMemberIds);
     const { data, error } = await supabaseClient
         .from('scans')
-        .select('id, barcode, box_number, box_status, qty, scanned_at, user_id, profiles(display_name, email)')
+        .select('id, remark, barcode, box_number, box_status, qty, scanned_at, user_id, profiles(display_name, email)')
         .eq('enterprise_id', AppState.profile.enterprise_id)
         .in('user_id', ids);
     if (error) {
