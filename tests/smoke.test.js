@@ -20,7 +20,8 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     const modal = () => document.getElementById('helpModal').classList.contains('active');
     for (const id of APPS.map(a => a.id)) {
       localStorage.clear();
-      ok('help guide written for: ' + id, !!HELP[id] && HELP[id].steps.length >= 3);
+      ok('help guide written in English for: ' + id, !!HELP[id] && HELP[id].en.steps.length >= 3);
+      ok('help guide written in Arabic for: ' + id, !!HELP[id].ar && HELP[id].ar.steps.length === HELP[id].en.steps.length && /[\u0600-\u06FF]/.test(HELP[id].ar.intro) && !!HELP[id].ar.before === !!HELP[id].en.before);
       openApp(id);
       ok('guide opens by itself the first time: ' + id, modal());
       const title = document.getElementById('helpTitle').textContent;
@@ -30,6 +31,10 @@ const { start, openApp, report, stop } = require('./helpers/harness');
       ok('guide does not open by itself the second time: ' + id, !modal());
       document.getElementById('helpBtn').click();
       ok('"?" button opens the guide again: ' + id, modal());
+      document.querySelector('#helpLang [data-lang="ar"]').click();
+      ok('Arabic toggle shows the guide right-to-left: ' + id, document.getElementById('helpBody').dir === 'rtl' && /[\u0600-\u06FF]/.test(document.getElementById('helpBody').textContent));
+      document.querySelector('#helpLang [data-lang="en"]').click();
+      ok('English toggle brings it back: ' + id, document.getElementById('helpBody').dir === 'ltr' && !/[\u0600-\u06FF]/.test(document.getElementById('helpBody').textContent));
       document.getElementById('helpCloseBtn').click();
     }
     ok('Year/Season store id comes from the Google account', AppState.storeId === 'a@b.c' && AppState.storeName === 'Ann');

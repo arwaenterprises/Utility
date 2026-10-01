@@ -2462,3 +2462,8 @@ a.trust-badge:hover { box-shadow: var(--shadow-md); }
 .help-body li { margin: 6px 0; }
 .help-intro { font-weight: 600; }
 .help-before { background: var(--ak-cream-light); border-left: 4px solid var(--ak-warning); border-radius: 8px; padding: 8px 10px; margin-top: 10px; font-size: 13px; }
+
+/* help guide: Arabic reads right-to-left */
+.help-body[dir="rtl"] ol, .help-body[dir="rtl"] ul { margin: 0 20px 0 0; }
+.help-body[dir="rtl"] .help-before { border-left: none; border-right: 4px solid var(--ak-warning); }
+.help-modal .lang-toggle { margin-bottom: 8px; }
