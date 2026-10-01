@@ -165,6 +165,40 @@ async function refParseFile(file, listType) {
 }
 
 // ------------------------------------------------
+// Template download: an Excel file with the right column headers
+// ------------------------------------------------
+const REF_HEADER_WORDS = { id: 'ID', trn: 'TRN', ptl: 'PTL' };
+function refHeaderLabel(key) {
+    return key.split('_').map(w => REF_HEADER_WORDS[w] || (w.charAt(0).toUpperCase() + w.slice(1))).join(' ');
+}
+
+const REF_TEMPLATE_NOTES = {
+    box_list: ['Box Number is required. Everything else is optional.'],
+    price_list: ['Barcode is required. Everything else is optional.'],
+    ys_item_master: ['Barcode is required.', 'Season: SS or FW.'],
+    ys_ptl_config: ['PTL Number is required (1 becomes 01).', 'Season: SS or FW.', 'Year Logic: lte (that year and earlier) or exact (that year only).'],
+    doc_boxes: ['Document Number, Box Number and Store Name are all required.', 'One row per box.']
+};
+
+// Sheet 1 ("Data") holds only the header row - that is the sheet the upload reads.
+// Sheet 2 ("Instructions") explains the columns and is ignored by the upload.
+function refDownloadTemplate(listType) {
+    const def = REF_LISTS[listType];
+    const wb = XLSX.utils.book_new();
+    const headers = def.columns.map(c => refHeaderLabel(c.key));
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
+    ws['!cols'] = headers.map(h => ({ wch: Math.max(14, h.length + 4) }));
+    XLSX.utils.book_append_sheet(wb, ws, 'Data');
+    const info = [['Column', 'Required?']]
+        .concat(def.columns.map(c => [refHeaderLabel(c.key), c.required ? 'Required' : 'Optional']))
+        .concat([[''], ['Notes']])
+        .concat((REF_TEMPLATE_NOTES[listType] || []).map(n => [n]))
+        .concat([['Fill the Data sheet from row 2 down, save, then upload. An upload replaces the whole list.']]);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(info), 'Instructions');
+    XLSX.writeFile(wb, 'template_' + def.label.replace(/[^a-z0-9]+/gi, '_') + '.xlsx');
+}
+
+// ------------------------------------------------
 // Upload (replace the whole list)
 // ------------------------------------------------
 async function refUploadList(listType, rows, onProgress) {

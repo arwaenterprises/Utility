@@ -72,6 +72,7 @@ async function initPriceCheck() {
     await openPcDb();
     await refOpenDB();
     document.getElementById('pcUploadBtn').style.display = refCanUpload() ? '' : 'none';
+    document.getElementById('pcTemplateBtn').style.display = refCanUpload() ? '' : 'none';
     await updatePcTimestamp();
 
     if (!pcListenerAdded) {

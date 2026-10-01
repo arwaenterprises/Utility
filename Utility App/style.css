@@ -2415,3 +2415,93 @@ body.rtl .form-select {
 .bs-doc-empty { color: var(--ak-text-light); font-size: 13px; text-align: center; padding: 12px; }
 .bs-doc-actions { display: flex; gap: 8px; margin-top: 12px; }
 .bs-doc-actions .btn { flex: 1; }
+
+/* =====================================================
+   COMPACT LAYOUT - tighter spacing on every screen so
+   more of the page is free (and Google AdSense can fit).
+   Placed last on purpose: it overrides the roomier values above.
+   ===================================================== */
+.header { padding: 6px 14px; gap: 10px; }
+.header-logo { width: 32px; height: 32px; font-size: 12px; border-radius: 8px; }
+.main-container { padding: 8px 10px; }
+.card { padding: 12px; border-radius: 14px; }
+.card-title { font-size: 1.1rem; margin-bottom: 2px; gap: 8px; }
+.card-subtitle { font-size: 13px; margin-bottom: 8px; }
+.form-group { margin-bottom: 10px; }
+.form-group label { margin-bottom: 4px; font-size: 13px; }
+.form-input, .form-select, .modal-input { padding: 9px 12px; border-radius: 10px; }
+.btn { padding: 10px 18px; border-radius: 10px; font-size: 14px; }
+.error-msg { margin-bottom: 8px; }
+.store-info-box { padding: 12px; }
+
+/* Home screen */
+.home-header { margin-bottom: 10px; }
+.app-grid { gap: 10px; }
+.app-tile { padding: 14px 10px; }
+.session-banner { margin-bottom: 8px; }
+
+/* Tool header (back button + title). The subtitle line is hidden: the title says it. */
+.app-header { margin-bottom: 6px; gap: 10px; }
+.app-back-btn { width: 34px; height: 34px; border-radius: 10px; }
+.app-title h2 { font-size: 1.05rem; }
+.app-title p { display: none; }
+
+/* Box Scanner and Year/Season scan screens */
+.info-bar { padding: 5px 10px; margin-bottom: 6px; }
+.stats-row { gap: 6px; margin-bottom: 6px; }
+.stat-box { padding: 6px 4px; border-radius: 10px; }
+.stat-number { font-size: 1.15rem; margin-top: 0; }
+.scan-card { padding: 12px; }
+.close-box-row { margin-bottom: 8px; }
+.close-box-btn { padding: 10px; }
+.scans-table-container { padding: 10px; margin-bottom: 8px; border-radius: 14px; }
+.scans-table-header { margin-bottom: 6px; }
+.scans-table th { padding: 6px 8px; }
+.scans-table td { padding: 6px 8px; }
+.lang-toggle { margin-bottom: 8px; }
+
+/* Box Segregate / Price Check */
+.bs-wrap { gap: 8px; }
+.bs-search-row { gap: 6px; }
+.bs-search-row input { padding: 9px 12px; }
+.bs-icon-btn { width: 40px; height: 40px; font-size: 18px; }
+.bs-result, .bs-notfound { padding: 10px 14px; }
+.pc-price-highlight { padding: 10px 14px; }
+.bs-doc-result { padding: 10px; margin-bottom: 8px; }
+.bs-doc-store { font-size: 22px; }
+.bs-doc-actions { margin-top: 8px; }
+
+/* Item Barcode / Box Code / Photo Capture */
+.print-settings-bar { margin-bottom: 10px; gap: 12px; }
+.print-settings-section { margin-bottom: 10px; }
+.mode-toggle { margin-bottom: 10px; padding: 8px; gap: 10px; }
+.info-note { margin-bottom: 10px; }
+.csv-preview { margin-top: 8px; padding: 10px; }
+.preview-area { margin-top: 10px; padding: 12px; }
+.preview-label { padding: 10px; }
+.print-status { margin-top: 8px; padding: 10px; }
+.photo-mode-toggle { margin-bottom: 10px; }
+.photo-grid { margin-top: 10px; }
+.photo-stats { padding: 10px; margin-bottom: 10px; }
+.sku-input-row { margin-bottom: 8px; }
+.photo-actions { margin-top: 10px; }
+.download-option { margin-bottom: 8px; }
+.ys-sync-status { margin-bottom: 8px; }
+.app-placeholder-icon { margin-bottom: 8px; }
+
+/* Modals stay readable but lose the extra air */
+.modal-overlay { padding: 12px; }
+.modal { padding: 16px; }
+.modal-body { margin-bottom: 12px; }
+.settings-section { margin-bottom: 12px; }
+
+/* Google AdSense slot: collapsed (takes no space) until ads are switched on by adding
+   the class "ads-on" to <body>. Keep it as the last element of the page so ads never
+   push tool controls around. */
+.ad-slot { display: none; }
+body.ads-on .ad-slot {
+    display: block;
+    min-height: 90px;
+    margin: 8px 0;
+    text-align: center;
+}

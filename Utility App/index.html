@@ -591,6 +591,7 @@
                     <div class="bs-top-bar">
                         <button class="bs-round-btn" id="pcRefreshBtn" onclick="refreshPcData()" title="Sync data" aria-label="Sync data">↻</button>
                         <button class="bs-round-btn bs-upload-btn" id="pcUploadBtn" onclick="uploadPcList()" title="Upload list" aria-label="Upload list" style="display:none;">⬆</button>
+                        <button class="bs-round-btn bs-upload-btn" id="pcTemplateBtn" onclick="refDownloadTemplate('price_list')" title="Download template" aria-label="Download template" style="display:none;">📄</button>
                         <span id="pcTimestamp" class="bs-ts">No data</span>
                     </div>
                     <div class="bs-search-row">
@@ -615,6 +616,7 @@
                     <div class="bs-top-bar">
                         <button class="bs-round-btn" id="bsRefreshBtn" onclick="refreshBsData()" title="Sync data" aria-label="Sync data">↻</button>
                         <button class="bs-round-btn bs-upload-btn" id="bsUploadBtn" onclick="uploadBsList()" title="Upload list" aria-label="Upload list" style="display:none;">⬆</button>
+                        <button class="bs-round-btn bs-upload-btn" id="bsTemplateBtn" onclick="refDownloadTemplate(bsActiveList())" title="Download template" aria-label="Download template" style="display:none;">📄</button>
                         <div class="unique-toggle bs-pallet-toggle" title="Pallet mode: sort boxes by document / store">
                             <label><input type="checkbox" id="bsPalletToggle"> <span>Pallet</span></label>
                         </div>
@@ -664,7 +666,9 @@
                         </div>
                         <div id="ysUploadRow" class="ys-upload-row" style="display:none;">
                             <button class="bs-sync-btn bs-upload-btn bs-small-btn" id="ysUploadItemsBtn" type="button" title="Upload item master">⬆ Items</button>
+                            <button class="bs-round-btn bs-upload-btn bs-tpl-btn" type="button" onclick="refDownloadTemplate('ys_item_master')" title="Download item master template" aria-label="Download item master template">📄</button>
                             <button class="bs-sync-btn bs-upload-btn bs-small-btn" id="ysUploadPtlBtn" type="button" title="Upload PTL config">⬆ PTL</button>
+                            <button class="bs-round-btn bs-upload-btn bs-tpl-btn" type="button" onclick="refDownloadTemplate('ys_ptl_config')" title="Download PTL config template" aria-label="Download PTL config template">📄</button>
                         </div>
                         <div id="ysSyncStatus" class="ys-sync-status" style="display:none;">
                             <span class="spinner"></span> <span id="ysSyncMsg">Syncing item data...</span>
@@ -1004,6 +1008,9 @@
 
             </div><!-- end yearSegregateApp -->
 
+            <!-- Reserved for Google AdSense (hidden until ads are switched on; see .ad-slot in style.css) -->
+            <div class="ad-slot" id="adSlotBottom" aria-hidden="true"></div>
+
     </main>
 
     <!-- Hidden Print Container -->
@@ -1012,16 +1019,16 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=23"></script>
-    <script src="js/supabaseClient.js?v=23"></script>
-    <script src="js/lists.js?v=23"></script>
-    <script src="js/app.js?v=23"></script>
-    <script src="js/boxScanner.js?v=23"></script>
-    <script src="js/itemBarcode.js?v=23"></script>
-    <script src="js/boxCode.js?v=23"></script>
-    <script src="js/photoCapture.js?v=23"></script>
-    <script src="js/boxSegregate.js?v=23"></script>
-    <script src="js/priceCheck.js?v=23"></script>
-    <script src="js/yearSegregate.js?v=23"></script>
+    <script src="js/config.js?v=24"></script>
+    <script src="js/supabaseClient.js?v=24"></script>
+    <script src="js/lists.js?v=24"></script>
+    <script src="js/app.js?v=24"></script>
+    <script src="js/boxScanner.js?v=24"></script>
+    <script src="js/itemBarcode.js?v=24"></script>
+    <script src="js/boxCode.js?v=24"></script>
+    <script src="js/photoCapture.js?v=24"></script>
+    <script src="js/boxSegregate.js?v=24"></script>
+    <script src="js/priceCheck.js?v=24"></script>
+    <script src="js/yearSegregate.js?v=24"></script>
 </body>
 </html>

@@ -29,6 +29,7 @@ async function initBoxSegregate() {
     bsPalletMode = Storage.get('bs_pallet_mode') === '1';
 
     document.getElementById('bsUploadBtn').style.display = refCanUpload() ? '' : 'none';
+    document.getElementById('bsTemplateBtn').style.display = refCanUpload() ? '' : 'none';
 
     if (!bsListenerAdded) {
         const input = document.getElementById('bsBarcodeInput');
