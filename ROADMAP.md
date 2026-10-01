@@ -40,6 +40,13 @@ A running, numbered backlog of everything discussed for this app, so it isn't ju
 22. When a user or enterprise admin resets their data, it must be **actually deleted** from Supabase (not just hidden/flagged) to keep storage within free-tier limits while scaling toward 500 users
 23. Everything must stay on free tiers across all tools/services used
 24. App must keep functioning exactly as it does now through the migration
+25. **Decided schema (final, ready to implement):**
+    - `profiles` — one row per signed-in user: `id`, `email`, `display_name`, `tier` (`individual`/`enterprise_admin`/`enterprise_member`), `enterprise_id` (nullable)
+    - `enterprises` — one row per org: `id`, `name`, `admin_user_id`
+    - `enterprise_invites` — pending email invites: `id`, `enterprise_id`, `invited_email`, `status`, `token`, `expires_at`
+    - `scans` — replaces both IndexedDB and the Google Sheet, same fields the app already uses (`store_id`, `store_name`, `staff_name`, `remark`, `box_number`, `barcode`, `qty`, `box_status`, `timestamp`, `scan_uid`), plus `user_id` and `enterprise_id` for ownership
+    - RLS: individuals and enterprise members only see their own `scans`; enterprise admins see every `scans` row tagged with their `enterprise_id`; Reset performs a real `DELETE`, not a soft-delete flag
+    - Net effect: replaces the current IndexedDB-then-sync-to-Sheets dual-write complexity with a single direct write to Supabase — simpler than what exists today, not more complex
 
 ## E. Auth
 
