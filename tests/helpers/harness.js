@@ -26,7 +26,9 @@ async function start() {
     if (!f.startsWith(APP)) { res.writeHead(403); return res.end(); }
     fs.readFile(f, (err, data) => {
       if (err) { res.writeHead(404); return res.end(); }
-      const type = f.endsWith('.js') ? 'text/javascript' : f.endsWith('.html') ? 'text/html' : f.endsWith('.css') ? 'text/css' : 'application/octet-stream';
+      const types = { '.js': 'text/javascript', '.html': 'text/html', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png',
+                      '.webmanifest': 'application/manifest+json', '.json': 'application/json' };
+      const type = types[path.extname(f)] || 'application/octet-stream';
       res.writeHead(200, { 'Content-Type': type, 'Content-Security-Policy': csp });
       res.end(data);
     });

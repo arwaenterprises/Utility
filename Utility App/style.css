@@ -2341,3 +2341,7 @@ body.ads-on .ad-slot {
 .view-box-list .scans-table { margin: 0; }
 .view-box-empty { text-align: center; color: var(--ak-danger); font-weight: 600; padding: 12px 6px; }
 .view-box-close-btn { background: var(--ak-danger); color: var(--ak-white); width: 100%; }
+
+/* Header logo is now the app icon itself (it brings its own rounded background) */
+.header-logo { background: none; box-shadow: none; padding: 0; overflow: hidden; }
+.header-logo img { width: 100%; height: 100%; display: block; }

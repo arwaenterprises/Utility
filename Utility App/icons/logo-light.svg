@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Same logo, light tile: used in the maroon page header where the maroon app icon would blend in -->
+  <rect width="512" height="512" rx="112" fill="#FFFFFF"/>
+  <rect x="104" y="212" width="304" height="212" rx="22" fill="#8B1A32"/>
+  <rect x="84" y="148" width="344" height="86" rx="22" fill="#A83350"/>
+  <rect x="226" y="148" width="60" height="86" fill="#C95A73"/>
+  <g fill="#FFFFFF">
+    <rect x="150" y="262" width="16" height="122"/>
+    <rect x="182" y="262" width="8"  height="122"/>
+    <rect x="206" y="262" width="22" height="122"/>
+    <rect x="244" y="262" width="8"  height="122"/>
+    <rect x="268" y="262" width="16" height="122"/>
+    <rect x="300" y="262" width="8"  height="122"/>
+    <rect x="324" y="262" width="22" height="122"/>
+    <rect x="360" y="262" width="8"  height="122"/>
+  </g>
+</svg>

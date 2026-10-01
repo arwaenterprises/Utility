@@ -5,7 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Utility">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#8B1A32">
     <title>Utility</title>
+    <!-- Installable app (PWA): manifest + icons. Icons are original artwork in icons/ (replace the files to change the logo). -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="icons/icon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
@@ -23,7 +31,7 @@
 <body>
     <!-- HEADER -->
     <header class="header">
-        <div class="header-logo">U</div>
+        <div class="header-logo"><img src="icons/logo-light.svg" alt="Utility" width="32" height="32"></div>
         <h1 class="header-title">Utility</h1>
         <div class="header-store" id="headerUser"></div>
         <button class="btn-signout" id="accountBtn" title="Account">👤</button>
@@ -968,16 +976,16 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=28"></script>
-    <script src="js/supabaseClient.js?v=28"></script>
-    <script src="js/lists.js?v=28"></script>
-    <script src="js/usage.js?v=28"></script>
-    <script src="js/app.js?v=28"></script>
-    <script src="js/boxScanner.js?v=28"></script>
-    <script src="js/itemBarcode.js?v=28"></script>
-    <script src="js/boxCode.js?v=28"></script>
-    <script src="js/boxSegregate.js?v=28"></script>
-    <script src="js/priceCheck.js?v=28"></script>
-    <script src="js/yearSegregate.js?v=28"></script>
+    <script src="js/config.js?v=30"></script>
+    <script src="js/supabaseClient.js?v=30"></script>
+    <script src="js/lists.js?v=30"></script>
+    <script src="js/usage.js?v=30"></script>
+    <script src="js/app.js?v=30"></script>
+    <script src="js/boxScanner.js?v=30"></script>
+    <script src="js/itemBarcode.js?v=30"></script>
+    <script src="js/boxCode.js?v=30"></script>
+    <script src="js/boxSegregate.js?v=30"></script>
+    <script src="js/priceCheck.js?v=30"></script>
+    <script src="js/yearSegregate.js?v=30"></script>
 </body>
 </html>

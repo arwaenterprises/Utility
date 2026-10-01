@@ -20,6 +20,18 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('no Google Apps Script / hard-coded admin code left in the app', typeof CONFIG.GOOGLE_SCRIPT_URL === 'undefined' && typeof CONFIG.ADMIN_CODE === 'undefined' && typeof CONFIG.YS_SCRIPT_URL === 'undefined' && typeof CONFIG.PC_SCRIPT_URL === 'undefined');
     return log;
   });
+  // Ask Chrome itself whether this is an installable app (manifest + icons + service worker + secure context).
+  await page.waitForTimeout(1500);                                  // let the service worker finish installing
+  const cdp = await page.context().newCDPSession(page);
+  const m = await cdp.send('Page.getAppManifest');
+  const inst = await cdp.send('Page.getInstallabilityErrors');
+  const manifestJson = m.data ? JSON.parse(m.data) : {};
+  log.push({ pass: !(m.errors || []).length && manifestJson.name === 'Utility', name: 'Chrome reads the manifest without errors', extra: JSON.stringify(m.errors || []) });
+  log.push({ pass: (inst.installabilityErrors || []).length === 0, name: 'Chrome reports no reasons the app cannot be installed', extra: JSON.stringify(inst.installabilityErrors || []) });
+  const sw = await page.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); return r ? (r.active ? 'active' : (r.installing ? 'installing' : 'registered')) : 'none'; });
+  log.push({ pass: sw === 'active', name: 'service worker is active (offline files cached)', extra: sw });
+  const cached = await page.evaluate(async () => { const keys = await caches.keys(); const c = await caches.open(keys[0]); return (await c.keys()).map(r => new URL(r.url).pathname); });
+  log.push({ pass: cached.some(p => p.endsWith('manifest.webmanifest')) && cached.some(p => p.endsWith('icon-512.png')), name: 'manifest and icons are in the offline cache', extra: cached.length + ' files' });
   const failures = report(log, errors.filter(e => !/Failed to load resource/.test(e)));
   await stop(ctx);
   process.exit(failures ? 1 : 0);

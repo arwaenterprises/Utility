@@ -33,6 +33,14 @@ reachable; run them with `PGHOST=... PGUSER=... npm run test:sql`.
 GitHub runs the same tests on every push (`.github/workflows/test.yml`). A red check means something that
 worked before no longer does - open the failed run to see which line failed.
 
+## Installing the app on a device (PWA)
+
+The site is an installable app: it opens full-screen with its own icon and works offline.
+- **Android / Windows / Mac (Chrome or Edge):** open `https://utility.arwaenterprises.com`, sign in, then browser menu (three dots) -> **Install app** (or the install icon in the address bar).
+- **iPhone / iPad (Safari):** Share button -> **Add to Home Screen**.
+- Updates arrive by themselves the next time the app is opened with internet.
+The logo is original artwork in `Utility App/icons/` (`icon.svg` is the master; PNG sizes are generated from it). To use a different logo, replace those files and keep the same file names and sizes (the tests check this).
+
 ## Releasing a change
 
 1. Change the app files in `Utility App/`.

@@ -30,6 +30,25 @@ const shell = [...sw.matchAll(/'\.\/(js\/[^']+)'/g)].map(m => m[1]);
 check('service worker caches every script', tags.every(t => shell.includes(t.file)), tags.filter(t => !shell.includes(t.file)).map(t => t.file).join());
 check('service worker lists no missing files', shell.every(f => fs.existsSync(path.join(APP, f))), shell.filter(f => !fs.existsSync(path.join(APP, f))).join());
 
+// 2b. Installable app (PWA): manifest + icons exist, are valid, are linked from index.html and cached by the service worker.
+let manifest = null;
+try { manifest = JSON.parse(fs.readFileSync(path.join(APP, 'manifest.webmanifest'), 'utf8')); } catch (e) { /* reported below */ }
+check('manifest.webmanifest exists and is valid JSON', !!manifest);
+if (manifest) {
+  check('manifest: name, short_name, start_url, standalone display', !!manifest.name && !!manifest.short_name && !!manifest.start_url && manifest.display === 'standalone');
+  check('manifest: theme and background colours', /^#[0-9a-f]{6}$/i.test(manifest.theme_color || '') && /^#[0-9a-f]{6}$/i.test(manifest.background_color || ''));
+  const pngSize = f => { const b = fs.readFileSync(path.join(APP, f)); return b.readUInt32BE(16) + 'x' + b.readUInt32BE(20); };
+  for (const icon of manifest.icons || []) {
+    const exists = fs.existsSync(path.join(APP, icon.src));
+    check(`manifest icon ${icon.src} exists with the declared size (${icon.sizes}, ${icon.purpose})`, exists && pngSize(icon.src) === icon.sizes, exists ? pngSize(icon.src) : 'missing');
+  }
+  const has = (size, purpose) => (manifest.icons || []).some(i => i.sizes === size && i.purpose === purpose);
+  check('manifest has 192 and 512 icons plus a maskable 512 icon', has('192x192', 'any') && has('512x512', 'any') && has('512x512', 'maskable'));
+  check('service worker caches the manifest and every manifest icon', sw.includes('manifest.webmanifest') && (manifest.icons || []).every(i => sw.includes(i.src)));
+}
+check('index.html links the manifest, favicon, apple-touch-icon and theme colour', html.includes('rel="manifest"') && html.includes('rel="icon"') && html.includes('rel="apple-touch-icon"') && /name="theme-color"/.test(html));
+for (const f of ['icons/apple-touch-icon.png', 'icons/favicon.svg', 'icons/icon-32.png']) check('icon file exists: ' + f, fs.existsSync(path.join(APP, f)));
+
 // 3. Things that were removed must stay removed.
 const appText = ['index.html', 'style.css', 'sw.js', ...jsFiles.map(f => 'js/' + f)].map(f => fs.readFileSync(path.join(APP, f), 'utf8')).join('\n');
 for (const word of ['photoCapture', 'GOOGLE_SCRIPT_URL', 'PC_SCRIPT_URL', 'YS_SCRIPT_URL', 'ADMIN_CODE', 'script.google.com']) {

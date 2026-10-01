@@ -124,6 +124,8 @@ All three tools are off Google Sheets / Apps Script and on Supabase. **Built and
 
 68. **Box Scanner: "View Box" + 40% Close Box button** — ✅ built. The button row is now **Close Box (40%) | View Box (40%) | keyboard**; View Box is also shown **before any box is open** (then it spans the row; Close Box and the keyboard button appear only while a box is open). **View Box** opens a pop-up with a scan field: scan any box ID and it shows that box's content — box ID, item count, status (Open / Closed) and every scanned barcode with its time, in scan order; a box with no scans shows "No scans found for this box". The pop-up stays open so several boxes can be checked one after another; its **red Close button** (or Esc) closes it and puts the cursor back on the barcode field (or the Box ID field if no box is open) so scanning continues exactly where it was. Read-only (no delete inside the pop-up); English + Arabic labels. It looks at this device's scans for the signed-in user (an enterprise member who has reset their device will not see boxes from before the reset). Cache `v28`; 13 new tests.
 
+69. **Installable app (PWA) + logo** — ✅ built. The site had a service worker (offline files) but no manifest or icons, so browsers would not offer a proper install. Added `manifest.webmanifest` (name Utility, standalone / full-screen, maroon theme colour, cream background), an **original logo** (a cardboard box with a barcode, in the app's maroon — designed here, not taken from the internet, to avoid copyright problems) as `icons/icon.svg` with generated PNGs (192, 512, a maskable 512 for Android's round/squircle crops, 180 Apple touch icon, 32/48 favicons), a light-tile `logo-light.svg` for the page header, `<link>`/`<meta>` tags in `index.html`, and everything added to the service-worker cache. Chrome's own installability check (run in the automated tests) reports **no errors**. Operators install via Chrome menu -> Install app, or Safari Share -> Add to Home Screen (see README). **Not tested on real devices** (Android Chrome and iOS Safari differ in install behaviour) — part of the next-week device test. To change the logo later: replace the files in `Utility App/icons/` (same names and sizes). Cache `v30`.
+
 ## J. What is pending (summary — keep this section current)
 
 **Needs the user:**
@@ -133,6 +135,7 @@ All three tools are off Google Sheets / Apps Script and on Supabase. **Built and
 - After a day of normal use, check the browser console (F12) for "Content Security Policy" warnings; if none, switch the CSP header to enforcing (item 11).
 - Decide whether the Pallet download should also list never-scanned / unknown boxes — item 57.
 - Decide who may create enterprises when real customers / pricing arrive (open today) — item 66.
+- Install the app on one Android tablet and one iPad (item 69) and check the icon, full-screen mode and offline start.
 - Re-test Pallet mode with the real file: expand the list to check the box numbers match what the scanner reads (item 65).
 - Google OAuth consent-screen status (user believes ~100 users is fine). The Privacy Policy / Terms pages (item 41) are no longer tied to AdSense; they are only needed if Google asks for them for sign-in verification (item 46).
 - Switch off the old Netlify site when the last operator has moved (item 16).
