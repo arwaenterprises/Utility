@@ -59,8 +59,8 @@ A running, numbered backlog of everything discussed for this app, so it isn't ju
 
 ## Phasing (agreed approach)
 
-1. **Phase 1 (next up):** Clone the app on a new branch (`saas-pilot`), hide every tool tile except Box Scanner, deploy that branch to `utility.arwaenterprises.com` as a second Netlify site. No backend changes yet — still talks to the same Google Apps Script.
-2. **Phase 2:** Design and build the Supabase migration for Box Scanner only — accounts, Google OAuth, Row-Level Security multi-tenancy, data-reset-deletes-data behavior (items 17–26). This needs its own dedicated design session before implementation starts.
+1. **Phase 1 — done:** Cloned the app on branch `saas-pilot`, hid every tool tile except Box Scanner, deployed that branch to a second Netlify site, pointed `utility.arwaenterprises.com` at it. Live over HTTP; HTTPS cert issuance deferred (DNS now correct, just needs a retry in Netlify when convenient — not blocking). Still talks to the same Google Apps Script — no backend changes yet.
+2. **Phase 2 (next up):** Design and build the Supabase migration for Box Scanner only — accounts, Google OAuth, Row-Level Security multi-tenancy, data-reset-deletes-data behavior (items 17–26). This needs its own dedicated design session before implementation starts.
 3. **Phase 3:** Once Box Scanner on Supabase is proven stable, decide on rolling the same pattern out to the remaining tools, revealing each tile as it's migrated.
 4. **Phase 4:** Add Google AdSense once the Supabase migration is stable (items 27–31).
 5. **Phase 5:** Retire the old Netlify + Google Apps Script version once the new one is fully proven.
