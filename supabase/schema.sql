@@ -40,7 +40,7 @@ create table if not exists public.enterprise_invites (
 
 create table if not exists public.scans (
     id uuid primary key default gen_random_uuid(),
-    user_id uuid not null references auth.users(id) on delete cascade,
+    user_id uuid not null references public.profiles(id) on delete cascade,
     enterprise_id uuid references public.enterprises(id) on delete set null,
     remark text,
     box_number text not null,
@@ -50,6 +50,24 @@ create table if not exists public.scans (
     scan_uid uuid not null default gen_random_uuid() unique,
     scanned_at timestamptz not null default now()
 );
+
+-- Migration for an already-existing scans table (originally pointed at
+-- auth.users directly): repoint user_id at public.profiles instead, so
+-- PostgREST can auto-embed profiles when querying scans (needed for the
+-- Team Scans view to show who scanned what). Safe - profiles.id is always
+-- equal to the auth.users id it was created for, so no data is orphaned.
+do $$
+begin
+    if exists (
+        select 1 from pg_constraint
+        where conrelid = 'public.scans'::regclass
+          and confrelid = 'auth.users'::regclass
+    ) then
+        alter table public.scans drop constraint scans_user_id_fkey;
+        alter table public.scans add constraint scans_user_id_fkey
+            foreign key (user_id) references public.profiles(id) on delete cascade;
+    end if;
+end $$;
 
 create index if not exists scans_user_id_idx on public.scans(user_id);
 create index if not exists scans_enterprise_id_idx on public.scans(enterprise_id);
@@ -192,8 +210,38 @@ begin
 end;
 $$;
 
+create or replace function public.remove_enterprise_member(member_user_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    target_enterprise_id uuid;
+begin
+    if not public.current_user_is_enterprise_admin() then
+        raise exception 'Only an enterprise admin can remove a member.';
+    end if;
+    if member_user_id = auth.uid() then
+        raise exception 'Cannot remove yourself.';
+    end if;
+
+    select enterprise_id into target_enterprise_id from public.profiles where id = member_user_id;
+    if target_enterprise_id is null or target_enterprise_id != public.current_user_enterprise_id() then
+        raise exception 'That user is not a member of your enterprise.';
+    end if;
+
+    update public.profiles
+    set tier = 'individual', enterprise_id = null
+    where id = member_user_id;
+
+    return true;
+end;
+$$;
+
 grant execute on function public.create_enterprise(text) to authenticated;
 grant execute on function public.accept_enterprise_invite(uuid) to authenticated;
+grant execute on function public.remove_enterprise_member(uuid) to authenticated;
 
 -- ============================================
 -- ROW LEVEL SECURITY
