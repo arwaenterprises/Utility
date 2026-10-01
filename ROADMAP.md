@@ -22,7 +22,7 @@ A running, numbered backlog of everything discussed for this app, so it isn't ju
 
 ## C. Domain & deployment
 
-15. Custom subdomain: `utility.arwaenterprises.com` — **live and serving all current `saas-pilot` features** (Netlify auto-deploys on every push to `saas-pilot`; HTTPS certificate is issued — confirmed by the user). **Open problem:** the user can only reach the site **while on a VPN**. A check from outside the user's network (cloud container) loads it normally over HTTPS from Netlify (HTTP 200, HSTS), so the site and certificate look fine and the block is likely specific to the user's network / ISP / DNS. To diagnose: compare mobile data vs. office Wi-Fi; change the device's DNS to 1.1.1.1 or 8.8.8.8; compare `nslookup utility.arwaenterprises.com` with and without the VPN; check whether `utilityy.netlify.app` loads without the VPN. If only the custom domain is blocked, ask the ISP / network admin to un-block or re-categorise it; otherwise it is a DNS issue to fix at the domain registrar.
+15. Custom subdomain: `utility.arwaenterprises.com` — **live and serving all current `saas-pilot` features** (Netlify auto-deploys on every push to `saas-pilot`; HTTPS certificate issued). The earlier "only reachable on a VPN" problem is **specific to the user's home Wi-Fi** (all other devices/networks work), so it is a home-router / ISP DNS issue, not a site problem — nothing to fix in the app. (If it ever matters: change the router's DNS to 1.1.1.1 / 8.8.8.8.)
 16. Prove out the new architecture on a clone of the app before touching the live one — ✅ **done**. The old Netlify app (`utilityy.netlify.app`, Google Apps Script) **keeps working as-is**; operators are being moved gradually to `utility.arwaenterprises.com`, and the old URL will be disabled when the last operator has moved (that final switch-off is the only thing left, and it is a Netlify setting, not code).
 
 ## D. SaaS / multi-tenancy — ✅ done (Box Scanner built first; the other tools followed in Phase 3, section I)
@@ -124,8 +124,7 @@ All three tools are off Google Sheets / Apps Script and on Supabase. **Built and
 
 **Needs the user:**
 - Re-run `supabase/schema.sql` in the Supabase SQL editor (adds the stricter Box Scanner delete rule and `rename_enterprise`; safe to re-run).
-- Real-device test of everything together: list uploads (formats in item 60, template icons), sync + offline lookups, Pallet mode + AWB download, Year/Season scans → Team console, Reset behaviours (items 43, 59), invite resend / rename — item 44.
-- **Reach the site without a VPN** — item 15 (looks like a network / DNS block on the user's side).
+- **Real-device test of everything together — user will do this over the week after 2026-10-01 (item 44):** list uploads (formats in item 60, template icons), sync + offline lookups, Pallet mode + AWB download, Year/Season scans → Team console, Reset behaviours (items 43, 59), invite resend / rename — item 44.
 - After a day of normal use, check the browser console (F12) for "Content Security Policy" warnings; if none, switch the CSP header to enforcing (item 11).
 - Decide whether the Pallet download should also list never-scanned / unknown boxes — item 57.
 - Decide who may create enterprises when real customers / pricing arrive (open today) — item 66.
