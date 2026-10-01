@@ -2451,3 +2451,14 @@ a.trust-badge:hover { box-shadow: var(--shadow-md); }
 .dp-links a { padding: 7px 12px; border: 1px solid var(--ak-maroon); border-radius: 20px; font-size: 13px; font-weight: 600; text-decoration: none; color: var(--ak-maroon); }
 .login-teaser { text-align: center; font-size: 13px; color: var(--ak-text-light); margin: 12px 0; }
 .trust-badge { padding: 14px 8px; }
+
+/* v42: "?" help button + guide modal */
+.app-help-btn { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--ak-maroon); background: var(--ak-white); color: var(--ak-maroon); font-size: 18px; font-weight: 800; cursor: pointer; flex: 0 0 auto; }
+.app-help-btn:hover { background: var(--ak-maroon); color: var(--ak-white); }
+.help-modal { max-width: 440px; width: 100%; max-height: 88vh; display: flex; flex-direction: column; }
+.help-body { overflow-y: auto; font-size: 14px; line-height: 1.5; }
+.help-body h4 { color: var(--ak-maroon); margin: 14px 0 6px; font-size: 14px; }
+.help-body ol, .help-body ul { margin: 0 0 0 20px; padding: 0; }
+.help-body li { margin: 6px 0; }
+.help-intro { font-weight: 600; }
+.help-before { background: var(--ak-cream-light); border-left: 4px solid var(--ak-warning); border-radius: 8px; padding: 8px 10px; margin-top: 10px; font-size: 13px; }

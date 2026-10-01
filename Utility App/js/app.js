@@ -753,6 +753,7 @@ function openApp(appId) {
     updateBackButton();
     showScreen('appScreen');
     initializeApp(appId);
+    if (typeof helpAutoShowOnce === 'function') helpAutoShowOnce(appId);
 }
 
 function updateBackButton() {

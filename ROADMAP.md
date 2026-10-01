@@ -171,3 +171,5 @@ All three tools are off Google Sheets / Apps Script and on Supabase. **Built and
 Independent of the phases above: item 41 (Privacy Policy/Terms on the main domain) can be done any time — it isn't blocking any phase.
 
 73. Trust pages — ✅ **done (v38-39)**: login page now describes the tools, Arwa Enterprises (India & GCC), data & security summary and links to public About & Contact, Privacy, Terms and Security pages (drafts, not legal advice — have a lawyer review Privacy/Terms). Data statement: "stays until you delete it". Still to do: Google OAuth consent-screen verification (use these page URLs), GitHub Dependabot/secret scanning.
+
+74. Step-by-step help for every tool — ✅ **done (v42)**: a **?** button in each tool's header opens a guide (before you start → steps → good to know); it also opens by itself the first time a person opens a tool. Text lives in `Utility App/js/help.js` — add an entry when a new tool is added. **Owner to check the wording** of Year/Season Sort (ST/close codes, voice button) and Box Segregate/Price Check against real use.

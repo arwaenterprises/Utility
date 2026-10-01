@@ -6,7 +6,7 @@
 //
 // BUMP CACHE_VERSION every time you deploy a change to index.html/js/css,
 // same as the ?v= numbers in index.html's script tags.
-const CACHE_VERSION = 'ak-utility-v41';
+const CACHE_VERSION = 'ak-utility-v42';
 
 const APP_SHELL = [
     './',
@@ -35,6 +35,7 @@ const APP_SHELL = [
     './js/lists.js',
     './js/usage.js',
     './js/syncstatus.js',
+    './js/help.js',
     './js/app.js',
     './js/boxScanner.js',
     './js/itemBarcode.js',

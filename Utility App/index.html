@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=41"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=41"></script>
-    <script src="vendor/qrcode.min.js?v=41"></script>
-    <script src="vendor/html5-qrcode.min.js?v=41"></script>
-    <script src="vendor/supabase.js?v=41"></script>
+    <script src="vendor/xlsx.full.min.js?v=42"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=42"></script>
+    <script src="vendor/qrcode.min.js?v=42"></script>
+    <script src="vendor/html5-qrcode.min.js?v=42"></script>
+    <script src="vendor/supabase.js?v=42"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -116,6 +116,17 @@
                 <button class="btn btn-secondary" id="downloadTeamSelectedBtn">⬇ Download Selected</button>
                 <button class="btn btn-secondary" id="resetTeamSelectedBtn" style="background: var(--ak-danger); color: white; border: none;">Reset Selected</button>
                 <button class="btn btn-primary" id="closeTeamBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HELP MODAL: step-by-step guide for the open tool (content in js/help.js) -->
+    <div class="modal-overlay" id="helpModal">
+        <div class="modal help-modal">
+            <h3 class="modal-title" id="helpTitle">How to use</h3>
+            <div class="modal-body help-body" id="helpBody" style="text-align: left;"></div>
+            <div class="modal-buttons">
+                <button class="btn btn-primary btn-block" id="helpCloseBtn" type="button">Got it</button>
             </div>
         </div>
     </div>
@@ -219,6 +230,7 @@
                     <h2 id="appTitleText">App Name</h2>
                     <p id="appSubtitleText">App description</p>
                 </div>
+                <button class="app-help-btn" id="helpBtn" type="button" title="How to use this tool" aria-label="How to use this tool">?</button>
             </div>
             
             <!-- BOX SCANNER APP -->
@@ -1039,17 +1051,18 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=41"></script>
-    <script src="js/supabaseClient.js?v=41"></script>
-    <script src="js/lists.js?v=41"></script>
-    <script src="js/usage.js?v=41"></script>
-    <script src="js/syncstatus.js?v=41"></script>
-    <script src="js/app.js?v=41"></script>
-    <script src="js/boxScanner.js?v=41"></script>
-    <script src="js/itemBarcode.js?v=41"></script>
-    <script src="js/boxCode.js?v=41"></script>
-    <script src="js/boxSegregate.js?v=41"></script>
-    <script src="js/priceCheck.js?v=41"></script>
-    <script src="js/yearSegregate.js?v=41"></script>
+    <script src="js/config.js?v=42"></script>
+    <script src="js/supabaseClient.js?v=42"></script>
+    <script src="js/lists.js?v=42"></script>
+    <script src="js/usage.js?v=42"></script>
+    <script src="js/syncstatus.js?v=42"></script>
+    <script src="js/help.js?v=42"></script>
+    <script src="js/app.js?v=42"></script>
+    <script src="js/boxScanner.js?v=42"></script>
+    <script src="js/itemBarcode.js?v=42"></script>
+    <script src="js/boxCode.js?v=42"></script>
+    <script src="js/boxSegregate.js?v=42"></script>
+    <script src="js/priceCheck.js?v=42"></script>
+    <script src="js/yearSegregate.js?v=42"></script>
 </body>
 </html>

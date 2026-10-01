@@ -16,6 +16,22 @@ const { start, openApp, report, stop } = require('./helpers/harness');
       try { await initializeApp(id); await new Promise(r => setTimeout(r, 150)); } catch (e) { err = e.message; }
       ok('tool opens: ' + id, !err && !!document.getElementById(APPS.find(a => a.id === id).containerId), err);
     }
+    // Help guides: every tool has one; it opens by itself once, and the "?" button opens it again.
+    const modal = () => document.getElementById('helpModal').classList.contains('active');
+    for (const id of APPS.map(a => a.id)) {
+      localStorage.clear();
+      ok('help guide written for: ' + id, !!HELP[id] && HELP[id].steps.length >= 3);
+      openApp(id);
+      ok('guide opens by itself the first time: ' + id, modal());
+      const title = document.getElementById('helpTitle').textContent;
+      document.getElementById('helpCloseBtn').click();
+      ok('"Got it" closes the guide: ' + id, !modal() && title.includes(APPS.find(a => a.id === id).name));
+      openApp(id);
+      ok('guide does not open by itself the second time: ' + id, !modal());
+      document.getElementById('helpBtn').click();
+      ok('"?" button opens the guide again: ' + id, modal());
+      document.getElementById('helpCloseBtn').click();
+    }
     ok('Year/Season store id comes from the Google account', AppState.storeId === 'a@b.c' && AppState.storeName === 'Ann');
     ok('no Google Apps Script / hard-coded admin code left in the app', typeof CONFIG.GOOGLE_SCRIPT_URL === 'undefined' && typeof CONFIG.ADMIN_CODE === 'undefined' && typeof CONFIG.YS_SCRIPT_URL === 'undefined' && typeof CONFIG.PC_SCRIPT_URL === 'undefined');
     return log;
