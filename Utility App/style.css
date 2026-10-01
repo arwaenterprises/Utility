@@ -2367,3 +2367,8 @@ body.rtl .form-select {
 .update-banner span { flex: 1; }
 .update-banner .btn { padding: 8px 14px; background: var(--ak-white); color: var(--ak-maroon); font-size: 13px; }
 .update-banner .update-later { background: none; border: none; color: var(--ak-white); font-size: 16px; cursor: pointer; padding: 4px 6px; }
+
+/* Item Barcode: "Add text" toggle + text box */
+.item-text-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.item-text-row .unique-toggle { flex: 0 0 auto; }
+.item-text-row .form-input { flex: 1; min-width: 0; margin: 0; }

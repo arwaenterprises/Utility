@@ -403,6 +403,10 @@
                         </div>
                         <input type="text" id="itemBarcodeInput" class="form-input" placeholder="Scan barcode, paste comma-separated, or upload CSV..." autocomplete="off">
                         <p class="help-text">Supports: single barcode, comma-separated (e.g., 123,456,789), or CSV upload</p>
+                        <div class="item-text-row">
+                            <div class="unique-toggle" title="Print a line of text above the barcode"><label><input type="checkbox" id="itemTextToggle"> <span>Add text</span></label></div>
+                            <input type="text" id="itemLabelText" class="form-input" maxlength="40" autocomplete="off" placeholder="Text above the barcode (e.g. Apparel)" style="display:none;">
+                        </div>
                     </div>
                     
                     <div class="csv-preview" id="itemCsvPreview">
@@ -989,17 +993,17 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=35"></script>
-    <script src="js/supabaseClient.js?v=35"></script>
-    <script src="js/lists.js?v=35"></script>
-    <script src="js/usage.js?v=35"></script>
-    <script src="js/syncstatus.js?v=35"></script>
-    <script src="js/app.js?v=35"></script>
-    <script src="js/boxScanner.js?v=35"></script>
-    <script src="js/itemBarcode.js?v=35"></script>
-    <script src="js/boxCode.js?v=35"></script>
-    <script src="js/boxSegregate.js?v=35"></script>
-    <script src="js/priceCheck.js?v=35"></script>
-    <script src="js/yearSegregate.js?v=35"></script>
+    <script src="js/config.js?v=36"></script>
+    <script src="js/supabaseClient.js?v=36"></script>
+    <script src="js/lists.js?v=36"></script>
+    <script src="js/usage.js?v=36"></script>
+    <script src="js/syncstatus.js?v=36"></script>
+    <script src="js/app.js?v=36"></script>
+    <script src="js/boxScanner.js?v=36"></script>
+    <script src="js/itemBarcode.js?v=36"></script>
+    <script src="js/boxCode.js?v=36"></script>
+    <script src="js/boxSegregate.js?v=36"></script>
+    <script src="js/priceCheck.js?v=36"></script>
+    <script src="js/yearSegregate.js?v=36"></script>
 </body>
 </html>

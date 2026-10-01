@@ -6,7 +6,9 @@ const PrintState = {
         outputFormat: 'barcode',
         barcodeType: 'numeric',
         boxPrefix: 'RTO',
-        boxOutputFormat: 'barcode'
+        boxOutputFormat: 'barcode',
+        labelTextOn: false,       // Item Barcode: print a line of text above the barcode
+        labelText: ''
     },
     printMode: 'single',
     csvData: [],
@@ -23,12 +25,124 @@ function savePrintSettings() {
 }
 
 // ============================================
+// ITEM BARCODE - LABEL DRAWING
+// ============================================
+// Bar height is 70 (it used to be 80: about 12% shorter). The preview is scaled the same way.
+const ITEM_BAR_HEIGHT = 70;
+const ITEM_PREVIEW_BAR_HEIGHT = 52;
+
+// The text to print above the barcode, or '' when "Add text" is off.
+function itemLabelText() {
+    return PrintState.settings.labelTextOn ? String(PrintState.settings.labelText || '').trim() : '';
+}
+
+// Adds a bold line of text above an already drawn barcode (SVG), left-aligned with the bars:
+//   Apparel
+//   |||| ||| |||||
+//   300100010265
+// "Add text" is on but nothing is typed: stop before printing a label without the text the user asked for.
+function itemTextMissing() {
+    if (PrintState.settings.labelTextOn && !itemLabelText()) {
+        showItemStatus('error', 'Enter the text for the label, or turn off "Add text"');
+        document.getElementById('itemLabelText').focus();
+        setTimeout(() => hideItemStatus(), 2500);
+        return true;
+    }
+    return false;
+}
+
+function addTextAboveBarcode(svg, text) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const width = parseFloat(svg.getAttribute('width')) || 200;
+    const height = parseFloat(svg.getAttribute('height')) || 100;
+    const margin = 5;
+    let fontSize = 18;
+    // shrink long text so it never runs past the end of the bars
+    const approxWidth = (size) => text.length * size * 0.6;
+    while (fontSize > 9 && approxWidth(fontSize) > width - margin * 2) fontSize--;
+    const headerHeight = Math.round(fontSize + 10);
+
+    const bg = document.createElementNS(NS, 'rect');
+    bg.setAttribute('x', '0'); bg.setAttribute('y', '0');
+    bg.setAttribute('width', '100%'); bg.setAttribute('height', String(headerHeight));
+    bg.setAttribute('fill', '#ffffff');
+
+    const body = document.createElementNS(NS, 'g');
+    body.setAttribute('transform', `translate(0 ${headerHeight})`);
+    while (svg.firstChild) body.appendChild(svg.firstChild);
+
+    const label = document.createElementNS(NS, 'text');
+    label.setAttribute('x', String(margin));
+    label.setAttribute('y', String(fontSize + 2));
+    label.setAttribute('font-family', 'Arial, Helvetica, sans-serif');
+    label.setAttribute('font-weight', '700');
+    label.setAttribute('font-size', String(fontSize));
+    label.setAttribute('fill', '#000000');
+    label.setAttribute('class', 'item-label-text');
+    label.textContent = text;
+
+    svg.appendChild(bg);
+    svg.appendChild(body);
+    svg.appendChild(label);
+    svg.setAttribute('height', (height + headerHeight) + 'px');
+    svg.setAttribute('viewBox', `0 0 ${width} ${height + headerHeight}`);
+}
+
+// Draws the barcode for `value` into the <svg id=svgId> that is already in the page, with the optional text on top.
+function drawItemBarcode(svgId, value, opts) {
+    const o = { height: ITEM_BAR_HEIGHT, fontSize: 16, margin: 5, ...(opts || {}) };
+    try {
+        const format = PrintState.settings.barcodeType === 'numeric' ? 'CODE128C' : 'CODE128B';
+        JsBarcode('#' + svgId, value, { format: format, width: 2, height: o.height, displayValue: true, fontSize: o.fontSize, margin: o.margin });
+    } catch (e) {
+        JsBarcode('#' + svgId, value, { format: 'CODE128', width: 2, height: o.height, displayValue: true, fontSize: o.fontSize, margin: o.margin });
+    }
+    const text = itemLabelText();
+    if (text) addTextAboveBarcode(document.getElementById(svgId), text);
+}
+
+// QR labels get the same text as a bold line above the code.
+function itemQrHeaderElement() {
+    const text = itemLabelText();
+    if (!text) return null;
+    const div = document.createElement('div');
+    div.className = 'item-label-text';
+    div.style.cssText = 'font: 700 18px Arial, Helvetica, sans-serif; text-align: left; width: 100%; padding: 0 4px 4px;';
+    div.textContent = text;
+    return div;
+}
+
+// ============================================
 // ITEM BARCODE - INITIALIZATION
 // ============================================
 function initItemBarcode() {
     loadPrintSettings();
     updateItemDisplaySettings();
     setupItemBarcodeListeners();
+    syncItemTextControls();
+}
+
+// Shows / hides the text box to match the toggle and restores what was saved.
+function syncItemTextControls() {
+    const on = !!PrintState.settings.labelTextOn;
+    document.getElementById('itemTextToggle').checked = on;
+    const input = document.getElementById('itemLabelText');
+    input.style.display = on ? '' : 'none';
+    input.value = PrintState.settings.labelText || '';
+}
+
+function handleItemTextToggle(e) {
+    PrintState.settings.labelTextOn = e.target.checked;
+    savePrintSettings();
+    syncItemTextControls();
+    if (e.target.checked) document.getElementById('itemLabelText').focus();
+    updateItemPreview();
+}
+
+function handleItemTextInput(e) {
+    PrintState.settings.labelText = e.target.value;
+    savePrintSettings();
+    updateItemPreview();
 }
 
 function setupItemBarcodeListeners() {
@@ -41,6 +155,14 @@ function setupItemBarcodeListeners() {
         if (e.key === 'Enter') handleItemBarcodeEnter();
     });
     document.getElementById('itemBarcodeInput').addEventListener('input', updateItemPreview);
+
+    // "Add text" toggle + text box (listeners are added once; this function runs on every open of the tab)
+    if (!setupItemBarcodeListeners.textBound) {
+        setupItemBarcodeListeners.textBound = true;
+        document.getElementById('itemTextToggle').addEventListener('change', handleItemTextToggle);
+        document.getElementById('itemLabelText').addEventListener('input', handleItemTextInput);
+        document.getElementById('itemLabelText').addEventListener('keypress', (e) => { if (e.key === 'Enter') document.getElementById('itemBarcodeInput').focus(); });
+    }
     
     // Quantity input
     document.getElementById('itemQtyInput').addEventListener('keypress', (e) => {
@@ -115,13 +237,10 @@ function updateItemPreview() {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.id = 'previewBarcode';
         document.getElementById('previewLabel').appendChild(svg);
-        try {
-            const format = PrintState.settings.barcodeType === 'numeric' ? 'CODE128C' : 'CODE128B';
-            JsBarcode('#previewBarcode', barcode, { format: format, width: 2, height: 60, displayValue: true, fontSize: 14, margin: 5 });
-        } catch (e) {
-            JsBarcode('#previewBarcode', barcode, { format: 'CODE128', width: 2, height: 60, displayValue: true, fontSize: 14, margin: 5 });
-        }
+        drawItemBarcode('previewBarcode', barcode, { height: ITEM_PREVIEW_BAR_HEIGHT, fontSize: 14 });
     } else {
+        const qrHeader = itemQrHeaderElement();
+        if (qrHeader) document.getElementById('previewLabel').appendChild(qrHeader);
         const qrDiv = document.createElement('div');
         qrDiv.id = 'previewQR';
         document.getElementById('previewLabel').appendChild(qrDiv);
@@ -144,6 +263,7 @@ async function printItemLabel() {
         showItemStatus('error', 'Please enter a barcode');
         return;
     }
+    if (itemTextMissing()) return;
     
     let qty = PrintState.printMode === 'bulk' ? parseInt(document.getElementById('itemQtyInput').value) || 1 : 1;
     if (qty < 1) qty = 1;
@@ -165,14 +285,11 @@ async function printItemLabel() {
                 svg.id = `printBarcode_${i}`;
                 labelDiv.appendChild(svg);
                 printContainer.appendChild(labelDiv);
-                try {
-                    const format = PrintState.settings.barcodeType === 'numeric' ? 'CODE128C' : 'CODE128B';
-                    JsBarcode(`#printBarcode_${i}`, barcode, { format: format, width: 2, height: 80, displayValue: true, fontSize: 16, margin: 5 });
-                } catch (e) {
-                    JsBarcode(`#printBarcode_${i}`, barcode, { format: 'CODE128', width: 2, height: 80, displayValue: true, fontSize: 16, margin: 5 });
-                }
+                drawItemBarcode(`printBarcode_${i}`, barcode);
             } else {
                 const qrCanvas = await createQRWithText(barcode, 150);
+                const qrHeader = itemQrHeaderElement();
+                if (qrHeader) labelDiv.appendChild(qrHeader);
                 labelDiv.appendChild(qrCanvas);
                 printContainer.appendChild(labelDiv);
             }
@@ -262,6 +379,7 @@ function cancelCSV() {
 
 async function printFromCSV() {
     if (PrintState.isProcessing || PrintState.csvData.length === 0) return;
+    if (itemTextMissing()) return;
     PrintState.isProcessing = true;
     document.getElementById('itemCsvPreview').classList.remove('show');
     const totalLabels = PrintState.csvData.reduce((sum, item) => sum + item.qty, 0);
@@ -282,14 +400,11 @@ async function printFromCSV() {
                     svg.id = `printBarcode_${labelCount}`;
                     labelDiv.appendChild(svg);
                     printContainer.appendChild(labelDiv);
-                    try {
-                        const format = PrintState.settings.barcodeType === 'numeric' ? 'CODE128C' : 'CODE128B';
-                        JsBarcode(`#printBarcode_${labelCount}`, item.barcode, { format: format, width: 2, height: 80, displayValue: true, fontSize: 16, margin: 5 });
-                    } catch (e) {
-                        JsBarcode(`#printBarcode_${labelCount}`, item.barcode, { format: 'CODE128', width: 2, height: 80, displayValue: true, fontSize: 16, margin: 5 });
-                    }
+                    drawItemBarcode(`printBarcode_${labelCount}`, item.barcode);
                 } else {
                     const qrCanvas = await createQRWithText(item.barcode, 150);
+                    const qrHeader = itemQrHeaderElement();
+                    if (qrHeader) labelDiv.appendChild(qrHeader);
                     labelDiv.appendChild(qrCanvas);
                     printContainer.appendChild(labelDiv);
                 }
@@ -344,7 +459,8 @@ async function testPrint() {
         svg.id = 'testBarcode';
         labelDiv.appendChild(svg);
         printContainer.appendChild(labelDiv);
-        JsBarcode('#testBarcode', 'TEST-12345', { format: 'CODE128', width: 2, height: 80, displayValue: true, fontSize: 16, margin: 10 });
+        JsBarcode('#testBarcode', 'TEST-12345', { format: 'CODE128', width: 2, height: ITEM_BAR_HEIGHT, displayValue: true, fontSize: 16, margin: 10 });
+        if (itemLabelText()) addTextAboveBarcode(document.getElementById('testBarcode'), itemLabelText());
     } else {
         const qrCanvas = await createQRWithText('TEST-12345', 150);
         labelDiv.appendChild(qrCanvas);

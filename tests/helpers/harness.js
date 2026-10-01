@@ -10,6 +10,7 @@ const ROOT = path.join(__dirname, '..', '..');
 const APP = path.join(ROOT, 'Utility App');
 const MOCK = fs.readFileSync(path.join(__dirname, 'mock-supabase.js'), 'utf8');
 const XLSX_SRC = fs.readFileSync(require.resolve('xlsx/dist/xlsx.full.min.js'), 'utf8');
+const JSBARCODE_SRC = fs.readFileSync(path.join(path.dirname(require.resolve('jsbarcode/package.json')), 'dist', 'JsBarcode.all.min.js'), 'utf8');
 
 function readCsp() {
   const toml = fs.readFileSync(path.join(ROOT, 'netlify.toml'), 'utf8');
@@ -45,9 +46,12 @@ async function openApp(ctx, viewport) {
   const errors = [];
   page.on('pageerror', e => errors.push('JS error: ' + e.message));
   // Block the internet (CDN libraries fail to load here; SheetJS is served from node_modules instead).
-  await page.route(/^(?!http:\/\/127\.0\.0\.1).*/, r => /xlsx/.test(r.request().url())
-    ? r.fulfill({ contentType: 'text/javascript', body: XLSX_SRC })
-    : r.abort());
+  await page.route(/^(?!http:\/\/127\.0\.0\.1).*/, r => {
+    const url = r.request().url();
+    if (/xlsx/.test(url)) return r.fulfill({ contentType: 'text/javascript', body: XLSX_SRC });
+    if (/jsbarcode/i.test(url)) return r.fulfill({ contentType: 'text/javascript', body: JSBARCODE_SRC });   // the real barcode library
+    return r.abort();
+  });
   await page.addInitScript(MOCK);
   await page.addInitScript(() => {
     window.__csp = [];
