@@ -2420,3 +2420,21 @@ a.trust-badge:hover { box-shadow: var(--shadow-md); }
 .login-foot a { color: var(--ak-maroon); }
 .login-foot .login-checked { font-size: 11px; }
 @media (min-width: 700px) { .trust-row { grid-template-columns: repeat(4, 1fr); } .tool-grid { grid-template-columns: repeat(3, 1fr); } }
+
+/* v40: centred layout + brand-coloured badges + a colour per tool */
+.login-info h3, .login-foot, .card-title, .card-subtitle { text-align: center; }
+#loginScreen .card-title { justify-content: center; }
+.tool-chip { align-items: center; text-align: center; border-top: 3px solid var(--c, var(--ak-maroon)); }
+.tool-chip b { color: var(--c, var(--ak-maroon)); }
+.tool-ico { background: var(--c, var(--ak-maroon)); }
+.trust-badge { border-top-width: 4px; }
+.b-google { border-top-color: #4285F4; }
+.b-ssl, .b-safe { border-top-color: #1e8e3e; }
+.b-noads { border-top-color: #8B1A32; }
+.tb-ico.tb-google { background: conic-gradient(#EA4335 0 25%, #FBBC05 0 50%, #34A853 0 75%, #4285F4 0); position: relative; }
+.tb-google span { width: 18px; height: 18px; border-radius: 50%; background: var(--ak-white); }
+.tb-ico.tb-grade { width: auto; min-width: 46px; height: 30px; border-radius: 8px; background: #1e8e3e; color: #fff; font-weight: 800; font-size: 16px; padding: 0 8px; }
+.tb-ico.tb-check { background: #1e8e3e; }
+.tb-check svg { stroke: #fff; stroke-width: 3; }
+.tb-ico.tb-noads { background: rgba(139, 26, 50, 0.12); }
+.tb-noads svg { stroke: #8B1A32; }

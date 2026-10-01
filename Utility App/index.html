@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=39"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=39"></script>
-    <script src="vendor/qrcode.min.js?v=39"></script>
-    <script src="vendor/html5-qrcode.min.js?v=39"></script>
-    <script src="vendor/supabase.js?v=39"></script>
+    <script src="vendor/xlsx.full.min.js?v=40"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=40"></script>
+    <script src="vendor/qrcode.min.js?v=40"></script>
+    <script src="vendor/html5-qrcode.min.js?v=40"></script>
+    <script src="vendor/supabase.js?v=40"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -143,21 +143,21 @@
             </div>
 
             <div class="trust-row">
-                <div class="trust-badge"><span class="tb-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg></span><span class="tb-t">Google sign-in</span><span class="tb-s">We never see your password</span></div>
-                <a class="trust-badge" href="https://www.ssllabs.com/ssltest/analyze.html?d=utility.arwaenterprises.com" target="_blank" rel="noopener"><span class="tb-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><span class="tb-t">HTTPS: grade A+</span><span class="tb-s">SSL Labs, 1 Oct 2026 &#8599;</span></a>
-                <a class="trust-badge" href="https://transparencyreport.google.com/safe-browsing/search?url=https%3A%2F%2Futility.arwaenterprises.com" target="_blank" rel="noopener"><span class="tb-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></span><span class="tb-t">Safe Browsing: clean</span><span class="tb-s">Google, 1 Oct 2026 &#8599;</span></a>
-                <div class="trust-badge"><span class="tb-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/></svg></span><span class="tb-t">No ads, no tracking</span><span class="tb-s">Your data stays until you delete it</span></div>
+                <div class="trust-badge b-google"><span class="tb-ico tb-google"><span></span></span><span class="tb-t">Google sign-in</span><span class="tb-s">We never see your password</span></div>
+                <a class="trust-badge b-ssl" href="https://www.ssllabs.com/ssltest/analyze.html?d=utility.arwaenterprises.com" target="_blank" rel="noopener"><span class="tb-ico tb-grade">A+</span><span class="tb-t">HTTPS: grade A+</span><span class="tb-s">SSL Labs, 1 Oct 2026 &#8599;</span></a>
+                <a class="trust-badge b-safe" href="https://transparencyreport.google.com/safe-browsing/search?url=https%3A%2F%2Futility.arwaenterprises.com" target="_blank" rel="noopener"><span class="tb-ico tb-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><span class="tb-t">Safe Browsing: clean</span><span class="tb-s">Google, 1 Oct 2026 &#8599;</span></a>
+                <div class="trust-badge b-noads"><span class="tb-ico tb-noads"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M6.7 6.7l10.6 10.6"/></svg></span><span class="tb-t">No ads, no tracking</span><span class="tb-s">Your data stays until you delete it</span></div>
             </div>
 
             <div class="card login-info">
                 <h3>Six tools, one login</h3>
                 <div class="tool-grid">
-                    <div class="tool-chip"><span class="tool-ico">&#128230;</span><b>Box Scanner</b><small>Scan items into boxes</small></div>
-                    <div class="tool-chip"><span class="tool-ico">&#128269;</span><b>Box Segregate</b><small>Look up boxes, check pallets</small></div>
-                    <div class="tool-chip"><span class="tool-ico">&#128176;</span><b>Price Check</b><small>Scan an item, see its price</small></div>
-                    <div class="tool-chip"><span class="tool-ico">&#128450;&#65039;</span><b>Year/Season Sort</b><small>Sort items into boxes</small></div>
-                    <div class="tool-chip"><span class="tool-ico">&#127991;&#65039;</span><b>Item Barcode</b><small>Print item labels</small></div>
-                    <div class="tool-chip"><span class="tool-ico">&#128424;&#65039;</span><b>Box Labels</b><small>Print box labels</small></div>
+                    <div class="tool-chip" style="--c:#8B1A32"><span class="tool-ico">&#128230;</span><b>Box Scanner</b><small>Scan items into boxes</small></div>
+                    <div class="tool-chip" style="--c:#1a73e8"><span class="tool-ico">&#128269;</span><b>Box Segregate</b><small>Look up boxes, check pallets</small></div>
+                    <div class="tool-chip" style="--c:#2e9e4f"><span class="tool-ico">&#128176;</span><b>Price Check</b><small>Scan an item, see its price</small></div>
+                    <div class="tool-chip" style="--c:#e8710a"><span class="tool-ico">&#128450;&#65039;</span><b>Year/Season Sort</b><small>Sort items into boxes</small></div>
+                    <div class="tool-chip" style="--c:#7b3fb5"><span class="tool-ico">&#127991;&#65039;</span><b>Item Barcode</b><small>Print item labels</small></div>
+                    <div class="tool-chip" style="--c:#00838f"><span class="tool-ico">&#128424;&#65039;</span><b>Box Labels</b><small>Print box labels</small></div>
                 </div>
             </div>
 
@@ -1034,17 +1034,17 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=39"></script>
-    <script src="js/supabaseClient.js?v=39"></script>
-    <script src="js/lists.js?v=39"></script>
-    <script src="js/usage.js?v=39"></script>
-    <script src="js/syncstatus.js?v=39"></script>
-    <script src="js/app.js?v=39"></script>
-    <script src="js/boxScanner.js?v=39"></script>
-    <script src="js/itemBarcode.js?v=39"></script>
-    <script src="js/boxCode.js?v=39"></script>
-    <script src="js/boxSegregate.js?v=39"></script>
-    <script src="js/priceCheck.js?v=39"></script>
-    <script src="js/yearSegregate.js?v=39"></script>
+    <script src="js/config.js?v=40"></script>
+    <script src="js/supabaseClient.js?v=40"></script>
+    <script src="js/lists.js?v=40"></script>
+    <script src="js/usage.js?v=40"></script>
+    <script src="js/syncstatus.js?v=40"></script>
+    <script src="js/app.js?v=40"></script>
+    <script src="js/boxScanner.js?v=40"></script>
+    <script src="js/itemBarcode.js?v=40"></script>
+    <script src="js/boxCode.js?v=40"></script>
+    <script src="js/boxSegregate.js?v=40"></script>
+    <script src="js/priceCheck.js?v=40"></script>
+    <script src="js/yearSegregate.js?v=40"></script>
 </body>
 </html>
