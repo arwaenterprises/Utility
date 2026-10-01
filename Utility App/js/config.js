@@ -16,12 +16,12 @@ const CONFIG = {
 // ============================================
 const APPS = [
     { id: 'boxScanner', name: 'Box Scanner', icon: '📦', description: 'Scan items into boxes', sessionRequired: true, containerId: 'boxScannerApp' },
-    { id: 'itemBarcode', name: 'Item Barcode', icon: '🏷️', description: 'Print item labels', sessionRequired: false, containerId: 'itemBarcodeApp', hidden: true },
-    { id: 'boxCode', name: 'Print Box Label', icon: '🖨️', description: 'Generate box labels', sessionRequired: false, containerId: 'boxCodeApp', hidden: true },
-    { id: 'photoCapture', name: 'Photo Capture For Increff URLs', icon: '📷', description: 'Capture product photos', sessionRequired: false, containerId: 'photoCaptureApp', hidden: true },
-    { id: 'boxSegregate', name: 'Box Segregate', icon: '🔍', description: 'Look up box details by barcode', sessionRequired: false, containerId: 'boxSegregateApp', hidden: true },
-    { id: 'priceCheck', name: 'Price Check', icon: '💰', description: 'Check item price by barcode', sessionRequired: false, containerId: 'priceCheckApp', hidden: true },
-    { id: 'yearSegregate', name: 'Year/Season Sort', icon: '🗂️', description: 'Sort items by year & season into PTL boxes', sessionRequired: true, containerId: 'yearSegregateApp', hidden: true }
+    { id: 'itemBarcode', name: 'Item Barcode', icon: '🏷️', description: 'Print item labels', sessionRequired: false, containerId: 'itemBarcodeApp' },
+    { id: 'boxCode', name: 'Print Box Label', icon: '🖨️', description: 'Generate box labels', sessionRequired: false, containerId: 'boxCodeApp' },
+    { id: 'photoCapture', name: 'Photo Capture For Increff URLs', icon: '📷', description: 'Capture product photos', sessionRequired: false, containerId: 'photoCaptureApp' },
+    { id: 'boxSegregate', name: 'Box Segregate', icon: '🔍', description: 'Look up box details by barcode', sessionRequired: false, containerId: 'boxSegregateApp' },
+    { id: 'priceCheck', name: 'Price Check', icon: '💰', description: 'Check item price by barcode', sessionRequired: false, containerId: 'priceCheckApp' },
+    { id: 'yearSegregate', name: 'Year/Season Sort', icon: '🗂️', description: 'Sort items by year & season into PTL boxes', sessionRequired: true, containerId: 'yearSegregateApp' }
 ];
 
 // ============================================
@@ -35,7 +35,12 @@ const AppState = {
     currentScreen: 'loginScreen',
     hasActiveSession: false,
     activeSessionApp: null,
-    isOnline: navigator.onLine
+    isOnline: navigator.onLine,
+    // Compatibility for the tools still on the old Apps Script backend (Year/Season Sort),
+    // which were written against Store ID login and read these two fields. They now
+    // come from the signed-in Google account.
+    get storeId() { return this.user?.email || ''; },
+    get storeName() { return this.profile?.display_name || this.user?.email || ''; }
 };
 
 // ============================================
