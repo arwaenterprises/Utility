@@ -34,6 +34,7 @@ grep -c "NOTICE:  PASS" "$LOG" | xargs -I{} echo "{} access-rule checks passed"
 echo "== usage_queries.sql"
 QDIR="$(mktemp -d)"
 awk -v d="$QDIR" '/^-- Q[0-9]+\./ { n++; f = sprintf("%s/q%02d.sql", d, n) } n { print > f }' supabase/usage_queries.sql
+sed -i "s/select 2026 as yr/select $(date +%Y) as yr/" "$QDIR/q12.sql"   # Q12 is hard-coded to 2026; test it for the current year
 count=0
 for f in "$QDIR"/q*.sql; do
   if ! psql -q -v ON_ERROR_STOP=1 -d "$DB" -At -f "$f" >"$f.out" 2>&1; then echo "FAIL: $(head -1 "$f")"; cat "$f.out"; exit 1; fi
@@ -45,5 +46,9 @@ expect q01.sql 'price_check\|lookup_found\|6\|0'
 expect q02.sql '^member1@x.com\|member1@x.com\|New Name\|3\|65\|.*\|6$'
 expect q03.sql '^New Name\|1\|3\|65'
 expect q10.sql '^5\|'
+expect q12.sql '^GRAND TOTAL \(everyone\)\|\|\|1\|2\|3\|65\|.*\|6\|$'
+expect q12.sql '^Subtotal - New Name\|New Name\|\|1\|2\|3\|65'
+expect q12.sql '^member1@x.com\|New Name\|member1@x.com\|1\|2\|3\|65'
+[ "$(head -1 "$QDIR/q12.sql.out" | cut -d'|' -f1)" = "GRAND TOTAL (everyone)" ] || { echo "FAIL: Q12 grand total is not the first row"; cat "$QDIR/q12.sql.out"; exit 1; }
 rm -rf "$QDIR"
 echo "$count usage queries ran and returned the expected numbers"

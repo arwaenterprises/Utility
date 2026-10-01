@@ -11,6 +11,8 @@
 --   To change the period, edit the two dates in the first lines of the query
 --   (current_date - 7 means "the last 7 days"; use date '2026-10-01' for a fixed day).
 --
+-- FOR A WHOLE YEAR (2026, 2027, ...): use Q12 at the bottom - change the year in its first line.
+--
 -- IF YOU SEE:  relation "usage_report" does not exist
 --   The usage tables are not in your database yet. Run supabase/schema.sql once in the SQL editor
 --   (paste the whole file, Run; it is safe to re-run), then come back here.
@@ -162,3 +164,44 @@ select day, email, display_name, coalesce(enterprise, 'Individual') as enterpris
 from usage_report
 where day >= current_date - 30
 order by day, email, tool, action;
+
+
+-- Q12. YEARLY REPORT - one query for a whole calendar year -------------------------
+--      Change the year on the next line (2026, 2027, ...) and run. One result with:
+--        * first row: GRAND TOTAL for everyone
+--        * then each enterprise: its people, followed by a "Subtotal" row
+--      Columns: how many people / days were active, then every task counted for the year
+--      (BS = Box Scanner, YS = Year/Season; "labels" = barcodes/codes printed).
+with params as (select 2026 as yr)                                  -- <<< CHANGE THE YEAR HERE
+select
+    case when grouping(u.enterprise) = 1 then 'GRAND TOTAL (everyone)'
+         when grouping(u.email) = 1      then 'Subtotal - ' || u.enterprise
+         else u.user_name end                                                   as who,
+    case when grouping(u.enterprise) = 1 then null else u.enterprise end        as enterprise,
+    case when grouping(u.email) = 1 then null else u.email end                  as email,
+    count(distinct u.email)                                                     as active_users,
+    count(distinct u.day)                                                       as active_days,
+    sum(u.event_count) filter (where u.tool = 'box_scanner' and u.action = 'box_closed')                     as bs_boxes_closed,
+    sum(u.qty)         filter (where u.tool = 'box_scanner' and u.action = 'box_closed')                     as bs_items,
+    sum(u.event_count) filter (where u.tool = 'year_season' and u.action = 'box_closed')                     as ys_boxes_closed,
+    sum(u.qty)         filter (where u.tool = 'year_season' and u.action = 'box_closed')                     as ys_items,
+    sum(u.qty)         filter (where u.tool in ('item_barcode', 'box_code') and u.action = 'print_job')      as labels_printed,
+    sum(u.event_count) filter (where u.tool = 'box_segregate' and u.action = 'lookup_found')                 as segregate_found,
+    sum(u.event_count) filter (where u.tool = 'box_segregate' and u.action = 'lookup_not_found')             as segregate_not_found,
+    sum(u.event_count) filter (where u.tool = 'box_segregate_pallet' and u.action = 'box_scanned')           as pallet_scanned,
+    sum(u.event_count) filter (where u.tool = 'box_segregate_pallet' and u.action = 'box_duplicate')         as pallet_duplicates,
+    sum(u.event_count) filter (where u.tool = 'box_segregate_pallet' and u.action = 'box_not_found')         as pallet_not_found,
+    sum(u.event_count) filter (where u.tool = 'price_check' and u.action = 'lookup_found')                   as price_found,
+    sum(u.event_count) filter (where u.tool = 'price_check' and u.action = 'lookup_not_found')               as price_not_found
+from (
+    select r.day, r.email, coalesce(r.display_name, r.email) as user_name,
+           coalesce(r.enterprise, 'Individual') as enterprise, r.tool, r.action, r.event_count, r.qty
+    from usage_report r, params
+    where r.day >= make_date(params.yr, 1, 1)
+      and r.day <  make_date(params.yr + 1, 1, 1)
+) u
+group by rollup (u.enterprise, (u.email, u.user_name))
+order by grouping(u.enterprise) desc,            -- grand total first
+         u.enterprise,
+         grouping(u.email) desc,                  -- then the enterprise subtotal, then its people
+         bs_boxes_closed desc nulls last, u.user_name;
