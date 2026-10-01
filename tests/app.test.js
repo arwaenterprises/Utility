@@ -46,10 +46,27 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     const r2 = await refSync('box_list', {}); ok('second sync is up-to-date', r2 === 'uptodate');
     // large list: progress % and chunking
     const big = Array.from({ length: 5200 }, (_, i) => ({ box_number: 'X' + i, store_name: 'S' }));
+    const c0 = window.__compactCalls || 0;
     const up = []; await refUploadList('box_list', big, p => up.push(Math.round(p)));
     ok('large upload chunked (3 chunks of 2000) w/ progress', __db.reference_chunks.filter(c => c.list_type === 'box_list').length === 3 && up.length >= 4 && up[up.length-1] === 100, up.join(','));
     const down = []; await refSync('box_list', { onProgress: p => down.push(Math.round(p)) });
     ok('large download w/ progress', down[down.length - 1] === 100 && down.some(x => x > 0 && x < 100), down.join(',') + ' / rows=' + (await refCacheGet('box_list')).length);
+    const got = await refCacheGet('box_list');
+    ok('uploaded in the smaller format, parallel chunks arrive complete and in order', window.__compactCalls - c0 === 3 && got.length === 5200 && got.every((r, k) => r.box_number === big[k].box_number && r.store_name === 'S'), 'compact calls=' + window.__compactCalls + ' rows=' + got.length);
+    // database not updated with the newer function yet -> falls back to the older format, same result
+    window.__noCompact = true;
+    await refUploadList('box_list', big);
+    await refSync('box_list', {});
+    const got2 = await refCacheGet('box_list');
+    ok('falls back to the older upload format when the database has no compact function', got2.length === 5200 && got2.every((r, k) => r.box_number === big[k].box_number), 'rows=' + got2.length);
+    window.__noCompact = false;
+    // a failing chunk stops the whole upload and the old list stays active
+    const activeBefore = __db.reference_chunks.filter(c => c.list_type === 'box_list' && c.is_active).reduce((n, c) => n + c.row_count, 0);
+    window.__failSeq = 1;
+    let failed = false;
+    try { await refUploadList('box_list', Array.from({ length: 4500 }, (_, i) => ({ box_number: 'F' + i }))); } catch (e) { failed = true; }
+    window.__failSeq = null;
+    ok('a failing chunk fails the upload and keeps the old list', failed && __db.reference_chunks.filter(c => c.list_type === 'box_list' && c.is_active).reduce((n, c) => n + c.row_count, 0) === activeBefore);
 
     // ---------- Pallet mode ----------
     const docs = await refParseFile(mkFile('Document Number,Box Number,Store Name\nD1,P1,Riyadh Park\nD1,P2,Riyadh Park\nD2,P3,Jeddah Mall of Arabia\n'), 'doc_boxes');

@@ -232,17 +232,62 @@ function refDownloadTemplate(listType) {
 // ------------------------------------------------
 // Upload (replace the whole list)
 // ------------------------------------------------
+// Speed: chunks go up several at a time (REF_UPLOAD_PARALLEL), and each chunk is sent as
+// plain value arrays plus ONE list of column names instead of repeating the names in every
+// row (about half the bytes). The server turns them back into the usual records, so what is
+// stored and downloaded is unchanged. If the database has not been updated with the newer
+// append_list_chunk_compact function yet, the older (bigger) format is used automatically.
+const REF_UPLOAD_PARALLEL = 4;
+
+function refMissingFunction(err) {
+    return !!err && (err.code === 'PGRST202' || /could not find the function|does not exist/i.test(err.message || ''));
+}
+
 async function refUploadList(listType, rows, onProgress) {
     const report = onProgress || function () {};
     report(0);
     let r = await supabaseClient.rpc('begin_list_upload', { p_list_type: listType });
     if (r.error) throw r.error;
-    for (let i = 0, seq = 0; i < rows.length; i += REF_UPLOAD_CHUNK, seq++) {
-        const chunk = rows.slice(i, i + REF_UPLOAD_CHUNK);
-        r = await supabaseClient.rpc('append_list_chunk', { p_list_type: listType, p_seq: seq, p_rows: chunk });
-        if (r.error) throw r.error;
-        report(Math.min(i + REF_UPLOAD_CHUNK, rows.length) / rows.length * 95);
+
+    const keySet = new Set();
+    rows.forEach(o => { for (const k in o) keySet.add(k); });
+    const keys = Array.from(keySet);
+    const chunkCount = Math.ceil(rows.length / REF_UPLOAD_CHUNK);
+    let compact = true;
+    let sentRows = 0;
+    let failure = null;
+    let nextSeq = 0;
+
+    async function sendChunk(seq) {
+        const chunk = rows.slice(seq * REF_UPLOAD_CHUNK, (seq + 1) * REF_UPLOAD_CHUNK);
+        if (compact) {
+            const res = await supabaseClient.rpc('append_list_chunk_compact', {
+                p_list_type: listType, p_seq: seq, p_keys: keys,
+                p_rows: chunk.map(o => keys.map(k => (o[k] == null ? '' : String(o[k]))))
+            });
+            if (!res.error) return;
+            if (!refMissingFunction(res.error)) throw res.error;
+            compact = false;                       // database not updated yet: use the older format
+        }
+        const res = await supabaseClient.rpc('append_list_chunk', { p_list_type: listType, p_seq: seq, p_rows: chunk });
+        if (res.error) throw res.error;
+        return chunk.length;
     }
+
+    async function worker() {
+        while (!failure) {
+            const seq = nextSeq++;
+            if (seq >= chunkCount) return;
+            try {
+                await sendChunk(seq);
+                sentRows += Math.min(REF_UPLOAD_CHUNK, rows.length - seq * REF_UPLOAD_CHUNK);
+                report(sentRows / rows.length * 95);
+            } catch (e) { failure = failure || e; return; }
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(REF_UPLOAD_PARALLEL, chunkCount) }, worker));
+    if (failure) throw failure;
+
     r = await supabaseClient.rpc('commit_list_upload', { p_list_type: listType });
     if (r.error) throw r.error;
     report(100);

@@ -558,6 +558,41 @@ begin
 end;
 $$;
 
+-- Step 2 (faster version): same as above, but the rows arrive as value arrays plus ONE list of
+-- column names (about half the upload size). They are turned back into the usual records here,
+-- so what is stored is identical. The app uses this when it exists, else append_list_chunk.
+create or replace function public.append_list_chunk_compact(p_list_type text, p_seq integer, p_keys text[], p_rows jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_eid uuid := public.current_user_enterprise_id();
+    v_objs jsonb;
+begin
+    if not public.can_upload_reference_list() then
+        raise exception 'Only an enterprise admin or an individual account can upload lists';
+    end if;
+    if jsonb_typeof(p_rows) <> 'array' then
+        raise exception 'rows must be a JSON array';
+    end if;
+    if jsonb_array_length(p_rows) > 5000 then
+        raise exception 'chunk too large (max 5000 records)';
+    end if;
+    if p_keys is null or coalesce(array_length(p_keys, 1), 0) not between 1 and 30 then
+        raise exception 'keys must list between 1 and 30 column names';
+    end if;
+    select coalesce(jsonb_agg(
+               jsonb_object(p_keys, array(select x.t from jsonb_array_elements_text(e.value) with ordinality as x(t, o) order by x.o))
+               order by e.ord), '[]'::jsonb)
+      into v_objs
+      from jsonb_array_elements(p_rows) with ordinality as e(value, ord);
+    insert into public.reference_chunks (list_type, user_id, enterprise_id, seq, row_count, rows, is_active)
+    values (p_list_type, auth.uid(), v_eid, p_seq, jsonb_array_length(v_objs), v_objs, false);
+end;
+$$;
+
 -- Step 3: swap. In ONE transaction, delete the old active list and activate the
 -- new chunks, so a failed upload never leaves a half list. Returns the record count.
 create or replace function public.commit_list_upload(p_list_type text)
@@ -598,6 +633,7 @@ $$;
 grant execute on function public.can_upload_reference_list() to authenticated;
 grant execute on function public.begin_list_upload(text) to authenticated;
 grant execute on function public.append_list_chunk(text, integer, jsonb) to authenticated;
+grant execute on function public.append_list_chunk_compact(text, integer, text[], jsonb) to authenticated;
 grant execute on function public.commit_list_upload(text) to authenticated;
 
 

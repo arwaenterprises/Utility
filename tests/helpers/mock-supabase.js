@@ -45,8 +45,14 @@ window.__rpcCalls = [];
   const rpcs = {
     begin_list_upload: ({ p_list_type }) => { db.reference_chunks = db.reference_chunks.filter(r => !(r.list_type === p_list_type && !r.is_active && owned(r))); },
     append_list_chunk: ({ p_list_type, p_seq, p_rows }) => {
+      if (window.__failSeq === p_seq) throw { message: 'chunk failed (test)' };
       if (p_rows.length > 5000) throw { message: 'chunk too large' };
       db.reference_chunks.push({ id: 'c' + Math.random(), list_type: p_list_type, user_id: window.__me.id, enterprise_id: window.__me.enterprise_id, seq: p_seq, row_count: p_rows.length, rows: p_rows, is_active: false, uploaded_at: new Date().toISOString() });
+    },
+    append_list_chunk_compact: ({ p_list_type, p_seq, p_keys, p_rows }) => {
+      if (window.__noCompact) throw { code: 'PGRST202', message: 'Could not find the function public.append_list_chunk_compact' };
+      window.__compactCalls = (window.__compactCalls || 0) + 1;
+      return rpcs.append_list_chunk({ p_list_type, p_seq, p_rows: p_rows.map(r => Object.fromEntries(p_keys.map((k, i) => [k, r[i]]))) });
     },
     commit_list_upload: ({ p_list_type }) => {
       const staged = db.reference_chunks.filter(r => r.list_type === p_list_type && !r.is_active && owned(r));
