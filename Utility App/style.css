@@ -813,6 +813,11 @@ body.rtl { direction: rtl; }
     color: var(--ak-white);
 }
 
+.scanner-kbd-btn.processing {
+    opacity: 0.5;
+    cursor: wait;
+}
+
 .scans-table-container {
     background: var(--glass-bg);
     backdrop-filter: blur(20px);

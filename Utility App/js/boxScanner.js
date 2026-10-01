@@ -2,7 +2,6 @@
 // BOX SCANNER MODULE - STATE & CONFIG
 // ============================================
 const ScannerState = {
-    staffName: '',
     remark: '',
     currentBox: null,
     boxScanning: false,
@@ -13,23 +12,13 @@ const ScannerState = {
     pendingDeleteId: null,
     completedBoxes: new Set(),
     isProcessingClose: false,
-    isSyncing: false,
-    syncIntervalId: null
+    isSubmittingScan: false
 };
-
-// Unique ID for every scan. Generated once at scan time and never regenerated,
-// so a resent batch carries the same IDs and the server can skip what it already wrote.
-function newScanUid() {
-    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-    // Fallback for non-secure contexts where crypto.randomUUID is unavailable
-    return 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10) +
-           '-' + Math.random().toString(36).slice(2, 10);
-}
 
 const ScannerT = {
     en: {
-        lblStaffName: "Your Name", lblRemark: "Remark", lblStartSession: "Start Session",
-        lblStore: "Store:", lblStaff: "Staff:", lblTotal: "Total", lblBoxQty: "Box Qty", lblBoxes: "Boxes",
+        lblRemark: "Remark", lblStartSession: "Start Session",
+        lblTotal: "Total", lblBoxQty: "Box Qty", lblBoxes: "Boxes",
         lblBoxId: "Box ID", lblBarcode: "Barcode", lblCloseBox: "Close Box", lblRecentScans: "Last 5 Scans",
         thBarcode: "Barcode", thTime: "Time", thAction: "Del", lblDownload: "Download", lblReset: "Reset",
         lblSettings: "Settings", lblCloseBoxTitle: "Close Box", lblQtyItems: "Quantity:", lblItems: "items",
@@ -37,21 +26,24 @@ const ScannerT = {
         lblResetTitle: "Reset Session?", lblResetMsg: "This will download your data and start a new session.",
         lblDeleteTitle: "Delete Scan?", lblDeleteMsg: "Delete this scan?", lblSettingsTitle: "Settings",
         lblLanguage: "Language", boxIdPlaceholder: "Scan box ID...", barcodePlaceholder: "Scan barcode...",
-        remarkPlaceholder: "e.g., Fall Winter 2023 stocks", staffPlaceholder: "Enter your name...",
-        errEnterName: "Please enter your name", errEnterRemark: "Please enter a remark",
+        remarkPlaceholder: "e.g., Fall Winter 2023 stocks",
+        errEnterRemark: "Please enter a remark",
         errBoxFirst: "Scan Box ID first", errSameBox: "Scan same Box ID!", errCloseBoxFirst: "Close the box first!",
         errBoxAlreadyClosed: "Box already closed",
         errNumericOnly: "Numeric mode (Nu) is active — alphanumeric barcode not allowed",
         errModeLockedDuringBox: "Close the current box before changing Nu/AlNu mode",
         errDuplicateBarcode: "This barcode was already scanned in this box",
         errUniqueLockedDuringBox: "Close the current box before changing the No Dup setting",
+        errOffline: "You're offline — scanning needs a connection",
+        errSaveFailed: "Could not save scan, please try again",
+        errLoadFailed: "Could not load your scans, please try again",
         lblUniqueToggle: "No Dup",
         lblModeNu: "Nu",
         lblModeAlphanumeric: "ALNU"
     },
     ar: {
-        lblStaffName: "اسمك", lblRemark: "ملاحظة", lblStartSession: "بدء الجلسة",
-        lblStore: "المتجر:", lblStaff: "الموظف:", lblTotal: "الإجمالي", lblBoxQty: "الصندوق", lblBoxes: "مكتمل",
+        lblRemark: "ملاحظة", lblStartSession: "بدء الجلسة",
+        lblTotal: "الإجمالي", lblBoxQty: "الصندوق", lblBoxes: "مكتمل",
         lblBoxId: "رقم الصندوق", lblBarcode: "الباركود", lblCloseBox: "إغلاق الصندوق", lblRecentScans: "آخر 5 مسح",
         thBarcode: "الباركود", thTime: "الوقت", thAction: "حذف", lblDownload: "تحميل", lblReset: "إعادة",
         lblSettings: "الإعدادات", lblCloseBoxTitle: "إغلاق الصندوق", lblQtyItems: "الكمية:", lblItems: "قطعة",
@@ -59,14 +51,17 @@ const ScannerT = {
         lblResetTitle: "إعادة تعيين؟", lblResetMsg: "سيتم تحميل البيانات وبدء جلسة جديدة.",
         lblDeleteTitle: "حذف المسح؟", lblDeleteMsg: "حذف هذا المسح؟", lblSettingsTitle: "الإعدادات",
         lblLanguage: "اللغة", boxIdPlaceholder: "امسح رقم الصندوق...", barcodePlaceholder: "امسح الباركود...",
-        remarkPlaceholder: "مثال: مخزون خريف وشتاء 2023", staffPlaceholder: "أدخل اسمك...",
-        errEnterName: "الرجاء إدخال اسمك", errEnterRemark: "الرجاء إدخال ملاحظة",
+        remarkPlaceholder: "مثال: مخزون خريف وشتاء 2023",
+        errEnterRemark: "الرجاء إدخال ملاحظة",
         errBoxFirst: "امسح رقم الصندوق أولاً", errSameBox: "امسح نفس رقم الصندوق!", errCloseBoxFirst: "أغلق الصندوق أولاً!",
         errBoxAlreadyClosed: "الصندوق مغلق بالفعل",
         errNumericOnly: "وضع الأرقام (Nu) مفعّل — لا يُسمح بباركود يحتوي على حروف",
         errModeLockedDuringBox: "أغلق الصندوق الحالي قبل تغيير وضع Nu/AlNu",
         errDuplicateBarcode: "تم مسح هذا الباركود مسبقًا في هذا الصندوق",
         errUniqueLockedDuringBox: "أغلق الصندوق الحالي قبل تغيير إعداد منع التكرار",
+        errOffline: "أنت غير متصل — المسح يحتاج إلى اتصال",
+        errSaveFailed: "تعذر حفظ المسح، حاول مرة أخرى",
+        errLoadFailed: "تعذر تحميل المسح، حاول مرة أخرى",
         lblUniqueToggle: "بدون تكرار",
         lblModeNu: "Nu",
         lblModeAlphanumeric: "ALNU"
@@ -76,87 +71,41 @@ const ScannerT = {
 function scannerT(key) { return ScannerT[ScannerState.language][key] || key; }
 
 // ============================================
-// BOX SCANNER - DATABASE
+// BOX SCANNER - SUPABASE DATA LAYER
 // ============================================
-let scannerDB;
-const SCANNER_DB_NAME = 'AKBoxScannerDB';
-const SCANNER_STORE = 'scans';
-
-function initScannerDB() {
-    return new Promise((resolve, reject) => {
-        const req = indexedDB.open(SCANNER_DB_NAME, 1);
-        req.onerror = () => reject(req.error);
-        req.onsuccess = () => { scannerDB = req.result; resolve(scannerDB); };
-        req.onupgradeneeded = (e) => {
-            const db = e.target.result;
-            if (!db.objectStoreNames.contains(SCANNER_STORE)) {
-                db.createObjectStore(SCANNER_STORE, { keyPath: 'id', autoIncrement: true });
-            }
-        };
-    });
-}
+// Online-only by design for this pilot: every scan writes straight to Supabase,
+// no local queue. If the write fails (e.g. offline), the scan is not recorded
+// and the user sees an error rather than a silently lost/queued item.
 
 async function addScan(scan) {
-    return new Promise((resolve, reject) => {
-        const tx = scannerDB.transaction([SCANNER_STORE], 'readwrite');
-        const store = tx.objectStore(SCANNER_STORE);
-        const req = store.add(scan);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-    });
+    const { data, error } = await supabaseClient.from('scans').insert(scan).select().single();
+    if (error) throw error;
+    return data;
 }
 
 async function getAllScans() {
-    return new Promise((resolve, reject) => {
-        const tx = scannerDB.transaction([SCANNER_STORE], 'readonly');
-        const store = tx.objectStore(SCANNER_STORE);
-        const req = store.getAll();
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-    });
+    const { data, error } = await supabaseClient.from('scans').select('*').order('scanned_at', { ascending: true });
+    if (error) throw error;
+    return data;
 }
 
-// One-time backfill: scans captured before scanUid existed would otherwise be
-// unidentifiable to the server and could still duplicate. Give them an ID before
-// they are ever synced.
-async function backfillScanUids() {
-    const scans = await getAllScans();
-    const missing = scans.filter(s => !s.scanUid);
-    for (const scan of missing) {
-        scan.scanUid = newScanUid();
-        await updateScan(scan);
-    }
-    return missing.length;
-}
-
-async function updateScan(scan) {
-    return new Promise((resolve, reject) => {
-        const tx = scannerDB.transaction([SCANNER_STORE], 'readwrite');
-        const store = tx.objectStore(SCANNER_STORE);
-        const req = store.put(scan);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-    });
+async function closeBoxScansInDb(boxNumber) {
+    const { error } = await supabaseClient
+        .from('scans')
+        .update({ box_status: 'Closed' })
+        .eq('box_number', boxNumber)
+        .eq('box_status', 'Open');
+    if (error) throw error;
 }
 
 async function deleteScanById(id) {
-    return new Promise((resolve, reject) => {
-        const tx = scannerDB.transaction([SCANNER_STORE], 'readwrite');
-        const store = tx.objectStore(SCANNER_STORE);
-        const req = store.delete(id);
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
-    });
+    const { error } = await supabaseClient.from('scans').delete().eq('id', id);
+    if (error) throw error;
 }
 
 async function clearAllScans() {
-    return new Promise((resolve, reject) => {
-        const tx = scannerDB.transaction([SCANNER_STORE], 'readwrite');
-        const store = tx.objectStore(SCANNER_STORE);
-        const req = store.clear();
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
-    });
+    const { error } = await supabaseClient.from('scans').delete().eq('user_id', AppState.user.id);
+    if (error) throw error;
 }
 
 // ============================================
@@ -164,7 +113,6 @@ async function clearAllScans() {
 // ============================================
 function saveScannerSession() {
     Storage.setJSON('scanner_session', {
-        staffName: ScannerState.staffName,
         remark: ScannerState.remark,
         currentBox: ScannerState.currentBox,
         boxScanning: ScannerState.boxScanning,
@@ -178,7 +126,6 @@ function saveScannerSession() {
 function loadScannerSession() {
     const session = Storage.getJSON('scanner_session');
     if (session) {
-        ScannerState.staffName = session.staffName || '';
         ScannerState.remark = session.remark || '';
         ScannerState.currentBox = session.currentBox || null;
         ScannerState.boxScanning = session.boxScanning || false;
@@ -194,7 +141,6 @@ function loadScannerSession() {
 function clearScannerSession() {
     Storage.remove('scanner_session');
     Storage.remove('active_session');
-    ScannerState.staffName = '';
     ScannerState.remark = '';
     ScannerState.currentBox = null;
     ScannerState.boxScanning = false;
@@ -223,7 +169,6 @@ function applyScannerTranslations() {
         const el = document.getElementById(key);
         if (el && !el.matches('input, select')) el.textContent = lang[key];
     });
-    document.getElementById('scannerStaffInput').placeholder = scannerT('staffPlaceholder');
     document.getElementById('scannerRemarkInput').placeholder = scannerT('remarkPlaceholder');
     document.getElementById('boxIdInput').placeholder = scannerT('boxIdPlaceholder');
     document.getElementById('barcodeInput').placeholder = scannerT('barcodePlaceholder');
@@ -285,15 +230,12 @@ function syncScannerUniqueLock() {
 // BOX SCANNER - SESSION MANAGEMENT
 // ============================================
 function startScannerSession() {
-    const staff = document.getElementById('scannerStaffInput').value.trim();
     const remark = document.getElementById('scannerRemarkInput').value.trim();
 
-    if (!staff) { alert(scannerT('errEnterName')); document.getElementById('scannerStaffInput').focus(); return; }
     if (!remark) { alert(scannerT('errEnterRemark')); document.getElementById('scannerRemarkInput').focus(); return; }
 
-    ScannerState.staffName = staff;
     ScannerState.remark = remark;
-    
+
     setActiveSession('boxScanner', true);
     saveScannerSession();
 
@@ -310,15 +252,15 @@ function handleBoxIdScan(e) {
     if (e.key !== 'Enter') return;
     const boxId = document.getElementById('boxIdInput').value.trim();
     if (!boxId) return;
-    
+
     if (!ScannerState.boxScanning) {
         if (ScannerState.completedBoxes.has(boxId)) {
-            const boxQty = ScannerState.scans.filter(s => s.boxNumber === boxId).length;
+            const boxQty = ScannerState.scans.filter(s => s.box_number === boxId).length;
             alert(scannerT('errBoxAlreadyClosed') + ' (' + boxQty + ' items)');
             document.getElementById('boxIdInput').value = '';
             return;
         }
-        
+
         ScannerState.currentBox = boxId;
         ScannerState.boxScanning = true;
         saveScannerSession();
@@ -357,8 +299,8 @@ async function handleBarcodeScan(e) {
 
     if (ScannerState.uniqueMode) {
         const isDup = ScannerState.scans.some(s =>
-            s.boxNumber === ScannerState.currentBox &&
-            s.boxStatus === 'Open' &&
+            s.box_number === ScannerState.currentBox &&
+            s.box_status === 'Open' &&
             s.barcode === String(barcode)
         );
         if (isDup) {
@@ -368,33 +310,46 @@ async function handleBarcodeScan(e) {
         }
     }
 
+    if (!AppState.isOnline) {
+        alert(scannerT('errOffline'));
+        return;
+    }
+
+    if (ScannerState.isSubmittingScan) return;
+    ScannerState.isSubmittingScan = true;
+    document.getElementById('scannerKbdBtn')?.classList.add('processing');
+
     const scan = {
-        scanUid: newScanUid(),
-        storeId: AppState.storeId,
-        storeName: AppState.storeName,
-        staffName: ScannerState.staffName,
+        user_id: AppState.user.id,
+        enterprise_id: AppState.profile?.enterprise_id || null,
         remark: ScannerState.remark,
-        boxNumber: String(ScannerState.currentBox),
+        box_number: String(ScannerState.currentBox),
         barcode: String(barcode),
         qty: 1,
-        boxStatus: 'Open',
-        timestamp: new Date().toISOString(),
-        synced: false
+        box_status: 'Open'
     };
-    
-    await addScan(scan);
-    document.getElementById('barcodeInput').value = '';
-    document.getElementById('barcodeInput').classList.add('input-highlight');
-    setTimeout(() => document.getElementById('barcodeInput').classList.remove('input-highlight'), 500);
-    resetScannerKeyboard();
-    await loadAndDisplayScans();
+
+    try {
+        await addScan(scan);
+        document.getElementById('barcodeInput').value = '';
+        document.getElementById('barcodeInput').classList.add('input-highlight');
+        setTimeout(() => document.getElementById('barcodeInput').classList.remove('input-highlight'), 500);
+        resetScannerKeyboard();
+        await loadAndDisplayScans();
+    } catch (err) {
+        console.error('Save scan failed:', err);
+        alert(scannerT('errSaveFailed'));
+    } finally {
+        ScannerState.isSubmittingScan = false;
+        document.getElementById('scannerKbdBtn')?.classList.remove('processing');
+    }
 }
 
 // ============================================
 // BOX SCANNER - CLOSE BOX
 // ============================================
 function showCloseBoxModal() {
-    const boxQty = ScannerState.scans.filter(s => s.boxNumber === ScannerState.currentBox).length;
+    const boxQty = ScannerState.scans.filter(s => s.box_number === ScannerState.currentBox).length;
     document.getElementById('modalBoxId').textContent = ScannerState.currentBox;
     document.getElementById('modalBoxQty').textContent = boxQty;
     document.getElementById('closeBoxStep1').style.display = 'block';
@@ -436,17 +391,11 @@ async function executeCloseBox() {
     ScannerState.isProcessingClose = true;
     document.getElementById('closeBoxModal').classList.remove('active');
     document.getElementById('closeBoxScanInput').value = '';
-    
+
     try {
         const closedBox = ScannerState.currentBox;
-        for (const scan of ScannerState.scans) {
-            if (scan.boxNumber === closedBox && scan.boxStatus === 'Open') {
-                scan.boxStatus = 'Closed';
-                scan.synced = false;
-                await updateScan(scan);
-            }
-        }
-        if (ScannerState.currentBox) ScannerState.completedBoxes.add(ScannerState.currentBox);
+        await closeBoxScansInDb(closedBox);
+        if (closedBox) ScannerState.completedBoxes.add(closedBox);
         ScannerState.currentBox = null;
         ScannerState.boxScanning = false;
         saveScannerSession();
@@ -460,7 +409,9 @@ async function executeCloseBox() {
         updateScannerStats();
         syncScannerModeLock();
         syncScannerUniqueLock();
-        if (AppState.isOnline) await autoSyncScans();
+    } catch (err) {
+        console.error('Close box failed:', err);
+        alert(scannerT('errSaveFailed'));
     } finally {
         ScannerState.isProcessingClose = false;
     }
@@ -470,17 +421,22 @@ async function executeCloseBox() {
 // BOX SCANNER - DISPLAY & STATS
 // ============================================
 async function loadAndDisplayScans() {
-    ScannerState.scans = await getAllScans();
+    try {
+        ScannerState.scans = await getAllScans();
+    } catch (err) {
+        console.error('Load scans failed:', err);
+        alert(scannerT('errLoadFailed'));
+        return;
+    }
     updateScannerStats();
     updateScansTable();
-    updateSyncBadge();
 }
 
 function updateScannerStats() {
     document.getElementById('statTotal').textContent = ScannerState.scans.length;
     let boxQty = 0;
     if (ScannerState.currentBox) {
-        boxQty = ScannerState.scans.filter(s => s.boxNumber === ScannerState.currentBox).length;
+        boxQty = ScannerState.scans.filter(s => s.box_number === ScannerState.currentBox).length;
     }
     document.getElementById('statBoxQty').textContent = boxQty;
     document.getElementById('statBoxes').textContent = ScannerState.completedBoxes.size;
@@ -489,32 +445,20 @@ function updateScannerStats() {
 function updateScansTable() {
     const tbody = document.getElementById('scansTableBody');
     tbody.innerHTML = '';
-    const currentBoxScans = ScannerState.scans.filter(s => s.boxNumber === ScannerState.currentBox && s.boxStatus === 'Open');
+    const currentBoxScans = ScannerState.scans.filter(s => s.box_number === ScannerState.currentBox && s.box_status === 'Open');
     const recent = currentBoxScans.slice(-5).reverse();
-    
+
     if (recent.length === 0) {
         tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--ak-text-light);">No scans yet</td></tr>`;
         return;
     }
-    
+
     recent.forEach(scan => {
         const tr = document.createElement('tr');
-        const time = new Date(scan.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const time = new Date(scan.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         tr.innerHTML = `<td>${scan.barcode}</td><td>${time}</td><td><button class="delete-scan-btn" data-id="${scan.id}" data-barcode="${scan.barcode}">✕</button></td>`;
         tbody.appendChild(tr);
     });
-}
-
-function updateSyncBadge() {
-    const pending = ScannerState.scans.filter(s => !s.synced && s.boxStatus === 'Closed').length;
-    const badge = document.getElementById('syncBadge');
-    if (pending === 0) {
-        badge.textContent = '✓';
-        badge.className = 'sync-badge synced';
-    } else {
-        badge.textContent = pending;
-        badge.className = 'sync-badge pending';
-    }
 }
 
 // ============================================
@@ -529,92 +473,15 @@ function showDeleteModal(id, barcode) {
 async function executeDeleteScan(confirmed) {
     document.getElementById('deleteModal').classList.remove('active');
     if (confirmed && ScannerState.pendingDeleteId) {
-        await deleteScanById(ScannerState.pendingDeleteId);
-        await loadAndDisplayScans();
+        try {
+            await deleteScanById(ScannerState.pendingDeleteId);
+            await loadAndDisplayScans();
+        } catch (err) {
+            console.error('Delete scan failed:', err);
+            alert(scannerT('errSaveFailed'));
+        }
     }
     ScannerState.pendingDeleteId = null;
-}
-
-// ============================================
-// BOX SCANNER - GOOGLE SHEETS SYNC
-// ============================================
-// 45s must stay comfortably above the Apps Script lock wait (20s) plus write time.
-// If the client gives up while the server is still working, it resends a batch the
-// server has already written - which is what caused the duplicate rows.
-const SCANNER_POST_TIMEOUT_MS = 45000;
-
-async function postToGoogleSheets(action, data) {
-    if (!AppState.isOnline) return null;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), SCANNER_POST_TIMEOUT_MS);
-    try {
-        const response = await fetch(CONFIG.GOOGLE_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action, ...data }),
-            signal: controller.signal
-        });
-        const result = await response.json();
-        return (result && result.success) ? result : null;
-    } catch (e) {
-        console.error('Google Sheets post error:', e);
-        return null;
-    } finally {
-        clearTimeout(timeout);
-    }
-}
-
-// The in-page isSyncing flag cannot see a second tab or the installed PWA, which share
-// the same IndexedDB. The Web Lock is held across the whole origin, so only one instance
-// on the device can be syncing at a time.
-async function autoSyncScans() {
-    if (!navigator.locks) return runAutoSync();
-    return navigator.locks.request('ak-box-scanner-sync', { ifAvailable: true }, async (lock) => {
-        if (!lock) return; // another tab holds it
-        return runAutoSync();
-    });
-}
-
-async function runAutoSync() {
-    if (ScannerState.isSyncing) return;
-    ScannerState.isSyncing = true;
-    try {
-        const unsynced = ScannerState.scans.filter(s => !s.synced && s.boxStatus === 'Closed');
-        if (unsynced.length === 0) return;
-
-        // Random 0–4s jitter so concurrent users don't all hit the script at the same instant
-        await new Promise(r => setTimeout(r, Math.random() * 4000));
-
-        // Retrying is safe: every scan carries a scanUid and the server skips IDs it has
-        // already written, so a batch that landed but timed out will not be written twice.
-        let result = null;
-        for (let attempt = 0; attempt < 3; attempt++) {
-            result = await postToGoogleSheets('addScans', { scans: unsynced });
-            if (result && result.success) break;
-            if (attempt < 2) await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
-        }
-
-        if (result && result.success) {
-            // Trust the server's list of what it now holds rather than assuming the whole
-            // batch landed. Older server versions don't return it - fall back to the batch.
-            const accepted = Array.isArray(result.acceptedUids)
-                ? new Set(result.acceptedUids)
-                : new Set(unsynced.map(s => s.scanUid));
-            for (const scan of unsynced) {
-                // A scan with no ID cannot be matched against the server's list; the
-                // request succeeded, so treat it as done rather than resending forever.
-                if (scan.scanUid && !accepted.has(scan.scanUid)) continue;
-                scan.synced = true;
-                await updateScan(scan);
-            }
-            await loadAndDisplayScans();
-        }
-        // If all attempts failed: scans stay synced=false and will retry on the next 10s tick
-    } catch (e) {
-        console.log('Auto-sync failed:', e);
-    } finally {
-        ScannerState.isSyncing = false;
-    }
 }
 
 // ============================================
@@ -625,26 +492,33 @@ async function downloadScannerExcel() {
         alert(scannerT('errCloseBoxFirst'));
         return;
     }
-    const scans = await getAllScans();
+    let scans;
+    try {
+        scans = await getAllScans();
+    } catch (err) {
+        console.error('Load scans for export failed:', err);
+        alert(scannerT('errLoadFailed'));
+        return;
+    }
+    const nameForFile = (AppState.profile?.display_name || AppState.user?.email || 'export').replace(/[^a-z0-9]+/gi, '_');
     if (scans.length === 0) {
-        const data = [['Store ID', 'Store Name', 'Staff', 'Remark', 'Box Number', 'Barcode', 'Qty', 'Box Status', 'Timestamp']];
+        const data = [['Remark', 'Box Number', 'Barcode', 'Qty', 'Box Status', 'Scanned At']];
         const ws = XLSX.utils.aoa_to_sheet(data);
-        ws['!cols'] = [{wch:12},{wch:20},{wch:12},{wch:20},{wch:12},{wch:20},{wch:5},{wch:8},{wch:18}];
+        ws['!cols'] = [{wch:20},{wch:12},{wch:20},{wch:5},{wch:8},{wch:18}];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Scans');
-        XLSX.writeFile(wb, `${AppState.storeId}_empty_${new Date().toISOString().slice(0,10)}.xlsx`);
+        XLSX.writeFile(wb, `${nameForFile}_empty_${new Date().toISOString().slice(0,10)}.xlsx`);
         return;
     }
     const data = scans.map(s => ({
-        'Store ID': s.storeId, 'Store Name': s.storeName, 'Staff': s.staffName,
-        'Remark': s.remark, 'Box Number': s.boxNumber, 'Barcode': s.barcode, 'Qty': s.qty,
-        'Box Status': s.boxStatus || 'Open', 'Timestamp': new Date(s.timestamp).toLocaleString()
+        'Remark': s.remark, 'Box Number': s.box_number, 'Barcode': s.barcode, 'Qty': s.qty,
+        'Box Status': s.box_status || 'Open', 'Scanned At': new Date(s.scanned_at).toLocaleString()
     }));
     const ws = XLSX.utils.json_to_sheet(data);
-    ws['!cols'] = [{wch:12},{wch:20},{wch:12},{wch:12},{wch:20},{wch:12},{wch:20},{wch:5},{wch:8},{wch:18}];
+    ws['!cols'] = [{wch:20},{wch:12},{wch:20},{wch:5},{wch:8},{wch:18}];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Scans');
-    XLSX.writeFile(wb, `${AppState.storeId}_${ScannerState.staffName}_${new Date().toISOString().slice(0,10)}.xlsx`);
+    XLSX.writeFile(wb, `${nameForFile}_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 // ============================================
@@ -662,9 +536,14 @@ async function executeResetSession(confirmed) {
     document.getElementById('resetModal').classList.remove('active');
     if (confirmed) {
         await downloadScannerExcel();
-        await clearAllScans();
+        try {
+            await clearAllScans();
+        } catch (err) {
+            console.error('Clear scans failed:', err);
+            alert(scannerT('errSaveFailed'));
+            return;
+        }
         clearScannerSession();
-        document.getElementById('scannerStaffInput').value = '';
         document.getElementById('scannerRemarkInput').value = '';
         document.getElementById('boxIdInput').value = '';
         document.getElementById('barcodeInput').value = '';
@@ -711,7 +590,7 @@ function setupScannerEventListeners() {
     document.getElementById('closeBoxScanInput').addEventListener('keypress', handleCloseBoxScan);
     document.getElementById('scansTableBody').addEventListener('click', (e) => {
         if (e.target.classList.contains('delete-scan-btn')) {
-            showDeleteModal(parseInt(e.target.dataset.id), e.target.dataset.barcode);
+            showDeleteModal(e.target.dataset.id, e.target.dataset.barcode);
         }
     });
     document.getElementById('deleteYesBtn').addEventListener('click', () => executeDeleteScan(true));
@@ -728,13 +607,11 @@ function setupScannerEventListeners() {
 // BOX SCANNER - INITIALIZATION
 // ============================================
 async function initBoxScanner() {
-    await initScannerDB();
-    await backfillScanUids();
     setupScannerEventListeners();
     const hasSession = loadScannerSession();
     applyScannerTranslations();
-    
-    if (hasSession && ScannerState.staffName && ScannerState.remark) {
+
+    if (hasSession && ScannerState.remark) {
         setActiveSession('boxScanner', true);
         if (ScannerState.boxScanning && ScannerState.currentBox) {
             document.getElementById('boxIdGroup').classList.add('hidden');
@@ -752,21 +629,6 @@ async function initBoxScanner() {
     } else {
         showScannerScreen('scannerSessionScreen');
     }
-    
-    // initBoxScanner runs every time the app tile is opened (js/app.js), so clear any
-    // interval from a previous open instead of stacking up a new one each time.
-    if (ScannerState.syncIntervalId) {
-        clearInterval(ScannerState.syncIntervalId);
-        ScannerState.syncIntervalId = null;
-    }
-    // Random phase offset so 100 users don't all fire their sync at the exact same tick
-    const syncOffset = Math.random() * 10000;
-    setTimeout(() => {
-        if (ScannerState.syncIntervalId) clearInterval(ScannerState.syncIntervalId);
-        ScannerState.syncIntervalId = setInterval(async () => {
-            if (AppState.isOnline && ScannerState.staffName) await autoSyncScans();
-        }, 10000);
-    }, syncOffset);
 }
 
 // ============================================
@@ -792,4 +654,3 @@ function resetScannerKeyboard() {
     input.inputMode = 'none';
     btn.classList.remove('active');
 }
-
