@@ -210,34 +210,169 @@ async function removeMember(memberId) {
     await loadTeamMembersList();
 }
 
+// ============================================
+// TEAM SCANS (consolidated, filterable, grouped by box)
+// ============================================
+let teamScansCache = [];
+
+function scanDisplayName(s) {
+    return s.profiles?.display_name || s.profiles?.email || '—';
+}
+
 async function openTeamScansModal() {
-    const tbody = document.getElementById('teamScansTableBody');
-    tbody.innerHTML = '<tr><td colspan="4">Loading...</td></tr>';
+    document.getElementById('teamScansBoxList').innerHTML = '<p style="font-size:13px; color: var(--ak-text-light);">Loading...</p>';
     document.getElementById('teamScansModal').classList.add('active');
 
     const { data, error } = await supabaseClient
         .from('scans')
-        .select('barcode, box_number, box_status, profiles(display_name, email)')
+        .select('id, barcode, box_number, box_status, qty, scanned_at, user_id, profiles(display_name, email)')
         .eq('enterprise_id', AppState.profile.enterprise_id)
         .order('scanned_at', { ascending: false })
-        .limit(200);
+        .limit(1000);
 
     if (error) {
-        tbody.innerHTML = `<tr><td colspan="4">Could not load team scans</td></tr>`;
+        document.getElementById('teamScansBoxList').innerHTML = '<p style="font-size:13px;">Could not load team scans.</p>';
         return;
     }
-    tbody.innerHTML = data.map(s => `
-        <tr>
-            <td>${s.profiles?.display_name || s.profiles?.email || '—'}</td>
-            <td>${s.box_number}</td>
-            <td>${s.barcode}</td>
-            <td>${s.box_status}</td>
-        </tr>
-    `).join('') || '<tr><td colspan="4">No scans yet</td></tr>';
+
+    teamScansCache = data || [];
+    renderTeamScansMemberFilterOptions();
+    applyTeamScansFilters();
 }
 
 function closeTeamScansModal() {
     document.getElementById('teamScansModal').classList.remove('active');
+}
+
+function renderTeamScansMemberFilterOptions() {
+    const select = document.getElementById('teamScansMemberFilter');
+    const seen = new Map();
+    teamScansCache.forEach(s => { if (!seen.has(s.user_id)) seen.set(s.user_id, scanDisplayName(s)); });
+    const current = select.value;
+    select.innerHTML = '<option value="">All members</option>' +
+        Array.from(seen.entries()).map(([id, name]) => `<option value="${id}">${name}</option>`).join('');
+    select.value = current;
+}
+
+function applyTeamScansFilters() {
+    const memberFilter = document.getElementById('teamScansMemberFilter').value;
+    const statusFilter = document.getElementById('teamScansStatusFilter').value;
+
+    const filtered = teamScansCache.filter(s =>
+        (!memberFilter || s.user_id === memberFilter) &&
+        (!statusFilter || s.box_status === statusFilter)
+    );
+
+    renderTeamScansSummary(filtered);
+    renderTeamScansBoxList(filtered);
+}
+
+function renderTeamScansSummary(scans) {
+    const boxNumbers = new Set(scans.map(s => s.box_number));
+    const perMember = new Map();
+    scans.forEach(s => {
+        const name = scanDisplayName(s);
+        perMember.set(name, (perMember.get(name) || 0) + 1);
+    });
+
+    const memberBreakdown = Array.from(perMember.entries())
+        .map(([name, count]) => `${name}: ${count}`)
+        .join(' · ');
+
+    document.getElementById('teamScansSummary').innerHTML = `
+        <div class="stat-box">
+            <div class="stat-label">Items</div>
+            <div class="stat-number">${scans.length}</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Boxes</div>
+            <div class="stat-number">${boxNumbers.size}</div>
+        </div>
+    ` + (memberBreakdown ? `<p style="width:100%; font-size:12px; color: var(--ak-text-light); margin-top: 6px;">${memberBreakdown}</p>` : '');
+}
+
+function renderTeamScansBoxList(scans) {
+    const listEl = document.getElementById('teamScansBoxList');
+    const groups = new Map();
+    scans.forEach(s => {
+        if (!groups.has(s.box_number)) groups.set(s.box_number, []);
+        groups.get(s.box_number).push(s);
+    });
+
+    if (groups.size === 0) {
+        listEl.innerHTML = '<p style="font-size:13px; color: var(--ak-text-light);">No scans match this filter</p>';
+        return;
+    }
+
+    listEl.innerHTML = Array.from(groups.entries()).map(([boxNumber, items]) => {
+        const names = new Set(items.map(scanDisplayName));
+        const scannedBy = names.size === 1 ? Array.from(names)[0] : `${names.size} people`;
+        const status = items[0].box_status;
+        return `
+            <div class="box-group-row" data-box="${boxNumber}" style="display:flex; justify-content:space-between; align-items:center; padding:10px; border:1px solid var(--ak-gray-200); border-radius:8px; margin-bottom:6px; cursor:pointer;">
+                <div>
+                    <strong>${boxNumber}</strong>
+                    <div style="font-size:12px; color: var(--ak-text-light);">${scannedBy} · ${status}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-weight:600;">${items.length} items</div>
+                    <div style="font-size:11px; color: var(--ak-text-light);">tap for detail</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function openBoxDetail(boxNumber) {
+    const memberFilter = document.getElementById('teamScansMemberFilter').value;
+    const statusFilter = document.getElementById('teamScansStatusFilter').value;
+    const items = teamScansCache.filter(s =>
+        s.box_number === boxNumber &&
+        (!memberFilter || s.user_id === memberFilter) &&
+        (!statusFilter || s.box_status === statusFilter)
+    );
+
+    document.getElementById('boxDetailTitle').textContent = `Box ${boxNumber}`;
+    document.getElementById('boxDetailTableBody').innerHTML = items.map(s => `
+        <tr>
+            <td>${s.barcode}</td>
+            <td>${scanDisplayName(s)}</td>
+            <td>${new Date(s.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+        </tr>
+    `).join('') || '<tr><td colspan="3">No items</td></tr>';
+    document.getElementById('boxDetailModal').classList.add('active');
+}
+
+function closeBoxDetailModal() {
+    document.getElementById('boxDetailModal').classList.remove('active');
+}
+
+function downloadTeamScans() {
+    const memberFilter = document.getElementById('teamScansMemberFilter').value;
+    const statusFilter = document.getElementById('teamScansStatusFilter').value;
+    const filtered = teamScansCache.filter(s =>
+        (!memberFilter || s.user_id === memberFilter) &&
+        (!statusFilter || s.box_status === statusFilter)
+    );
+
+    if (filtered.length === 0) {
+        alert('No scans match the current filter.');
+        return;
+    }
+
+    const rows = filtered.map(s => ({
+        'Scanned By': scanDisplayName(s),
+        'Box Number': s.box_number,
+        'Barcode': s.barcode,
+        'Qty': s.qty,
+        'Status': s.box_status,
+        'Scanned At': new Date(s.scanned_at).toLocaleString()
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{wch:20},{wch:12},{wch:20},{wch:5},{wch:8},{wch:18}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Team Scans');
+    XLSX.writeFile(wb, `team_scans_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 async function checkForMyPendingInvite() {
@@ -392,6 +527,14 @@ function setupEventListeners() {
     document.getElementById('acceptInviteBtn').addEventListener('click', acceptMyInvite);
     document.getElementById('viewTeamScansBtn').addEventListener('click', openTeamScansModal);
     document.getElementById('closeTeamScansBtn').addEventListener('click', closeTeamScansModal);
+    document.getElementById('teamScansMemberFilter').addEventListener('change', applyTeamScansFilters);
+    document.getElementById('teamScansStatusFilter').addEventListener('change', applyTeamScansFilters);
+    document.getElementById('downloadTeamScansBtn').addEventListener('click', downloadTeamScans);
+    document.getElementById('teamScansBoxList').addEventListener('click', (e) => {
+        const row = e.target.closest('.box-group-row');
+        if (row) openBoxDetail(row.dataset.box);
+    });
+    document.getElementById('closeBoxDetailBtn').addEventListener('click', closeBoxDetailModal);
     document.getElementById('pendingInvitesList').addEventListener('click', (e) => {
         const id = e.target.dataset.cancelInvite;
         if (id) cancelInvite(id);

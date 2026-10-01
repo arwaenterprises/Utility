@@ -71,21 +71,45 @@
     <div class="modal-overlay" id="teamScansModal">
         <div class="modal" style="max-width: 500px;">
             <h3 class="modal-title">📦 Team Scans</h3>
-            <div class="modal-body" style="text-align: left; max-height: 50vh; overflow-y: auto;">
+            <div class="modal-body" style="text-align: left; max-height: 65vh; overflow-y: auto;">
+                <div id="teamScansSummary" class="stats-row" style="margin-bottom: 12px;"></div>
+
+                <div style="display:flex; gap: 8px; margin-bottom: 12px;">
+                    <select id="teamScansMemberFilter" class="form-select" style="flex:1;"></select>
+                    <select id="teamScansStatusFilter" class="form-select" style="flex:1;">
+                        <option value="">All statuses</option>
+                        <option value="Open">Open</option>
+                        <option value="Closed">Closed</option>
+                    </select>
+                </div>
+
+                <div id="teamScansBoxList"></div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary btn-block" id="downloadTeamScansBtn">Download</button>
+                <button class="btn btn-primary btn-block" id="closeTeamScansBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOX DETAIL MODAL (drill-down from Team Scans) -->
+    <div class="modal-overlay" id="boxDetailModal">
+        <div class="modal" style="max-width: 460px;">
+            <h3 class="modal-title">📦 <span id="boxDetailTitle"></span></h3>
+            <div class="modal-body" style="text-align: left; max-height: 55vh; overflow-y: auto;">
                 <table class="scans-table" style="width: 100%;">
                     <thead>
                         <tr>
-                            <th>By</th>
-                            <th>Box</th>
                             <th>Barcode</th>
-                            <th>Status</th>
+                            <th>By</th>
+                            <th>Time</th>
                         </tr>
                     </thead>
-                    <tbody id="teamScansTableBody"></tbody>
+                    <tbody id="boxDetailTableBody"></tbody>
                 </table>
             </div>
             <div class="modal-buttons">
-                <button class="btn btn-primary btn-block" id="closeTeamScansBtn">Close</button>
+                <button class="btn btn-primary btn-block" id="closeBoxDetailBtn">Back</button>
             </div>
         </div>
     </div>
@@ -986,15 +1010,15 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=15"></script>
-    <script src="js/supabaseClient.js?v=15"></script>
-    <script src="js/app.js?v=15"></script>
-    <script src="js/boxScanner.js?v=15"></script>
-    <script src="js/itemBarcode.js?v=15"></script>
-    <script src="js/boxCode.js?v=15"></script>
-    <script src="js/photoCapture.js?v=15"></script>
-    <script src="js/boxSegregate.js?v=15"></script>
-    <script src="js/priceCheck.js?v=15"></script>
-    <script src="js/yearSegregate.js?v=15"></script>
+    <script src="js/config.js?v=16"></script>
+    <script src="js/supabaseClient.js?v=16"></script>
+    <script src="js/app.js?v=16"></script>
+    <script src="js/boxScanner.js?v=16"></script>
+    <script src="js/itemBarcode.js?v=16"></script>
+    <script src="js/boxCode.js?v=16"></script>
+    <script src="js/photoCapture.js?v=16"></script>
+    <script src="js/boxSegregate.js?v=16"></script>
+    <script src="js/priceCheck.js?v=16"></script>
+    <script src="js/yearSegregate.js?v=16"></script>
 </body>
 </html>
