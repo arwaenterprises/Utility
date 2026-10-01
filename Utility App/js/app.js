@@ -361,6 +361,15 @@ async function initApp() {
 
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
+            // Supabase re-fires SIGNED_IN on token refresh (e.g. when the tab
+            // regains focus after being idle), not just on a genuine new login.
+            // Only navigate to home for an actual new sign-in - otherwise this
+            // was yanking people back to the home screen mid-task (e.g. out of
+            // an open Box Scanner session) every time the tab refocused.
+            if (AppState.user) {
+                AppState.user = session.user;
+                return;
+            }
             await enterAppAsSignedInUser(session);
         } else if (event === 'SIGNED_OUT') {
             AppState.user = null;
