@@ -17,7 +17,7 @@ A running, numbered backlog of everything discussed for this app, so it isn't ju
 
 10. Year/Season Sort's admin reset used a hardcoded password — **fixed**: the hardcoded admin code is gone (`CONFIG.ADMIN_CODE` removed); Reset now follows the real roles (individual clears device + server; enterprise member clears device only; admin resets from the Team console).
 11. Security headers on Netlify — ✅ **done** (`netlify.toml`). Enforced on every page: `X-Frame-Options: DENY` (nobody can embed the app in a frame / clickjacking), `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (camera for this site only — barcode scanning; no microphone / location / payment). **Content-Security-Policy is deployed in Report-Only mode** (it logs, never blocks): it allows scripts only from this site plus the five CDNs the app uses (SheetJS, jsDelivr, cdnjs, unpkg) and connections only to this site and the Supabase project; scripts keep `'unsafe-inline'` because `index.html` uses inline `onclick` handlers. The app's own code was tested headlessly with the policy **enforced** and produced no violations, but the CDN libraries could not be loaded in that test — so after the app has been used on every device for a day with no "Content Security Policy" warnings in the browser console (F12), **rename the header `Content-Security-Policy-Report-Only` → `Content-Security-Policy`** in `netlify.toml` to start enforcing. Any new CDN / API host must be added to that list.
-13. No automated tests exist for this app
+13. Automated tests — ✅ **done**. `npm test` runs static checks, 76 browser checks (real app, fake Supabase, Content-Security-Policy enforced) and 36 database checks (schema runs twice cleanly; who can read / write / delete what) on a throw-away Postgres; GitHub Actions runs them on every push (`.github/workflows/test.yml`). The static checks also fail if the app changed but the cache version (`?v=` / `CACHE_VERSION`) was not bumped, and if a service-role key or a removed feature slips back in. Deliberately breaking a rule makes the tests fail (verified). See `README.md`.
 14. No roadmap/backlog tracking file existed in the repo — **this file is the fix**
 
 ## C. Domain & deployment
@@ -128,11 +128,11 @@ All three tools are off Google Sheets / Apps Script and on Supabase. **Built and
 - Switch off the old Netlify site when the last operator has moved (item 16).
 
 **Open engineering work (not started):**
-- Item 13 — automated tests / CI (the headless + Postgres tests used so far exist only locally) and automatic database migrations.
+- Automatic database migrations (today `schema.sql` is re-run by hand in the Supabase SQL editor); the tests already prove it is safe to re-run.
 - AdSense (items 36–40) — **on hold by the user's decision**; nothing to do now.
 - Seat limits / billing (item 33) — only when pricing is decided.
 
-**Done recently:** offline Box Scanner (32), role-based Reset (22/43), Phase 3 migration + Pallet mode (section I), compact UI + template icons (61–63), security headers (11), delete-rule fix (45), invite expiry / rename / member count (33), Photo Capture removed (20), publish folder cleaned (64).
+**Done recently:** automated tests + CI (13), offline Box Scanner (32), role-based Reset (22/43), Phase 3 migration + Pallet mode (section I), compact UI + template icons (61–63), security headers (11), delete-rule fix (45), invite expiry / rename / member count (33), Photo Capture removed (20), publish folder cleaned (64).
 
 ## Phasing (agreed approach)
 

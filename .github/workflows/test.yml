@@ -1,0 +1,53 @@
+name: Tests
+
+# Runs on every push and pull request. A red check means something that worked before
+# (scanning, syncing, list uploads, who-can-see-what in the database, ...) no longer does.
+on:
+  push:
+    branches: [saas-pilot, main]
+  pull_request:
+
+jobs:
+  app:
+    name: App (browser) tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # the cache-version check compares with the previous commit
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Static checks
+        run: node tests/static-checks.js
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      - name: Browser tests
+        run: npm run test:app
+
+  database:
+    name: Database tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash tests/sql/run.sh
