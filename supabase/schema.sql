@@ -435,9 +435,13 @@ create policy "scans_update_team" on public.scans for update
         enterprise_id = public.current_user_enterprise_id()
     );
 
+-- Delete: individuals (no enterprise) may delete their own rows (their Reset does).
+-- Enterprise members may NOT - their Reset only clears their own device, and the data
+-- stays until the enterprise admin deletes it from the Team console (scans_delete_team).
+-- This is enforced here, not just in the UI, so calling the API directly cannot bypass it.
 drop policy if exists "scans_delete_own" on public.scans;
 create policy "scans_delete_own" on public.scans for delete
-    using (user_id = auth.uid());
+    using (user_id = auth.uid() and enterprise_id is null);
 
 drop policy if exists "scans_delete_team" on public.scans;
 create policy "scans_delete_team" on public.scans for delete
@@ -702,3 +706,28 @@ as $$
 $$;
 
 grant execute on function public.team_ys_member_stats() to authenticated;
+
+
+-- ============================================
+-- RENAME ENTERPRISE (admin only)
+-- ============================================
+create or replace function public.rename_enterprise(new_name text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if not public.current_user_is_enterprise_admin() then
+        raise exception 'Only the enterprise admin can rename the enterprise';
+    end if;
+    if new_name is null or length(trim(new_name)) = 0 then
+        raise exception 'Name cannot be empty';
+    end if;
+    update public.enterprises
+    set name = trim(new_name)
+    where id = public.current_user_enterprise_id();
+end;
+$$;
+
+grant execute on function public.rename_enterprise(text) to authenticated;

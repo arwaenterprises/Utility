@@ -132,19 +132,39 @@ async function loadPendingInvitesList() {
     const listEl = document.getElementById('pendingInvitesList');
     const { data, error } = await supabaseClient
         .from('enterprise_invites')
-        .select('id, invited_email, status')
+        .select('id, invited_email, status, expires_at')
         .eq('enterprise_id', AppState.profile.enterprise_id)
         .order('created_at', { ascending: false });
     if (error) {
         listEl.textContent = '';
         return;
     }
-    listEl.innerHTML = data.map(inv => `
-        <div style="display:flex; justify-content:space-between; align-items:center; font-size: 13px; padding: 4px 0;">
-            <span>${inv.invited_email} — ${inv.status}</span>
-            ${inv.status === 'pending' ? `<button class="delete-scan-btn" data-cancel-invite="${inv.id}">✕</button>` : ''}
-        </div>
-    `).join('') || '<div style="font-size: 13px; color: var(--ak-text-light);">No invites yet</div>';
+    // The database refuses an expired invite, but it keeps the row as 'pending'; show
+    // it as expired and let the admin re-send (a fresh 7-day invite) or remove it.
+    listEl.innerHTML = data.map(inv => {
+        const expired = inv.status === 'pending' && new Date(inv.expires_at) < new Date();
+        const label = expired ? 'expired' : inv.status;
+        const actions = inv.status !== 'pending' ? '' :
+            (expired ? `<button class="icon-btn" data-resend-invite="${inv.id}" data-email="${escapeHtml(inv.invited_email)}" title="Send a new invite">↻</button>` : '') +
+            `<button class="delete-scan-btn" data-cancel-invite="${inv.id}" title="Remove invite">✕</button>`;
+        return `
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size: 13px; padding: 4px 0;${expired ? ' color: var(--ak-text-light);' : ''}">
+            <span>${escapeHtml(inv.invited_email)} — ${label}</span>
+            <span style="display:flex; gap:6px;">${actions}</span>
+        </div>`;
+    }).join('') || '<div style="font-size: 13px; color: var(--ak-text-light);">No invites yet</div>';
+}
+
+async function resendInvite(inviteId, email) {
+    const del = await supabaseClient.from('enterprise_invites').delete().eq('id', inviteId);
+    if (del.error) { alert(del.error.message); return; }
+    const { error } = await supabaseClient.from('enterprise_invites').insert({
+        enterprise_id: AppState.profile.enterprise_id,
+        invited_email: email,
+        invited_by: AppState.user.id
+    });
+    if (error) { alert(error.message); return; }
+    await loadPendingInvitesList();
 }
 
 async function cancelInvite(inviteId) {
@@ -236,6 +256,25 @@ async function openTeamModal() {
     await loadPendingInvitesList();
     await refreshTeamMemberStats();
     await refreshTeamYsStats();
+    await refreshTeamTitle();
+}
+
+// Title shows the enterprise name and how many people are in it (admin included).
+async function refreshTeamTitle() {
+    const { data } = await supabaseClient.from('enterprises').select('name').eq('id', AppState.profile.enterprise_id).maybeSingle();
+    const n = teamMemberStatsCache.length;
+    document.getElementById('teamModalTitle').textContent =
+        '👥 ' + ((data && data.name) || 'Team') + (n ? ` (${n} member${n === 1 ? '' : 's'})` : '');
+}
+
+async function renameEnterprise() {
+    const { data } = await supabaseClient.from('enterprises').select('name').eq('id', AppState.profile.enterprise_id).maybeSingle();
+    const name = prompt('Enterprise name:', (data && data.name) || '');
+    if (name === null) return;
+    if (!name.trim()) { alert('Name cannot be empty.'); return; }
+    const { error } = await supabaseClient.rpc('rename_enterprise', { new_name: name });
+    if (error) { alert(error.message); return; }
+    await refreshTeamTitle();
 }
 
 // ---- Year/Season Sort scans (separate from Box Scanner scans) ----
@@ -767,7 +806,6 @@ function initializeApp(appId) {
         case 'boxScanner': initBoxScanner(); break;
         case 'itemBarcode': initItemBarcode(); break;
         case 'boxCode': initBoxCode(); break;
-        case 'photoCapture': initPhotoCapture(); break;
         case 'boxSegregate': initBoxSegregate(); break;
         case 'priceCheck': initPriceCheck(); break;
         case 'yearSegregate': initYearSegregate(); break;
@@ -791,6 +829,8 @@ function setupEventListeners() {
     document.getElementById('pendingInvitesList').addEventListener('click', (e) => {
         const id = e.target.dataset.cancelInvite;
         if (id) cancelInvite(id);
+        const resendId = e.target.dataset.resendInvite;
+        if (resendId) resendInvite(resendId, e.target.dataset.email);
     });
 
     document.getElementById('teamSearchInput').addEventListener('input', (e) => runTeamSearch(e.target.value));
@@ -798,6 +838,7 @@ function setupEventListeners() {
     document.getElementById('teamSelectAllCheckbox').addEventListener('change', (e) => toggleSelectAll(e.target.checked));
 
     document.getElementById('downloadTeamSelectedBtn').addEventListener('click', downloadSelectedTeamData);
+    document.getElementById('renameEnterpriseBtn').addEventListener('click', renameEnterprise);
     document.getElementById('teamYsList').addEventListener('change', (e) => {
         const id = e.target.dataset.ysMember;
         if (!id) return;

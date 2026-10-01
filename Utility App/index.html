@@ -62,7 +62,7 @@
     <!-- TEAM MODAL (unified management + scans, scales to thousands of rows) -->
     <div class="modal-overlay" id="teamModal">
         <div class="modal" style="max-width: 720px;">
-            <h3 class="modal-title">👥 Team</h3>
+            <h3 class="modal-title"><span id="teamModalTitle">👥 Team</span> <button class="icon-btn" id="renameEnterpriseBtn" title="Rename enterprise" aria-label="Rename enterprise" style="font-size:14px;">✏️</button></h3>
             <div class="modal-body" style="text-align: left; max-height: 75vh; overflow-y: auto;">
                 <div class="settings-section" id="teamInviteSection">
                     <h4>Invite a Teammate</h4>
@@ -513,77 +513,6 @@
                     </div>
                 </div>
             </div>
-<!-- Photo Capture App -->
-            <div id="photoCaptureApp" class="app-module">
-                <div class="card">
-                    <h2 class="card-title">📷 Photo Capture</h2>
-                    
-                    <!-- Mode Toggle -->
-                    <div class="photo-mode-toggle">
-                        <button class="photo-mode-btn active" id="singleModeBtn" onclick="setPhotoMode('single')">Single</button>
-                        <button class="photo-mode-btn" id="multiModeBtn" onclick="setPhotoMode('multi')">Multi (up to 8)</button>
-                    </div>
-                    
-                    <!-- SKU Input -->
-                    <div class="form-group">
-                        <label>Scan or Enter SKU:</label>
-                        <div class="sku-input-row">
-                            <input type="number" id="skuInput" inputmode="numeric" pattern="[0-9]*" placeholder="Enter numeric SKU">
-                            <div class="sku-counter" id="skuPhotoCount">0</div>
-                        </div>
-                        <small style="color: rgba(255,255,255,0.5);" id="skuHint">Single mode: 1 photo per SKU</small>
-                    </div>
-                    
-                    <!-- Camera -->
-                    <div class="camera-container" id="cameraContainer">
-                        <video id="cameraVideo" autoplay playsinline></video>
-                        <canvas id="cameraCanvas"></canvas>
-                    </div>
-                    
-                    <!-- Capture Button -->
-                    <div style="text-align: center;">
-                        <button class="capture-btn" id="captureBtn" onclick="capturePhoto()"></button>
-                        <p style="color: rgba(255,255,255,0.5); font-size: 12px; margin-top: 5px;">Tap to capture</p>
-                    </div>
-                    
-                    <!-- Stats -->
-                    <div class="photo-stats">
-                        <div class="photo-stat">
-                            <div class="photo-stat-value" id="totalSkus">0</div>
-                            <div class="photo-stat-label">SKUs</div>
-                        </div>
-                        <div class="photo-stat">
-                            <div class="photo-stat-value" id="totalPhotos">0</div>
-                            <div class="photo-stat-label">Photos</div>
-                        </div>
-                        <div class="photo-stat">
-                            <div class="photo-stat-value" id="sessionSize">0 MB</div>
-                            <div class="photo-stat-label">Size</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Download Option -->
-                    <div class="download-option">
-                        <label>Download as:</label>
-                        <select id="downloadType">
-                            <option value="session">One ZIP (All Photos)</option>
-                            <option value="sku">Separate ZIP per SKU</option>
-                        </select>
-                    </div>
-                    
-                    <!-- Photo Grid -->
-                    <div class="photo-grid" id="photoGrid">
-                        <p style="color: rgba(255,255,255,0.4); text-align: center; grid-column: 1/-1; padding: 20px;">No photos captured yet</p>
-                    </div>
-                    
-                    <!-- Actions -->
-                    <div class="photo-actions">
-                        <button class="btn btn-secondary" onclick="clearPhotoSession()">🗑️ Clear All</button>
-                        <button class="btn btn-primary" onclick="downloadPhotos()">📥 Download ZIP</button>
-                    </div>
-                </div>
-            </div>
-
 <!-- Price Check App -->
             <div id="priceCheckApp" class="app-module">
                 <div class="card">
@@ -1019,16 +948,15 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=24"></script>
-    <script src="js/supabaseClient.js?v=24"></script>
-    <script src="js/lists.js?v=24"></script>
-    <script src="js/app.js?v=24"></script>
-    <script src="js/boxScanner.js?v=24"></script>
-    <script src="js/itemBarcode.js?v=24"></script>
-    <script src="js/boxCode.js?v=24"></script>
-    <script src="js/photoCapture.js?v=24"></script>
-    <script src="js/boxSegregate.js?v=24"></script>
-    <script src="js/priceCheck.js?v=24"></script>
-    <script src="js/yearSegregate.js?v=24"></script>
+    <script src="js/config.js?v=25"></script>
+    <script src="js/supabaseClient.js?v=25"></script>
+    <script src="js/lists.js?v=25"></script>
+    <script src="js/app.js?v=25"></script>
+    <script src="js/boxScanner.js?v=25"></script>
+    <script src="js/itemBarcode.js?v=25"></script>
+    <script src="js/boxCode.js?v=25"></script>
+    <script src="js/boxSegregate.js?v=25"></script>
+    <script src="js/priceCheck.js?v=25"></script>
+    <script src="js/yearSegregate.js?v=25"></script>
 </body>
 </html>
