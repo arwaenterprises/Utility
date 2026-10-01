@@ -2293,17 +2293,6 @@ body.rtl .form-select {
 .modal-body { margin-bottom: 12px; }
 .settings-section { margin-bottom: 12px; }
 
-/* Google AdSense slot: collapsed (takes no space) until ads are switched on by adding
-   the class "ads-on" to <body>. Keep it as the last element of the page so ads never
-   push tool controls around. */
-.ad-slot { display: none; }
-body.ads-on .ad-slot {
-    display: block;
-    min-height: 90px;
-    margin: 8px 0;
-    text-align: center;
-}
-
 /* ---- Box Scanner: Close Box (40%) + View Box button row, View Box pop-up ---- */
 .close-box-row { display: flex; }                         /* always shown now: View Box works with or without an open box */
 .close-box-row:not(.show) .close-box-btn,
@@ -2345,3 +2334,12 @@ body.ads-on .ad-slot {
 /* Header logo is now the app icon itself (it brings its own rounded background) */
 .header-logo { background: none; box-shadow: none; padding: 0; overflow: hidden; }
 .header-logo img { width: 100%; height: 100%; display: block; }
+
+/* Sync status line (Box Scanner / Year-Season): plain-words upload state under the badge */
+.sync-status-line { font-size: 11px; line-height: 1.35; margin-top: 6px; color: var(--ak-text-light); }
+.sync-status-line:empty { display: none; }
+.sync-status-line.ok { color: #2e7d32; }
+.sync-status-line.working { color: var(--ak-maroon); }
+.sync-status-line.warn { color: #8a4b00; background: #fff3e0; border: 1px solid #ffcc80; border-radius: 8px; padding: 6px 8px; font-weight: 600; }
+.sync-status-line.tappable { cursor: pointer; }
+#ysSyncStatusLine { margin: 0 0 6px; padding: 0 2px; }

@@ -12,7 +12,7 @@ AdSense Help Center / your AdSense account before relying on them. I have not in
 |---|---|
 | **Main domain** | `arwaenterprises.com` — the company / marketing website. **Not in the `Utility` repo.** Its platform, hosting and code location are **unknown to me** (first job of the new session: find out). |
 | **Utility app** | `utility.arwaenterprises.com` — the warehouse tools (Box Scanner, Box Segregate, Price Check, Year/Season, labels). Repo `arwaenterprises/Utility`, branch `saas-pilot`, hosted on Netlify, data in Supabase. A logged-in tool for ~100 operators. |
-| **Decision already taken** | **No ads inside the Utility app.** Ads go on **public content pages of the main domain only**, never next to scan/tap controls. (A hidden, empty `.ad-slot` placeholder exists in the app's `style.css`/`index.html`; it can be deleted once this is settled.) |
+| **Decision already taken** | **No ads inside the Utility app.** Ads go on **public content pages of the main domain only**, never next to scan/tap controls. (The unused hidden `.ad-slot` placeholder that used to be in the app has been removed.) |
 | **Why the app is a poor fit** | Behind a Google login, so Google's reviewer only ever sees a login screen (no public content); operators tap fast, so ads beside controls would cause accidental clicks, which AdSense treats as a violation **(verify)**. |
 | **Why do this at all** | Revenue from a content site. Side benefit: the Privacy Policy / Terms / homepage the main site needs are also what Google asks for when verifying the app's Google sign-in (roadmap items 41, 46). |
 | **Honest expectation** | AdSense pays per impression/click on **public traffic**. A site with little organic traffic earns very little. Approval is also not guaranteed. Plan the content as something useful in its own right. |
@@ -50,7 +50,7 @@ Facts about the Utility app to feed into the Privacy Policy (all true as of toda
 - Stored in Supabase (cloud database): scan records (box numbers, barcodes, remarks, quantities, timestamps), uploaded lists (box lists, price lists, item master, PTL config, TRN#/box lists), enterprise membership and invites, and **usage counts** (per user per day: boxes closed, labels printed, lookups — counts only, readable only by the owner).
 - Stored **on the user's device**: an offline copy of scans and lists (IndexedDB), settings and session state (localStorage), and a service-worker cache of the app files.
 - Hosting: Netlify (site) and Supabase (database/auth). The camera is used only for barcode scanning on the device. **No advertising or third-party tracking inside the app today.**
-- Data deletion: individuals can reset (delete) their own data; enterprise admins can delete their team's data; account deletion is not self-service yet (a gap to mention or fix).
+- Data deletion: users can reset (delete) their own data; enterprise admins can delete their team's data; **users can delete their whole account themselves** (Account → Delete my account; scans made for an enterprise stay with the enterprise's admin, everything else is deleted).
 Also publish the **homepage URL and Privacy Policy URL** where Google's OAuth consent screen asks for them (see roadmap items 41, 46).
 
 ### Phase 2 — Real content (the part that decides approval)

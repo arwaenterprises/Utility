@@ -11,6 +11,7 @@ var YSState = {
     pendingItem: null,
     pendingHuIdx: null,
     isSyncing: false,
+    lastSyncError: '',
     isProcessingClose: false,
     initialized: false,
     syncIntervalId: null
@@ -162,6 +163,7 @@ async function ysCloseBoxScans(ptlNumber, boxBarcode) {
     for (const scan of boxScans) {
         scan.boxStatus = 'Closed';
         scan.synced = false;
+        scan.pendingSince = Date.now();            // when it started waiting to upload (drives the "stuck" message)
         await ysDbPut(YS_SCANS_STORE, scan);
     }
     return boxScans.length;
@@ -756,12 +758,16 @@ async function ysRunAutoSync() {
             if (error) throw error;
             for (const scan of batch) {
                 scan.synced = true;
+                delete scan.pendingSince;
                 await ysDbPut(YS_SCANS_STORE, scan);
             }
+            YSState.lastSyncError = '';
+            Storage.set(ysLastUploadKey(), String(Date.now()));
             if (badge) badge.textContent = Math.round(Math.min(i + YS_SYNC_BATCH, unsynced.length) / unsynced.length * 100) + '%';
         }
     } catch (e) {
-        // Scans stay synced=false and are retried on the next tick.
+        // Scans stay synced=false and are retried on the next tick; the status line says why.
+        YSState.lastSyncError = (e && e.message) || String(e);
         console.error('YS auto-sync error:', e);
     } finally {
         YSState.isSyncing = false;
@@ -1053,12 +1059,27 @@ async function ysUpdateTotalStat() {
     ysUpdateSyncBadge(all);
 }
 
+function ysLastUploadKey() { return 'last_upload_ys_' + (AppState.user ? AppState.user.id : ''); }
+
+// One plain-words line: all uploaded / waiting / offline / stuck (and why).
+function ysUpdateSyncLine(pendingScans) {
+    const el = document.getElementById('ysSyncStatusLine');
+    if (!el || !AppState.user) return;
+    const oldest = pendingScans.reduce((m, s) => Math.min(m, s.pendingSince || Date.now()), Infinity);
+    SyncStatus.render(el, {
+        pending: pendingScans.length, oldestMs: isFinite(oldest) ? oldest : 0, online: AppState.isOnline,
+        lastOkMs: Number(Storage.get(ysLastUploadKey()) || 0), lastError: YSState.lastSyncError, noun: 'items'
+    });
+}
+
 function ysUpdateSyncBadge(scans) {
     if (!scans) {
         ysDbGetAll(YS_SCANS_STORE).then(all => ysUpdateSyncBadge(all));
         return;
     }
-    const pending = scans.filter(s => !s.synced && s.boxStatus === 'Closed').length;
+    const pendingScans = scans.filter(s => !s.synced && s.boxStatus === 'Closed');
+    const pending = pendingScans.length;
+    ysUpdateSyncLine(pendingScans);
     const badge = document.getElementById('ysSyncBadge');
     if (pending === 0) {
         badge.textContent = '✓';
@@ -1371,6 +1392,11 @@ function setupYsEventListeners() {
 
     // Download
     document.getElementById('ysDownloadBtn').addEventListener('click', ysDownloadExcel);
+    document.getElementById('ysSyncStatusLine').addEventListener('click', (e) => {
+        if (e.currentTarget.classList.contains('tappable') && AppState.isOnline) ysAutoSync();      // tap to retry now
+    });
+    window.addEventListener('online', () => ysUpdateSyncBadge());
+    window.addEventListener('offline', () => ysUpdateSyncBadge());
 
     // PTL cell click → detail popup
     document.getElementById('ysHuPanel').addEventListener('click', (e) => {
@@ -1465,6 +1491,7 @@ async function initYearSegregate() {
         if (YSState.syncIntervalId) clearInterval(YSState.syncIntervalId);
         YSState.syncIntervalId = setInterval(async () => {
             if (AppState.isOnline && YSState.staffName) await ysAutoSync();
+            ysUpdateSyncBadge();                      // keeps "x min ago" fresh
         }, 10000);
     }, syncOffset);
 }

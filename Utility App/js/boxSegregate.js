@@ -310,6 +310,19 @@ function downloadPalletExcel() {
     ws['!cols'] = [{wch:18},{wch:26},{wch:20},{wch:20}];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Segregation');
+
+    // Second sheet: boxes in the uploaded list that were never scanned (so nothing is forgotten before AWBs
+    // are generated). The first sheet stays exactly as it was.
+    const scannedSet = new Set(bsDocScans.map(s => String(s.box_number).toLowerCase()));
+    const missing = Array.from(bsDocMap.values())
+        .filter(r => !scannedSet.has(String(r.box_number).toLowerCase()))
+        .sort((a, b) => String(a.document_number).localeCompare(String(b.document_number), undefined, { numeric: true }) ||
+                        String(a.store_name).localeCompare(String(b.store_name)) ||
+                        String(a.box_number).localeCompare(String(b.box_number), undefined, { numeric: true }));
+    const ws2 = XLSX.utils.aoa_to_sheet([['TRN#', 'Store Name', 'Box Number']].concat(missing.map(r => [r.document_number, r.store_name, r.box_number])));
+    ws2['!cols'] = [{wch:18},{wch:26},{wch:20}];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Not scanned');
+
     XLSX.writeFile(wb, `box_segregation_${new Date().toISOString().slice(0, 10)}.xlsx`);
     return true;
 }

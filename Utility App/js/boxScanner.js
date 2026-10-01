@@ -13,7 +13,8 @@ const ScannerState = {
     completedBoxes: new Set(),
     isProcessingClose: false,
     isSyncing: false,
-    syncIntervalId: null
+    syncIntervalId: null,
+    lastSyncError: ''
 };
 
 const ScannerT = {
@@ -139,7 +140,7 @@ const SCANNER_SYNC_INTERVAL_MS = 10000;
 // response was lost is simply written onto the same rows again.
 async function pushScansToServer(scans, onProgress) {
     for (let i = 0; i < scans.length; i += SCANNER_SYNC_BATCH) {
-        const rows = scans.slice(i, i + SCANNER_SYNC_BATCH).map(({ synced, ...row }) => row);
+        const rows = scans.slice(i, i + SCANNER_SYNC_BATCH).map(({ synced, pending_since, ...row }) => row);
         const { error } = await supabaseClient.from('scans').upsert(rows, { onConflict: 'scan_uid' });
         if (error) throw error;
         if (onProgress) onProgress(Math.min(i + SCANNER_SYNC_BATCH, scans.length) / scans.length * 100);
@@ -170,12 +171,17 @@ async function runAutoSync() {
         await pushScansToServer(unsynced, (pct) => { if (badge) badge.textContent = Math.round(pct) + '%'; });
         for (const scan of unsynced) {
             scan.synced = true;
+            delete scan.pending_since;
             await updateScan(scan);
         }
+        ScannerState.lastSyncError = '';
+        Storage.set(scannerLastUploadKey(), String(Date.now()));
         await loadAndDisplayScans();
     } catch (err) {
-        // Scans stay synced=false and are retried on the next tick.
+        // Scans stay synced=false and are retried on the next tick; the status line says why.
+        ScannerState.lastSyncError = (err && err.message) || String(err);
         console.log('Auto-sync failed:', err);
+        updateScannerSyncLine();
     } finally {
         ScannerState.isSyncing = false;
     }
@@ -515,6 +521,7 @@ async function executeCloseBox() {
             if (scan.box_number === closedBox && scan.box_status === 'Open') {
                 scan.box_status = 'Closed';
                 scan.synced = false;
+                scan.pending_since = Date.now();     // when it started waiting to upload (drives the "stuck" message)
                 await updateScan(scan);
             }
         }
@@ -556,6 +563,21 @@ async function loadAndDisplayScans() {
     updateScannerStats();
     updateScansTable();
     updateSyncBadge();
+    updateScannerSyncLine();
+}
+
+function scannerLastUploadKey() { return 'last_upload_bs_' + (AppState.user ? AppState.user.id : ''); }
+
+// One plain-words line under the badge: all uploaded / waiting / offline / stuck (and why).
+function updateScannerSyncLine() {
+    const el = document.getElementById('syncStatusLine');
+    if (!el || !AppState.user) return;
+    const pending = ScannerState.scans.filter(s => !s.synced && s.box_status === 'Closed');
+    const oldest = pending.reduce((m, s) => Math.min(m, s.pending_since || new Date(s.scanned_at).getTime()), Infinity);
+    SyncStatus.render(el, {
+        pending: pending.length, oldestMs: isFinite(oldest) ? oldest : 0, online: AppState.isOnline,
+        lastOkMs: Number(Storage.get(scannerLastUploadKey()) || 0), lastError: ScannerState.lastSyncError, noun: 'items'
+    });
 }
 
 function updateSyncBadge() {
@@ -826,6 +848,11 @@ function setupScannerEventListeners() {
     document.getElementById('closeBoxCancelBtn').addEventListener('click', cancelCloseBox);
     document.getElementById('closeBoxBackBtn').addEventListener('click', cancelCloseBox);
     document.getElementById('closeBoxScanInput').addEventListener('keypress', handleCloseBoxScan);
+    document.getElementById('syncStatusLine').addEventListener('click', (e) => {
+        if (e.currentTarget.classList.contains('tappable') && AppState.isOnline) autoSyncScans();     // tap to retry now
+    });
+    window.addEventListener('online', updateScannerSyncLine);
+    window.addEventListener('offline', updateScannerSyncLine);
     document.getElementById('viewBoxBtn').addEventListener('click', openViewBox);
     document.getElementById('viewBoxCloseBtn').addEventListener('click', closeViewBox);
     document.getElementById('viewBoxScanInput').addEventListener('keypress', handleViewBoxScan);
@@ -889,6 +916,7 @@ async function initBoxScanner() {
     if (ScannerState.syncIntervalId) clearInterval(ScannerState.syncIntervalId);
     ScannerState.syncIntervalId = setInterval(() => {
         if (AppState.isOnline && AppState.user) autoSyncScans();
+        updateScannerSyncLine();                      // keeps "x min ago" fresh
     }, SCANNER_SYNC_INTERVAL_MS);
     autoSyncScans();
 }

@@ -814,3 +814,55 @@ join public.profiles p on p.id = u.user_id
 left join public.enterprises e on e.id = u.enterprise_id;
 
 revoke all on public.usage_report from anon, authenticated;
+
+
+-- ============================================
+-- DELETE MY ACCOUNT (self-service)
+-- ============================================
+-- Permanently deletes the signed-in user's account and everything tied to it (profile, scans,
+-- Year/Season scans, uploaded lists, usage counters) through the cascading foreign keys.
+--   * An enterprise MEMBER (or an ex-member) may delete their account. Scans they made FOR the
+--     enterprise are business records, so they are handed to the enterprise admin instead of
+--     being deleted; everything personal is deleted.
+--   * An enterprise ADMIN may delete the account only when the team has no other members (remove
+--     them first in the Team console). The enterprise and its data are then deleted with the admin.
+-- NOTE: deleting from auth.users inside a SECURITY DEFINER function is a common Supabase pattern, but it
+-- depends on the function owner's privileges on the auth schema - verify once on the live project.
+create or replace function public.delete_my_account()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_uid uuid := auth.uid();
+    v_profile public.profiles%rowtype;
+    v_others integer;
+begin
+    if v_uid is null then
+        raise exception 'Not signed in';
+    end if;
+    select * into v_profile from public.profiles where id = v_uid;
+
+    if v_profile.tier = 'enterprise_admin' then
+        select count(*) into v_others from public.profiles
+        where enterprise_id = v_profile.enterprise_id and id <> v_uid;
+        if v_others > 0 then
+            raise exception 'You are the enterprise admin and your team still has % member(s). Remove all members in the Team screen first, then delete your account.', v_others;
+        end if;
+    end if;
+
+    -- work done for an enterprise stays with the enterprise: hand it to the enterprise's admin
+    update public.scans s set user_id = e.admin_user_id
+    from public.enterprises e
+    where s.user_id = v_uid and s.enterprise_id = e.id and e.admin_user_id <> v_uid;
+
+    update public.ys_scans s set user_id = e.admin_user_id
+    from public.enterprises e
+    where s.user_id = v_uid and s.enterprise_id = e.id and e.admin_user_id <> v_uid;
+
+    delete from auth.users where id = v_uid;     -- cascades to profile and everything still owned by this user
+end;
+$$;
+
+grant execute on function public.delete_my_account() to authenticated;

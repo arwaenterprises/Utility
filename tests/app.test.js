@@ -9,7 +9,7 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     const log = []; const ok = (name, cond, extra) => log.push({ pass: !!cond, name, extra: extra === undefined ? '' : String(extra) });
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     window.alert = m => (window.__alerts = window.__alerts || []).push(String(m)); window.confirm = () => true;
-    const written = []; const realWrite = XLSX.writeFile; XLSX.writeFile = (wb, name) => written.push({ name, rows: XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]) });
+    const written = []; const realWrite = XLSX.writeFile; XLSX.writeFile = (wb, name) => written.push({ name, sheets: wb.SheetNames.slice(), rows: XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]), second: wb.SheetNames[1] ? XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[1]]) : null });
     AppState.user = { id: 'u1', email: 'a@b.c' }; AppState.profile = { display_name: 'Ann', enterprise_id: null, tier: 'individual' }; AppState.isOnline = true;
     const mkFile = (text, name) => new File([text], name || 'x.csv');
 
@@ -65,7 +65,13 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('doc scans persisted per user', Storage.getJSON('bs_doc_scans_u1').length === 2);
     downloadPalletExcel(); const dl = written.pop();
     ok('AWB download grouped by doc/store', dl.rows.length === 2 && dl.rows[0]['TRN#'] === 'D1' && dl.rows[0]['Store Name'] === 'Riyadh Park' && dl.rows[1]['TRN#'] === 'D2' && Object.keys(dl.rows[0]).join() === 'TRN#,Store Name,Box Number,Scanned At', JSON.stringify(dl.rows));
+    ok('Pallet download: second sheet "Not scanned" lists the boxes never scanned', dl.sheets.join() === 'Segregation,Not scanned' && dl.second.length === 1 && dl.second[0]['TRN#'] === 'D1' && dl.second[0]['Store Name'] === 'Riyadh Park' && dl.second[0]['Box Number'] === 'P2', JSON.stringify(dl.sheets) + JSON.stringify(dl.second));
+    ok('Pallet download: the first sheet (for AWBs) is unchanged and has no unscanned boxes', dl.rows.length === 2 && !dl.rows.some(r => r['Box Number'] === 'P2'));
     resetPalletScans(); ok('pallet reset downloads then clears', written.length === 1 && bsDocScans.length === 0);
+    bsDocScans = []; for (const v of ['p1', 'p2', 'p3']) { document.getElementById('bsBarcodeInput').value = v; bsIsLooking = false; lookupSegregateBox(); }
+    downloadPalletExcel(); const full = written.pop();
+    ok('Pallet download when everything was scanned: "Not scanned" sheet is present but empty', full.sheets.join() === 'Segregation,Not scanned' && full.second.length === 0 && full.rows.length === 3, JSON.stringify(full.second));
+    bsDocScans = []; Storage.setJSON('bs_doc_scans_u1', []);
     bsSetPalletMode(false); ok('toggle back to normal hides pallet panel', document.getElementById('bsPalletWrap').style.display === 'none');
 
     // ---------- templates ----------
@@ -80,7 +86,7 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     const filled = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(filled, XLSX.utils.aoa_to_sheet([['TRN#','Box Number','Store Name'],['D9','Z1','Mall']]), 'Data');
     const fp = await refParseFile(new File([XLSX.write(filled, { type: 'array', bookType: 'xlsx' })], 't.xlsx'), 'doc_boxes'); ok('filled template parses', fp.rows.length === 1 && fp.rows[0].document_number === 'D9');
     ok('template buttons exist', ['bsTemplateBtn','pcTemplateBtn'].every(id => document.getElementById(id)));
-    ok('ad slot exists and takes no space', getComputedStyle(document.getElementById('adSlotBottom')).display === 'none');
+    ok('no ad placeholder left in the app (ads are for the main domain only)', !document.getElementById('adSlotBottom') && ![...document.styleSheets].some(ss => [...ss.cssRules].some(r => /ad-slot/.test(r.cssText))));
 
 
     // ---------- Pallet list: hidden until expanded ----------
@@ -154,6 +160,15 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     await ysAutoSync();
     ok('YS closed scans synced to server, open stays local', __db.ys_scans.length === 2 && __db.ys_scans[0].ptl_number === '01' && __db.ys_scans[0].user_id === 'u1');
     await ysAutoSync(); ok('YS resync does not duplicate', __db.ys_scans.length === 2);
+    // status line (Year/Season): offline -> stuck -> tap to retry
+    const ysLine = () => document.getElementById('ysSyncStatusLine');
+    await ysDbAdd(YS_SCANS_STORE, { ...mk(crypto.randomUUID(), 'Closed'), pendingSince: Date.now() - 11 * 60000 });
+    AppState.isOnline = false; ysUpdateSyncBadge(); await sleep(100);
+    ok('Year/Season status line offline', /Offline - 1 items waiting/.test(ysLine().textContent), ysLine().textContent);
+    AppState.isOnline = true; window.__fail = true; await ysAutoSync(); await sleep(100);
+    ok('Year/Season status line stuck: duration + reason + retry', /not uploaded for 11 min/.test(ysLine().textContent) && /network down/.test(ysLine().textContent) && /Tap to retry/.test(ysLine().textContent), ysLine().textContent);
+    window.__fail = false; ysLine().click(); await sleep(200);
+    ok('Year/Season: tapping the line retries and it turns green', /^✓ All uploaded/.test(ysLine().textContent) && __db.ys_scans.length === 3, ysLine().textContent + ' / ' + __db.ys_scans.length);
     // legacy scan without uid gets one
     await ysDbAdd(YS_SCANS_STORE, { ...mk(undefined, 'Closed'), scanUid: undefined }); await ysBackfillScanUids();
     ok('YS legacy scans get scan uid', (await ysDbGetAll(YS_SCANS_STORE)).every(s => s.scanUid));
@@ -214,6 +229,39 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     Usage.log('hacking', 'x', 1, 0); await Usage.flush();
     ok('usage: an event the server rejects is dropped, not retried forever', Object.keys(Storage.getJSON('usage_pending_u1') || {}).length === 0);
     bsSetPalletMode(false);
+
+    // ---------- delete my account ----------
+    AppState.user = { id: 'u1', email: 'a@b.c' }; AppState.isOnline = true; window.__fail = false;
+    const alertsBefore = __alerts.length;
+    AppState.profile = { display_name: 'Ann', enterprise_id: null, tier: 'individual' };
+    await refOpenDB(); await refCachePut('box_list', [{ box_number: 'KEEP-ME-NOT' }]);
+    Storage.set('scanner_session', 'x'); Storage.setJSON('usage_pending_u1', { a: 1 });
+    ok('Account screen has a Delete my account button', !!document.getElementById('openDeleteAccountBtn'));
+    openDeleteAccount();
+    ok('delete: explanation for an individual', /permanently deletes your account and your data/.test(document.getElementById('deleteAccountText').textContent) && !/enterprise/i.test(document.getElementById('deleteAccountText').textContent), document.getElementById('deleteAccountText').textContent);
+    const delBtn = document.getElementById('deleteAccountConfirmBtn'), delIn = document.getElementById('deleteAccountConfirmInput');
+    ok('delete: the confirm button is off until DELETE is typed', delBtn.disabled && document.getElementById('deleteAccountModal').classList.contains('active'));
+    delIn.value = 'delete'; delIn.dispatchEvent(new Event('input')); ok('delete: lower-case "delete" is not enough', delBtn.disabled);
+    delIn.value = 'DELETE'; delIn.dispatchEvent(new Event('input')); ok('delete: typing DELETE enables the red button', !delBtn.disabled);
+    AppState.profile = { enterprise_id: 'E1', tier: 'enterprise_member' }; ok('delete: member is told enterprise scans stay with the enterprise', /stay with the enterprise/.test(deleteAccountExplanation()));
+    AppState.profile = { enterprise_id: 'E1', tier: 'enterprise_admin' }; ok('delete: admin is told members must be removed first', /no other members are left/.test(deleteAccountExplanation()));
+    AppState.profile = { display_name: 'Ann', enterprise_id: null, tier: 'individual' };
+    // the server refuses (admin with a team): nothing is wiped, the message is shown
+    window.__deleteError = 'You are the enterprise admin and your team still has 3 member(s).'; delBtn.click(); await sleep(100);
+    ok('delete refused by the server: message shown, data and login kept', __alerts.slice(alertsBefore).some(a => /still has 3 member/.test(a)) && AppState.user && (await refCacheGet('box_list')).length === 1 && Storage.get('scanner_session') === 'x' && !window.__deleted, __alerts.slice(-1).join());
+    window.__deleteError = ''; delBtn.disabled = false;
+    // offline: refused with an explanation, nothing happens
+    AppState.isOnline = false; delBtn.click(); await sleep(50);
+    ok('delete offline: asks to connect, nothing deleted', __alerts.slice(-1)[0].includes('offline') && !window.__deleted && !!AppState.user);
+    AppState.isOnline = true; delBtn.disabled = false;
+    // success
+    delBtn.click(); await sleep(400);
+    ok('delete: server function called and account deleted', window.__deleted === true && __rpcCalls.includes('delete_my_account'));
+    ok('delete: this device is wiped (saved settings, usage queue)', Storage.get('scanner_session') === null && Storage.getJSON('usage_pending_u1') === null && Object.keys(localStorage).filter(k => k.startsWith(CONFIG.STORAGE_PREFIX)).length === 0);
+    const dbs = (await indexedDB.databases()).map(d => d.name);
+    ok('delete: offline databases of this user are removed', !dbs.includes('AKRef_u1') && !dbs.includes('AKBoxScannerDB_u1') && !dbs.includes('AKYSSegregateDB_u1') && !dbs.includes('AKPriceCheckDB_u1'), dbs.join());
+    ok('delete: signed out, back on the login screen, confirmation shown', AppState.user === null && document.getElementById('loginScreen').classList.contains('active') && __alerts.slice(-1)[0].includes('deleted'), __alerts.slice(-1)[0]);
+    document.getElementById('deleteAccountModal').classList.remove('active');
 
     // ---------- Box Scanner badge % ----------
     ok('uids valid UUIDs', /^[0-9a-f-]{36}$/.test(newScanUid()));

@@ -51,7 +51,7 @@ for (const f of ['icons/apple-touch-icon.png', 'icons/favicon.svg', 'icons/icon-
 
 // 3. Things that were removed must stay removed.
 const appText = ['index.html', 'style.css', 'sw.js', ...jsFiles.map(f => 'js/' + f)].map(f => fs.readFileSync(path.join(APP, f), 'utf8')).join('\n');
-for (const word of ['photoCapture', 'GOOGLE_SCRIPT_URL', 'PC_SCRIPT_URL', 'YS_SCRIPT_URL', 'ADMIN_CODE', 'script.google.com']) {
+for (const word of ['photoCapture', 'GOOGLE_SCRIPT_URL', 'PC_SCRIPT_URL', 'YS_SCRIPT_URL', 'ADMIN_CODE', 'script.google.com', 'ad-slot', 'adSlotBottom']) {
   check('no leftover: ' + word, !appText.includes(word));
 }
 

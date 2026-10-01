@@ -63,6 +63,7 @@ window.__rpcCalls = [];
       if (!r) { r = { user_id: window.__me.id, day: p_day, tool: p_tool, action: p_action, event_count: 0, qty: 0 }; db.usage_daily.push(r); }
       r.event_count += p_count; r.qty += p_qty;
     },
+    delete_my_account: () => { if (window.__deleteError) throw { message: window.__deleteError }; window.__deleted = true; },
     rename_enterprise: ({ new_name }) => { db.enterprises[0].name = new_name.trim(); },
     team_member_stats: () => [{ user_id: 'u1', display_name: 'Ann', email: 'a@b.c', boxes_closed: 0, total_qty: 0 }, { user_id: 'u2', display_name: 'Bob', email: 'b@b.c', boxes_closed: 0, total_qty: 0 }],
     team_ys_member_stats: () => [{ user_id: 'u1', display_name: 'Ann', email: 'a@b.c', boxes_closed: 1, total_qty: db.ys_scans.length }]

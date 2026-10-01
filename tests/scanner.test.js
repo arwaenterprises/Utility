@@ -30,12 +30,15 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ScannerState.uniqueMode = false;
     await executeCloseBox();
     ok('closed box is pending sync (badge shows count)', badge() === '2' && serverScans() === 0, badge());
+    const line = () => document.getElementById('syncStatusLine');
+    ok('status line while offline: "Offline - 2 items waiting"', /Offline - 2 items waiting/.test(line().textContent) && /warn/.test(line().className), line().textContent);
     ok('usage statistics wait on the device while offline', __db.usage_daily.length === 0 && Object.keys(Storage.getJSON('usage_pending_u1') || {}).length === 1);
 
     AppState.isOnline = true; await autoSyncScans();                           // online but server failing
     ok('failed upload keeps scans pending', badge() === '2' && serverScans() === 0);
     window.__fail = false; await autoSyncScans();                              // server recovers
     ok('recovered upload clears the badge', badge() === '✓' && serverScans() === 2, badge());
+    ok('status line after upload: all uploaded + last upload time', /^✓ All uploaded · last upload (just now|\d+ min ago)$/.test(line().textContent) && /ok/.test(line().className), line().textContent);
     (await getAllScans()).forEach(s => s.synced = false); for (const s of await getAllScans()) await updateScan(s);
     await autoSyncScans();
     ok('resending the same scans does not duplicate rows', serverScans() === 2);
@@ -44,6 +47,16 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('usage: closed box counted once with its quantity', bc.length === 1 && bc[0].event_count === 1 && bc[0].qty === 2, JSON.stringify(bc));
     ok('usage: pending list is emptied after sending', Object.keys(Storage.getJSON('usage_pending_u1') || {}).length === 0);
     ok('scan ids are valid UUIDs', __db.scans.every(s => /^[0-9a-f-]{36}$/.test(s.scan_uid)));
+
+    // stuck uploads: online, server failing, a closed box waiting 11 minutes
+    window.__fail = true; AppState.isOnline = true;
+    await scan('S1', 'boxIdInput'); await scan('77', 'barcodeInput'); await executeCloseBox();
+    const waiting = (await getAllScans()).filter(x => !x.synced); waiting.forEach(x => x.pending_since = Date.now() - 11 * 60000); for (const x of waiting) await updateScan(x);
+    await autoSyncScans(); await loadAndDisplayScans();
+    ok('stuck: after 11 minutes the line says so, with the reason', /1 items not uploaded for 11 min/.test(line().textContent) && /network down/.test(line().textContent) && /Tap to retry/.test(line().textContent) && /warn/.test(line().className), line().textContent);
+    window.__fail = false; line().click(); await sleep(150);
+    ok('tapping the line retries and clears the warning', /^✓ All uploaded/.test(line().textContent) && serverScans() === 3 && badge() === '✓', line().textContent + ' / ' + serverScans());
+    ok('local-only bookkeeping field never reaches the server', __db.scans.every(r => !('pending_since' in r) && !('synced' in r)));
 
     await executeResetSession(true);
     ok('individual Reset clears the device AND the server', (await localScans()) === 0 && serverScans() === 0);
