@@ -13,6 +13,7 @@
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -24,41 +25,25 @@
     <header class="header">
         <div class="header-logo">AK</div>
         <h1 class="header-title">AK Utility</h1>
-        <div class="header-store" id="headerStore"></div>
+        <div class="header-store" id="headerUser"></div>
+        <button class="btn-signout" id="signOutBtn" title="Sign out">⎋</button>
         <div class="online-status online" id="onlineStatus">Online</div>
     </header>
 
     <!-- MAIN CONTAINER -->
     <main class="main-container">
-        
-        <!-- SCREEN: Store Login -->
+
+        <!-- SCREEN: Login -->
         <div id="loginScreen" class="screen active">
             <div class="card">
-                <h2 class="card-title">🏪 Store Login</h2>
-                <p class="card-subtitle">Enter your Store ID to access utilities</p>
-                
-                <div class="form-group">
-                    <label for="storeIdInput">Store ID</label>
-                    <input type="text" id="storeIdInput" class="form-input" placeholder="e.g., BLA1140" autocomplete="off" autocapitalize="characters">
-                </div>
-                
+                <h2 class="card-title">👋 Welcome</h2>
+                <p class="card-subtitle">Sign in to access your tools</p>
+
                 <div class="error-msg" id="loginError"></div>
-                
-                <button class="btn btn-primary btn-block" id="lookupStoreBtn">
-                    <span id="lookupBtnText">Search Your Store</span>
+
+                <button class="btn btn-primary btn-block" id="googleSignInBtn">
+                    <span id="googleSignInBtnText">Sign in with Google</span>
                 </button>
-                
-                <div id="storeConfirmBox" class="store-info-box" style="display: none;">
-                    <h3>✓ Store Found</h3>
-                    <div class="detail"><strong>Store ID:</strong> <span id="confirmStoreId"></span></div>
-                    <div class="detail"><strong>Store Name:</strong> <span id="confirmStoreName"></span></div>
-                    <div class="detail"><strong>Location:</strong> <span id="confirmLocation"></span></div>
-                    <p style="margin-top: 16px; font-weight: 500; color: var(--ak-text);">Is this your store?</p>
-                    <div class="btn-group" style="margin-top: 12px;">
-                        <button class="btn btn-primary" id="confirmYesBtn">Yes, Continue</button>
-                        <button class="btn btn-secondary" id="confirmNoBtn">No</button>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -938,14 +923,15 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=10"></script>
-    <script src="js/app.js?v=10"></script>
-    <script src="js/boxScanner.js?v=10"></script>
-    <script src="js/itemBarcode.js?v=10"></script>
-    <script src="js/boxCode.js?v=10"></script>
-    <script src="js/photoCapture.js?v=10"></script>
-    <script src="js/boxSegregate.js?v=10"></script>
-    <script src="js/priceCheck.js?v=10"></script>
-    <script src="js/yearSegregate.js?v=10"></script>
+    <script src="js/config.js?v=11"></script>
+    <script src="js/supabaseClient.js?v=11"></script>
+    <script src="js/app.js?v=11"></script>
+    <script src="js/boxScanner.js?v=11"></script>
+    <script src="js/itemBarcode.js?v=11"></script>
+    <script src="js/boxCode.js?v=11"></script>
+    <script src="js/photoCapture.js?v=11"></script>
+    <script src="js/boxSegregate.js?v=11"></script>
+    <script src="js/priceCheck.js?v=11"></script>
+    <script src="js/yearSegregate.js?v=11"></script>
 </body>
 </html>

@@ -10,6 +10,8 @@ function showScreen(screenId) {
 // ============================================
 // GOOGLE SHEETS API
 // ============================================
+// Still used by tools not yet migrated to Supabase (Item Barcode, Box Code,
+// Price Check, Box Segregate, Year/Season Sort - hidden in this pilot build).
 async function fetchFromGoogleSheets(action, params = {}) {
     if (!AppState.isOnline) return null;
     try {
@@ -25,61 +27,46 @@ async function fetchFromGoogleSheets(action, params = {}) {
 }
 
 // ============================================
-// STORE LOGIN
+// AUTH (Google sign-in via Supabase)
 // ============================================
-async function lookupStore() {
-    const input = document.getElementById('storeIdInput');
+async function signInWithGoogle() {
     const errorDiv = document.getElementById('loginError');
-    const btn = document.getElementById('lookupStoreBtn');
-    const btnText = document.getElementById('lookupBtnText');
-    
-    const storeId = input.value.trim().toUpperCase();
-    if (!storeId) {
-        showError(errorDiv, 'Please enter a Store ID');
-        return;
-    }
-    
-    btn.disabled = true;
-    btnText.innerHTML = '<span class="spinner"></span> Looking up...';
     errorDiv.classList.remove('show');
-    
-    const result = await fetchFromGoogleSheets('getStore', { storeId });
-    
-    btn.disabled = false;
-    btnText.textContent = 'Lookup Store';
-    
-    if (result && result.success && result.store) {
-        AppState.storeId = result.store.storeId;
-        AppState.storeName = result.store.storeName;
-        AppState.storeLocation = result.store.location;
-        
-        document.getElementById('confirmStoreId').textContent = result.store.storeId;
-        document.getElementById('confirmStoreName').textContent = result.store.storeName;
-        document.getElementById('confirmLocation').textContent = result.store.location;
-        
-        document.getElementById('storeConfirmBox').style.display = 'block';
-        btn.style.display = 'none';
-    } else {
-        showError(errorDiv, 'Store not found. Please check the Store ID.');
-    }
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin }
+    });
+    if (error) showError(errorDiv, error.message);
 }
 
-function confirmStore(confirmed) {
-    if (confirmed) {
-        Storage.set('store_id', AppState.storeId);
-        Storage.set('store_name', AppState.storeName);
-        Storage.set('store_location', AppState.storeLocation);
-        updateHeaderStore();
-        showScreen('homeScreen');
-        renderAppGrid();
-    } else {
-        document.getElementById('storeIdInput').value = '';
-        document.getElementById('storeConfirmBox').style.display = 'none';
-        document.getElementById('lookupStoreBtn').style.display = 'block';
-        AppState.storeId = '';
-        AppState.storeName = '';
-        AppState.storeLocation = '';
+async function signOut() {
+    await supabaseClient.auth.signOut();
+    AppState.user = null;
+    AppState.profile = null;
+    updateHeaderUser();
+    showScreen('loginScreen');
+}
+
+async function loadUserProfile() {
+    const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .eq('id', AppState.user.id)
+        .single();
+    if (error) {
+        console.error('Failed to load profile:', error);
+        return;
     }
+    AppState.profile = data;
+}
+
+async function enterAppAsSignedInUser(session) {
+    AppState.user = session.user;
+    await loadUserProfile();
+    updateHeaderUser();
+    checkExistingSession();
+    showScreen('homeScreen');
+    renderAppGrid();
 }
 
 function showError(element, message) {
@@ -87,13 +74,16 @@ function showError(element, message) {
     element.classList.add('show');
 }
 
-function updateHeaderStore() {
-    const el = document.getElementById('headerStore');
-    if (AppState.storeId) {
-        el.textContent = AppState.storeId;
+function updateHeaderUser() {
+    const el = document.getElementById('headerUser');
+    const signOutBtn = document.getElementById('signOutBtn');
+    if (AppState.user) {
+        el.textContent = AppState.profile?.display_name || AppState.user.email;
         el.classList.add('show');
+        signOutBtn.classList.add('show');
     } else {
         el.classList.remove('show');
+        signOutBtn.classList.remove('show');
     }
 }
 
@@ -211,10 +201,8 @@ function initializeApp(appId) {
 // EVENT LISTENERS
 // ============================================
 function setupEventListeners() {
-    document.getElementById('storeIdInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') lookupStore(); });
-    document.getElementById('lookupStoreBtn').addEventListener('click', lookupStore);
-    document.getElementById('confirmYesBtn').addEventListener('click', () => confirmStore(true));
-    document.getElementById('confirmNoBtn').addEventListener('click', () => confirmStore(false));
+    document.getElementById('googleSignInBtn').addEventListener('click', signInWithGoogle);
+    document.getElementById('signOutBtn').addEventListener('click', signOut);
     document.getElementById('appBackBtn').addEventListener('click', goToHome);
     document.getElementById('goToSessionBtn').addEventListener('click', () => { if (AppState.activeSessionApp) openApp(AppState.activeSessionApp); });
 }
@@ -253,18 +241,24 @@ async function initApp() {
     updateOnlineStatus();
     setupEventListeners();
     registerServiceWorker();
-    const storedStoreId = Storage.get('store_id');
-    if (storedStoreId) {
-        AppState.storeId = storedStoreId;
-        AppState.storeName = Storage.get('store_name') || '';
-        AppState.storeLocation = Storage.get('store_location') || '';
-        updateHeaderStore();
-        checkExistingSession();
-        showScreen('homeScreen');
-        renderAppGrid();
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+        await enterAppAsSignedInUser(session);
     } else {
         showScreen('loginScreen');
     }
+
+    supabaseClient.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+            await enterAppAsSignedInUser(session);
+        } else if (event === 'SIGNED_OUT') {
+            AppState.user = null;
+            AppState.profile = null;
+            updateHeaderUser();
+            showScreen('loginScreen');
+        }
+    });
 }
 
 document.addEventListener('DOMContentLoaded', initApp);
