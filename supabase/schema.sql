@@ -244,6 +244,81 @@ grant execute on function public.accept_enterprise_invite(uuid) to authenticated
 grant execute on function public.remove_enterprise_member(uuid) to authenticated;
 
 -- ============================================
+-- TEAM MANAGEMENT - READ-ONLY, ADMIN-ONLY RPCS
+-- ============================================
+-- Both scoped to the caller's own enterprise and gated on admin status inside
+-- the function body (not just by who can call it) - also protects direct
+-- PostgREST calls, not just UI buttons.
+
+create or replace function public.team_member_stats()
+returns table (
+    user_id uuid,
+    display_name text,
+    email text,
+    boxes_closed bigint,
+    total_qty bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    with my_scans as (
+        select * from public.scans
+        where enterprise_id = public.current_user_enterprise_id()
+    ),
+    box_status_per_user as (
+        select user_id, box_number, bool_and(box_status = 'Closed') as closed
+        from my_scans
+        group by user_id, box_number
+    )
+    select
+        p.id as user_id,
+        p.display_name,
+        p.email,
+        coalesce((select count(*) from box_status_per_user b where b.user_id = p.id and b.closed), 0) as boxes_closed,
+        coalesce((select sum(qty) from my_scans s where s.user_id = p.id), 0) as total_qty
+    from public.profiles p
+    where p.enterprise_id = public.current_user_enterprise_id()
+      and public.current_user_is_enterprise_admin();
+$$;
+
+create or replace function public.search_team_scans(search_term text, limit_count int default 100)
+returns table (
+    id uuid,
+    barcode text,
+    box_number text,
+    box_status text,
+    qty integer,
+    scanned_at timestamptz,
+    user_id uuid,
+    display_name text,
+    email text
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select s.id, s.barcode, s.box_number, s.box_status, s.qty, s.scanned_at, s.user_id, p.display_name, p.email
+    from public.scans s
+    join public.profiles p on p.id = s.user_id
+    where s.enterprise_id = public.current_user_enterprise_id()
+      and public.current_user_is_enterprise_admin()
+      and (
+        s.barcode ilike '%' || search_term || '%'
+        or s.box_number ilike '%' || search_term || '%'
+        or p.display_name ilike '%' || search_term || '%'
+        or p.email ilike '%' || search_term || '%'
+      )
+    order by s.scanned_at desc
+    limit limit_count;
+$$;
+
+grant execute on function public.team_member_stats() to authenticated;
+grant execute on function public.search_team_scans(text, int) to authenticated;
+
+-- ============================================
 -- ROW LEVEL SECURITY
 -- ============================================
 

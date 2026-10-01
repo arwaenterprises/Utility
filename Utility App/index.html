@@ -48,17 +48,9 @@
                     <button class="btn btn-primary btn-block" id="createEnterpriseBtn">Create</button>
                 </div>
 
-                <div class="settings-section" id="inviteTeammateSection" style="display:none;">
-                    <h4>Invite a Teammate</h4>
-                    <input type="email" id="inviteEmailInput" class="form-input" placeholder="teammate@email.com" style="margin-bottom: 10px;">
-                    <button class="btn btn-primary btn-block" id="sendInviteBtn">Send Invite</button>
-                    <div id="pendingInvitesList" style="margin-top: 12px;"></div>
-                </div>
-
-                <div class="settings-section" id="teamMembersSection" style="display:none;">
-                    <h4>Team Members</h4>
-                    <div id="teamMembersList"></div>
-                    <button class="btn btn-secondary btn-block" id="viewTeamScansBtn" style="margin-top: 10px;">View Team Scans</button>
+                <div class="settings-section" id="manageTeamSection" style="display:none;">
+                    <h4>Team</h4>
+                    <button class="btn btn-secondary btn-block" id="openTeamModalBtn">Manage Team</button>
                 </div>
             </div>
             <div class="modal-buttons">
@@ -67,27 +59,34 @@
         </div>
     </div>
 
-    <!-- TEAM SCANS MODAL -->
-    <div class="modal-overlay" id="teamScansModal">
-        <div class="modal" style="max-width: 500px;">
-            <h3 class="modal-title">📦 Team Scans</h3>
-            <div class="modal-body" style="text-align: left; max-height: 65vh; overflow-y: auto;">
-                <div id="teamScansSummary" class="stats-row" style="margin-bottom: 12px;"></div>
-
-                <div style="display:flex; gap: 8px; margin-bottom: 12px;">
-                    <select id="teamScansMemberFilter" class="form-select" style="flex:1;"></select>
-                    <select id="teamScansStatusFilter" class="form-select" style="flex:1;">
-                        <option value="">All statuses</option>
-                        <option value="Open">Open</option>
-                        <option value="Closed">Closed</option>
-                    </select>
+    <!-- TEAM MODAL (unified management + scans, scales to thousands of rows) -->
+    <div class="modal-overlay" id="teamModal">
+        <div class="modal" style="max-width: 560px;">
+            <h3 class="modal-title">👥 Team</h3>
+            <div class="modal-body" style="text-align: left; max-height: 70vh; overflow-y: auto;">
+                <div class="settings-section" id="teamInviteSection">
+                    <h4>Invite a Teammate</h4>
+                    <input type="email" id="inviteEmailInput" class="form-input" placeholder="teammate@email.com" style="margin-bottom: 10px;">
+                    <button class="btn btn-primary btn-block" id="sendInviteBtn">Send Invite</button>
+                    <div id="pendingInvitesList" style="margin-top: 12px;"></div>
                 </div>
 
-                <div id="teamScansBoxList"></div>
+                <div class="settings-section">
+                    <input type="text" id="teamSearchInput" class="form-input" placeholder="🔍 Search box number, user, or item...">
+                </div>
+
+                <div class="settings-section">
+                    <label style="display:flex; align-items:center; gap:8px; margin-bottom: 10px; font-weight: 600;">
+                        <input type="checkbox" id="teamSelectAllCheckbox"> <span>Select All</span>
+                    </label>
+                    <div id="teamMemberList"></div>
+                    <div id="teamSearchResults" style="display:none;"></div>
+                </div>
             </div>
             <div class="modal-buttons">
-                <button class="btn btn-secondary btn-block" id="downloadTeamScansBtn">Download</button>
-                <button class="btn btn-primary btn-block" id="closeTeamScansBtn">Close</button>
+                <button class="btn btn-secondary" id="downloadTeamSelectedBtn">Download</button>
+                <button class="btn btn-secondary" id="resetTeamSelectedBtn" style="background: var(--ak-danger); color: white; border: none;">Reset</button>
+                <button class="btn btn-primary" id="closeTeamBtn">Close</button>
             </div>
         </div>
     </div>
@@ -1010,15 +1009,15 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=16"></script>
-    <script src="js/supabaseClient.js?v=16"></script>
-    <script src="js/app.js?v=16"></script>
-    <script src="js/boxScanner.js?v=16"></script>
-    <script src="js/itemBarcode.js?v=16"></script>
-    <script src="js/boxCode.js?v=16"></script>
-    <script src="js/photoCapture.js?v=16"></script>
-    <script src="js/boxSegregate.js?v=16"></script>
-    <script src="js/priceCheck.js?v=16"></script>
-    <script src="js/yearSegregate.js?v=16"></script>
+    <script src="js/config.js?v=17"></script>
+    <script src="js/supabaseClient.js?v=17"></script>
+    <script src="js/app.js?v=17"></script>
+    <script src="js/boxScanner.js?v=17"></script>
+    <script src="js/itemBarcode.js?v=17"></script>
+    <script src="js/boxCode.js?v=17"></script>
+    <script src="js/photoCapture.js?v=17"></script>
+    <script src="js/boxSegregate.js?v=17"></script>
+    <script src="js/priceCheck.js?v=17"></script>
+    <script src="js/yearSegregate.js?v=17"></script>
 </body>
 </html>

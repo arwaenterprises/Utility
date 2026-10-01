@@ -108,13 +108,7 @@ async function openAccountModal() {
     const isIndividual = AppState.profile?.tier === 'individual';
     const isAdmin = AppState.profile?.tier === 'enterprise_admin';
     document.getElementById('createEnterpriseSection').style.display = isIndividual ? 'block' : 'none';
-    document.getElementById('inviteTeammateSection').style.display = isAdmin ? 'block' : 'none';
-    document.getElementById('teamMembersSection').style.display = isAdmin ? 'block' : 'none';
-
-    if (isAdmin) {
-        await loadPendingInvitesList();
-        await loadTeamMembersList();
-    }
+    document.getElementById('manageTeamSection').style.display = isAdmin ? 'block' : 'none';
 
     document.getElementById('accountModal').classList.add('active');
 }
@@ -181,162 +175,183 @@ async function cancelInvite(inviteId) {
     await loadPendingInvitesList();
 }
 
-async function loadTeamMembersList() {
-    const listEl = document.getElementById('teamMembersList');
-    const { data, error } = await supabaseClient
-        .from('profiles')
-        .select('id, display_name, email, tier')
-        .eq('enterprise_id', AppState.profile.enterprise_id)
-        .neq('id', AppState.user.id);
-    if (error) {
-        listEl.textContent = '';
-        return;
-    }
-    listEl.innerHTML = data.map(member => `
-        <div style="display:flex; justify-content:space-between; align-items:center; font-size: 13px; padding: 4px 0;">
-            <span>${member.display_name || member.email}</span>
-            <button class="delete-scan-btn" data-remove-member="${member.id}">✕</button>
-        </div>
-    `).join('') || '<div style="font-size: 13px; color: var(--ak-text-light);">No team members yet</div>';
-}
-
-async function removeMember(memberId) {
-    if (!confirm('Remove this teammate from your enterprise?')) return;
-    const { error } = await supabaseClient.rpc('remove_enterprise_member', { member_user_id: memberId });
-    if (error) {
-        alert(error.message);
-        return;
-    }
-    await loadTeamMembersList();
-}
-
 // ============================================
-// TEAM SCANS (consolidated, filterable, grouped by box)
+// TEAM MODAL (unified management + scans; scales to thousands of rows by
+// computing stats server-side and fetching box/item detail only on demand,
+// instead of loading the whole team's scan history into the browser)
 // ============================================
-let teamScansCache = [];
+let teamMemberStatsCache = [];       // [{user_id, display_name, email, boxes_closed, total_qty}]
+const teamMemberBoxesCache = new Map(); // user_id -> [{box_number, status, items:[...]}] (lazy-loaded on expand)
+const expandedMemberIds = new Set();
+const selectedMemberIds = new Set();
+let teamSearchDebounceTimer = null;
+let teamSearchResultsCache = []; // rows from the last search_team_scans() call
 
-function scanDisplayName(s) {
-    return s.profiles?.display_name || s.profiles?.email || '—';
+function teamMemberDisplayName(m) {
+    return m.display_name || m.email || '—';
 }
 
-async function openTeamScansModal() {
-    document.getElementById('teamScansBoxList').innerHTML = '<p style="font-size:13px; color: var(--ak-text-light);">Loading...</p>';
-    document.getElementById('teamScansModal').classList.add('active');
+async function openTeamModal() {
+    document.getElementById('teamSearchInput').value = '';
+    document.getElementById('teamSearchResults').style.display = 'none';
+    document.getElementById('teamSelectAllCheckbox').checked = false;
+    selectedMemberIds.clear();
+    expandedMemberIds.clear();
+    teamMemberBoxesCache.clear();
 
-    const { data, error } = await supabaseClient
-        .from('scans')
-        .select('id, barcode, box_number, box_status, qty, scanned_at, user_id, profiles(display_name, email)')
-        .eq('enterprise_id', AppState.profile.enterprise_id)
-        .order('scanned_at', { ascending: false })
-        .limit(1000);
+    document.getElementById('teamMemberList').innerHTML = '<p style="font-size:13px; color: var(--ak-text-light);">Loading...</p>';
+    document.getElementById('teamModal').classList.add('active');
 
+    await loadPendingInvitesList();
+    await refreshTeamMemberStats();
+}
+
+function closeTeamModal() {
+    document.getElementById('teamModal').classList.remove('active');
+}
+
+async function refreshTeamMemberStats() {
+    const { data, error } = await supabaseClient.rpc('team_member_stats');
     if (error) {
-        document.getElementById('teamScansBoxList').innerHTML = '<p style="font-size:13px;">Could not load team scans.</p>';
+        document.getElementById('teamMemberList').innerHTML = '<p style="font-size:13px;">Could not load team stats.</p>';
+        return;
+    }
+    teamMemberStatsCache = (data || []).sort((a, b) => teamMemberDisplayName(a).localeCompare(teamMemberDisplayName(b)));
+    renderTeamMemberList();
+}
+
+function renderTeamMemberList() {
+    const listEl = document.getElementById('teamMemberList');
+    if (teamMemberStatsCache.length === 0) {
+        listEl.innerHTML = '<div style="font-size: 13px; color: var(--ak-text-light);">No team members yet</div>';
         return;
     }
 
-    teamScansCache = data || [];
-    renderTeamScansMemberFilterOptions();
-    applyTeamScansFilters();
-}
-
-function closeTeamScansModal() {
-    document.getElementById('teamScansModal').classList.remove('active');
-}
-
-function renderTeamScansMemberFilterOptions() {
-    const select = document.getElementById('teamScansMemberFilter');
-    const seen = new Map();
-    teamScansCache.forEach(s => { if (!seen.has(s.user_id)) seen.set(s.user_id, scanDisplayName(s)); });
-    const current = select.value;
-    select.innerHTML = '<option value="">All members</option>' +
-        Array.from(seen.entries()).map(([id, name]) => `<option value="${id}">${name}</option>`).join('');
-    select.value = current;
-}
-
-function applyTeamScansFilters() {
-    const memberFilter = document.getElementById('teamScansMemberFilter').value;
-    const statusFilter = document.getElementById('teamScansStatusFilter').value;
-
-    const filtered = teamScansCache.filter(s =>
-        (!memberFilter || s.user_id === memberFilter) &&
-        (!statusFilter || s.box_status === statusFilter)
-    );
-
-    renderTeamScansSummary(filtered);
-    renderTeamScansBoxList(filtered);
-}
-
-function renderTeamScansSummary(scans) {
-    const boxNumbers = new Set(scans.map(s => s.box_number));
-    const perMember = new Map();
-    scans.forEach(s => {
-        const name = scanDisplayName(s);
-        perMember.set(name, (perMember.get(name) || 0) + 1);
-    });
-
-    const memberBreakdown = Array.from(perMember.entries())
-        .map(([name, count]) => `${name}: ${count}`)
-        .join(' · ');
-
-    document.getElementById('teamScansSummary').innerHTML = `
-        <div class="stat-box">
-            <div class="stat-label">Items</div>
-            <div class="stat-number">${scans.length}</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-label">Boxes</div>
-            <div class="stat-number">${boxNumbers.size}</div>
-        </div>
-    ` + (memberBreakdown ? `<p style="width:100%; font-size:12px; color: var(--ak-text-light); margin-top: 6px;">${memberBreakdown}</p>` : '');
-}
-
-function renderTeamScansBoxList(scans) {
-    const listEl = document.getElementById('teamScansBoxList');
-    const groups = new Map();
-    scans.forEach(s => {
-        if (!groups.has(s.box_number)) groups.set(s.box_number, []);
-        groups.get(s.box_number).push(s);
-    });
-
-    if (groups.size === 0) {
-        listEl.innerHTML = '<p style="font-size:13px; color: var(--ak-text-light);">No scans match this filter</p>';
-        return;
-    }
-
-    listEl.innerHTML = Array.from(groups.entries()).map(([boxNumber, items]) => {
-        const names = new Set(items.map(scanDisplayName));
-        const scannedBy = names.size === 1 ? Array.from(names)[0] : `${names.size} people`;
-        const status = items[0].box_status;
+    listEl.innerHTML = teamMemberStatsCache.map(m => {
+        const isExpanded = expandedMemberIds.has(m.user_id);
+        const isSelf = m.user_id === AppState.user?.id;
         return `
-            <div class="box-group-row" data-box="${boxNumber}" style="display:flex; justify-content:space-between; align-items:center; padding:10px; border:1px solid var(--ak-gray-200); border-radius:8px; margin-bottom:6px; cursor:pointer;">
-                <div>
-                    <strong>${boxNumber}</strong>
-                    <div style="font-size:12px; color: var(--ak-text-light);">${scannedBy} · ${status}</div>
+            <div class="box-group-row" style="display:flex; align-items:center; gap:8px; padding:10px; border:1px solid var(--ak-gray-200); border-radius:8px; margin-bottom:6px;">
+                <input type="checkbox" class="team-member-checkbox" data-member-id="${m.user_id}" ${selectedMemberIds.has(m.user_id) ? 'checked' : ''}>
+                <button class="delete-scan-btn" data-expand-member="${m.user_id}" style="flex-shrink:0;">${isExpanded ? '−' : '+'}</button>
+                <div style="flex:1; cursor:pointer;" data-expand-member="${m.user_id}">
+                    <strong>${teamMemberDisplayName(m)}</strong>
+                    <div style="font-size:12px; color: var(--ak-text-light);">${m.boxes_closed} boxes closed · ${m.total_qty} qty scanned</div>
                 </div>
-                <div style="text-align:right;">
-                    <div style="font-weight:600;">${items.length} items</div>
-                    <div style="font-size:11px; color: var(--ak-text-light);">tap for detail</div>
-                </div>
+                ${isSelf ? '' : `<button class="delete-scan-btn" data-remove-member="${m.user_id}" title="Remove from team">✕</button>`}
             </div>
+            <div class="member-detail" id="memberDetail_${m.user_id}" style="display:${isExpanded ? 'block' : 'none'}; margin: -2px 0 8px 32px;"></div>
         `;
     }).join('');
+
+    expandedMemberIds.forEach(id => renderMemberBoxes(id));
 }
 
-function openBoxDetail(boxNumber) {
-    const memberFilter = document.getElementById('teamScansMemberFilter').value;
-    const statusFilter = document.getElementById('teamScansStatusFilter').value;
-    const items = teamScansCache.filter(s =>
-        s.box_number === boxNumber &&
-        (!memberFilter || s.user_id === memberFilter) &&
-        (!statusFilter || s.box_status === statusFilter)
-    );
+async function toggleMemberExpand(userId) {
+    if (expandedMemberIds.has(userId)) {
+        expandedMemberIds.delete(userId);
+        renderTeamMemberList();
+        return;
+    }
+    expandedMemberIds.add(userId);
+    renderTeamMemberList();
 
+    if (!teamMemberBoxesCache.has(userId)) {
+        const detailEl = document.getElementById(`memberDetail_${userId}`);
+        if (detailEl) detailEl.innerHTML = '<p style="font-size:12px; color: var(--ak-text-light);">Loading...</p>';
+
+        const { data, error } = await supabaseClient
+            .from('scans')
+            .select('id, barcode, box_number, box_status, qty, scanned_at')
+            .eq('enterprise_id', AppState.profile.enterprise_id)
+            .eq('user_id', userId)
+            .order('scanned_at', { ascending: false })
+            .limit(5000);
+
+        if (error) {
+            teamMemberBoxesCache.set(userId, []);
+        } else {
+            const groups = new Map();
+            (data || []).forEach(s => {
+                if (!groups.has(s.box_number)) groups.set(s.box_number, []);
+                groups.get(s.box_number).push(s);
+            });
+            teamMemberBoxesCache.set(userId, Array.from(groups.entries()).map(([boxNumber, items]) => ({
+                boxNumber, status: items[0].box_status, items
+            })));
+        }
+    }
+    renderMemberBoxes(userId);
+}
+
+function renderMemberBoxes(userId) {
+    const detailEl = document.getElementById(`memberDetail_${userId}`);
+    if (!detailEl) return;
+    const boxes = teamMemberBoxesCache.get(userId);
+    if (!boxes) return; // still loading
+
+    if (boxes.length === 0) {
+        detailEl.innerHTML = '<p style="font-size:12px; color: var(--ak-text-light);">No scans yet</p>';
+        return;
+    }
+
+    detailEl.innerHTML = boxes.map(b => `
+        <div class="box-group-row" data-member="${userId}" data-box="${b.boxNumber}" style="display:flex; justify-content:space-between; align-items:center; padding:8px; border:1px solid var(--ak-gray-200); border-radius:6px; margin-bottom:4px; cursor:pointer; font-size:12px;">
+            <span><strong>${b.boxNumber}</strong> · ${b.status}</span>
+            <span>${b.items.length} items</span>
+        </div>
+    `).join('');
+}
+
+function toggleSelectAll(checked) {
+    selectedMemberIds.clear();
+    if (checked) teamMemberStatsCache.forEach(m => selectedMemberIds.add(m.user_id));
+    renderTeamMemberList();
+}
+
+function runTeamSearch(term) {
+    clearTimeout(teamSearchDebounceTimer);
+    const trimmed = term.trim();
+    if (!trimmed) {
+        document.getElementById('teamSearchResults').style.display = 'none';
+        document.getElementById('teamSelectAllCheckbox').parentElement.style.display = 'flex';
+        document.getElementById('teamMemberList').style.display = 'block';
+        return;
+    }
+    teamSearchDebounceTimer = setTimeout(() => executeTeamSearch(trimmed), 300);
+}
+
+async function executeTeamSearch(term) {
+    const resultsEl = document.getElementById('teamSearchResults');
+    document.getElementById('teamMemberList').style.display = 'none';
+    document.getElementById('teamSelectAllCheckbox').parentElement.style.display = 'none';
+    resultsEl.style.display = 'block';
+    resultsEl.innerHTML = '<p style="font-size:13px; color: var(--ak-text-light);">Searching...</p>';
+
+    const { data, error } = await supabaseClient.rpc('search_team_scans', { search_term: term, limit_count: 200 });
+    if (error) {
+        resultsEl.innerHTML = '<p style="font-size:13px;">Search failed.</p>';
+        return;
+    }
+    teamSearchResultsCache = data || [];
+    if (teamSearchResultsCache.length === 0) {
+        resultsEl.innerHTML = '<p style="font-size:13px; color: var(--ak-text-light);">No matches</p>';
+        return;
+    }
+    resultsEl.innerHTML = teamSearchResultsCache.map(s => `
+        <div class="box-group-row" data-search-box="${s.box_number}" style="display:flex; justify-content:space-between; align-items:center; padding:8px; border:1px solid var(--ak-gray-200); border-radius:6px; margin-bottom:4px; cursor:pointer; font-size:12px;">
+            <span><strong>${s.box_number}</strong> · ${s.barcode} · ${s.display_name || s.email}</span>
+            <span>${s.box_status}</span>
+        </div>
+    `).join('');
+}
+
+function openBoxDetail(boxNumber, items) {
     document.getElementById('boxDetailTitle').textContent = `Box ${boxNumber}`;
     document.getElementById('boxDetailTableBody').innerHTML = items.map(s => `
         <tr>
             <td>${s.barcode}</td>
-            <td>${scanDisplayName(s)}</td>
+            <td>${s.display_name || s.email || ''}</td>
             <td>${new Date(s.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
         </tr>
     `).join('') || '<tr><td colspan="3">No items</td></tr>';
@@ -347,21 +362,34 @@ function closeBoxDetailModal() {
     document.getElementById('boxDetailModal').classList.remove('active');
 }
 
-function downloadTeamScans() {
-    const memberFilter = document.getElementById('teamScansMemberFilter').value;
-    const statusFilter = document.getElementById('teamScansStatusFilter').value;
-    const filtered = teamScansCache.filter(s =>
-        (!memberFilter || s.user_id === memberFilter) &&
-        (!statusFilter || s.box_status === statusFilter)
-    );
+async function fetchSelectedTeamScans() {
+    const ids = Array.from(selectedMemberIds);
+    const { data, error } = await supabaseClient
+        .from('scans')
+        .select('id, barcode, box_number, box_status, qty, scanned_at, user_id, profiles(display_name, email)')
+        .eq('enterprise_id', AppState.profile.enterprise_id)
+        .in('user_id', ids);
+    if (error) {
+        alert(error.message);
+        return null;
+    }
+    return data || [];
+}
 
-    if (filtered.length === 0) {
-        alert('No scans match the current filter.');
+async function downloadSelectedTeamData() {
+    if (selectedMemberIds.size === 0) {
+        alert('Select at least one team member first.');
+        return;
+    }
+    const data = await fetchSelectedTeamScans();
+    if (!data) return;
+    if (data.length === 0) {
+        alert('No scans found for the selected members.');
         return;
     }
 
-    const rows = filtered.map(s => ({
-        'Scanned By': scanDisplayName(s),
+    const rows = data.map(s => ({
+        'Scanned By': s.profiles?.display_name || s.profiles?.email || '—',
         'Box Number': s.box_number,
         'Barcode': s.barcode,
         'Qty': s.qty,
@@ -373,6 +401,62 @@ function downloadTeamScans() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Team Scans');
     XLSX.writeFile(wb, `team_scans_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+async function resetSelectedTeamData() {
+    if (selectedMemberIds.size === 0) {
+        alert('Select at least one team member first.');
+        return;
+    }
+    if (!confirm(`Download and then permanently delete scan data for ${selectedMemberIds.size} selected member(s)?`)) return;
+
+    const data = await fetchSelectedTeamScans();
+    if (!data) return;
+    if (data.length > 0) {
+        const rows = data.map(s => ({
+            'Scanned By': s.profiles?.display_name || s.profiles?.email || '—',
+            'Box Number': s.box_number,
+            'Barcode': s.barcode,
+            'Qty': s.qty,
+            'Status': s.box_status,
+            'Scanned At': new Date(s.scanned_at).toLocaleString()
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws['!cols'] = [{wch:20},{wch:12},{wch:20},{wch:5},{wch:8},{wch:18}];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Team Scans');
+        XLSX.writeFile(wb, `team_scans_reset_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+
+    const ids = Array.from(selectedMemberIds);
+    const { error } = await supabaseClient
+        .from('scans')
+        .delete()
+        .eq('enterprise_id', AppState.profile.enterprise_id)
+        .in('user_id', ids);
+    if (error) {
+        alert(error.message);
+        return;
+    }
+
+    selectedMemberIds.clear();
+    teamMemberBoxesCache.clear();
+    expandedMemberIds.clear();
+    document.getElementById('teamSelectAllCheckbox').checked = false;
+    await refreshTeamMemberStats();
+}
+
+async function removeMember(memberId) {
+    if (!confirm('Remove this teammate from your enterprise?')) return;
+    const { error } = await supabaseClient.rpc('remove_enterprise_member', { member_user_id: memberId });
+    if (error) {
+        alert(error.message);
+        return;
+    }
+    selectedMemberIds.delete(memberId);
+    expandedMemberIds.delete(memberId);
+    teamMemberBoxesCache.delete(memberId);
+    await refreshTeamMemberStats();
 }
 
 async function checkForMyPendingInvite() {
@@ -525,23 +609,49 @@ function setupEventListeners() {
     document.getElementById('createEnterpriseBtn').addEventListener('click', createEnterprise);
     document.getElementById('sendInviteBtn').addEventListener('click', sendInvite);
     document.getElementById('acceptInviteBtn').addEventListener('click', acceptMyInvite);
-    document.getElementById('viewTeamScansBtn').addEventListener('click', openTeamScansModal);
-    document.getElementById('closeTeamScansBtn').addEventListener('click', closeTeamScansModal);
-    document.getElementById('teamScansMemberFilter').addEventListener('change', applyTeamScansFilters);
-    document.getElementById('teamScansStatusFilter').addEventListener('change', applyTeamScansFilters);
-    document.getElementById('downloadTeamScansBtn').addEventListener('click', downloadTeamScans);
-    document.getElementById('teamScansBoxList').addEventListener('click', (e) => {
-        const row = e.target.closest('.box-group-row');
-        if (row) openBoxDetail(row.dataset.box);
-    });
+    document.getElementById('openTeamModalBtn').addEventListener('click', openTeamModal);
+    document.getElementById('closeTeamBtn').addEventListener('click', closeTeamModal);
     document.getElementById('closeBoxDetailBtn').addEventListener('click', closeBoxDetailModal);
     document.getElementById('pendingInvitesList').addEventListener('click', (e) => {
         const id = e.target.dataset.cancelInvite;
         if (id) cancelInvite(id);
     });
-    document.getElementById('teamMembersList').addEventListener('click', (e) => {
-        const id = e.target.dataset.removeMember;
-        if (id) removeMember(id);
+
+    document.getElementById('teamSearchInput').addEventListener('input', (e) => runTeamSearch(e.target.value));
+
+    document.getElementById('teamSelectAllCheckbox').addEventListener('change', (e) => toggleSelectAll(e.target.checked));
+
+    document.getElementById('downloadTeamSelectedBtn').addEventListener('click', downloadSelectedTeamData);
+    document.getElementById('resetTeamSelectedBtn').addEventListener('click', resetSelectedTeamData);
+
+    document.getElementById('teamMemberList').addEventListener('click', (e) => {
+        if (e.target.matches('.team-member-checkbox')) {
+            const id = e.target.dataset.memberId;
+            if (e.target.checked) selectedMemberIds.add(id); else selectedMemberIds.delete(id);
+            return;
+        }
+        const removeId = e.target.dataset.removeMember;
+        if (removeId) { removeMember(removeId); return; }
+        const expandTarget = e.target.closest('[data-expand-member]');
+        if (expandTarget) toggleMemberExpand(expandTarget.dataset.expandMember);
+    });
+
+    document.getElementById('teamMemberList').addEventListener('click', (e) => {
+        const boxRow = e.target.closest('[data-member][data-box]');
+        if (!boxRow) return;
+        const userId = boxRow.dataset.member;
+        const boxNumber = boxRow.dataset.box;
+        const boxes = teamMemberBoxesCache.get(userId) || [];
+        const box = boxes.find(b => b.boxNumber === boxNumber);
+        if (box) openBoxDetail(boxNumber, box.items.map(i => ({ ...i, display_name: teamMemberDisplayName(teamMemberStatsCache.find(m => m.user_id === userId) || {}) })));
+    });
+
+    document.getElementById('teamSearchResults').addEventListener('click', (e) => {
+        const row = e.target.closest('[data-search-box]');
+        if (!row) return;
+        const boxNumber = row.dataset.searchBox;
+        const items = teamSearchResultsCache.filter(s => s.box_number === boxNumber);
+        openBoxDetail(boxNumber, items);
     });
 }
 
