@@ -13,7 +13,6 @@ what is pending.
 | `supabase/schema.sql` | The whole database: tables, access rules, functions. Safe to re-run in the Supabase SQL editor |
 | `supabase/usage_queries.sql` | Ready-made queries to see who used the app and how much (run in the Supabase SQL editor) |
 | `tests/` | Automated tests (never published) |
-| `legacy/` | Old files kept for reference (old Apps Script, backups); not published |
 
 ## Tests
 

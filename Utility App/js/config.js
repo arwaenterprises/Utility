@@ -31,9 +31,8 @@ const AppState = {
     hasActiveSession: false,
     activeSessionApp: null,
     isOnline: navigator.onLine,
-    // Compatibility for the tools still on the old Apps Script backend (Year/Season Sort),
-    // which were written against Store ID login and read these two fields. They now
-    // come from the signed-in Google account.
+    // Year/Season Sort identifies the operator by these two fields; both come from the
+    // signed-in Google account.
     get storeId() { return this.user?.email || ''; },
     get storeName() { return this.profile?.display_name || this.user?.email || ''; }
 };

@@ -292,7 +292,6 @@ function loadCachedHuConfig() {
 // Any PTL not in the current config is dropped, even if it has existing state.
 function buildHuStates() {
     const existing = YSState.huStates;
-    const configPtls = new Set(YSState.huConfig.map(c => c.ptlNumber));
 
     YSState.huStates = YSState.huConfig.map(cfg => {
         const prev = existing.find(s => s.ptlNumber === cfg.ptlNumber);
