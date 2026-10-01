@@ -1,4 +1,4 @@
-# AK Utility — Roadmap
+# Utility — Roadmap
 
 A running, numbered backlog of everything discussed for this app, so it isn't just living in chat history. Organized by section; item numbers are stable references, not priority order within a section.
 
@@ -15,62 +15,70 @@ A running, numbered backlog of everything discussed for this app, so it isn't ju
 
 ## B. Known pending (security & cleanup)
 
-9. Google Apps Script backend (`doPost`) has no authentication — anyone with the script URL can write arbitrary data to the Google Sheet
+9. Google Apps Script backend (`doPost`) has no authentication — anyone with the script URL can write arbitrary data to the Google Sheet. **Note:** Box Scanner no longer uses this path at all (see section D) — it only still applies to the tools not yet migrated off the old backend.
 10. Year/Season Sort's admin reset still uses the same hardcoded-password pattern Box Scanner used to have (not fixed — wasn't in scope when Box Scanner's was removed)
 11. No security headers (CSP, X-Frame-Options, etc.) configured on Netlify
-12. Store login has no password — by design, confirmed acceptable ("let it be")
+12. Store login has no password — **superseded for Box Scanner**: it no longer has Store ID login at all, replaced by Google OAuth (item 32). Still applies to tools not yet migrated.
 13. No automated tests exist for this app
 14. No roadmap/backlog tracking file existed in the repo — **this file is the fix**
 
 ## C. Domain & deployment
 
-15. Custom subdomain: `utility.arwaenterprises.com`
+15. Custom subdomain: `utility.arwaenterprises.com` — live; HTTPS cert status last noted as deferred, **not reconfirmed since** — verify this is actually issued, don't assume
 16. Prove out the new architecture on a clone of the app before touching the live one — current Netlify app (`utilityy.netlify.app`, backed by Google Apps Script) stays untouched and operational as a safety net until the new version is fully proven, then gets retired
 
-## D. SaaS / multi-tenancy
+## D. SaaS / multi-tenancy — ✅ done (Box Scanner only; other tools still TBD)
 
-17. Convert to multi-tenant SaaS — support ~100–200 users initially, scaling to ~500
-18. Migrate database from Google Sheets to Supabase (or similar free-tier DB), preserving all existing logic/behavior
-19. Two account tiers:
-    - **Single/individual user** — scans and sees only their own data
-    - **Enterprise** — an enterprise admin oversees ~10–15 sub-users under their org, can view all their data, and can reset it
-    - **Decided:** self-serve at signup (user picks Individual or Enterprise, no approval needed); enterprise admin adds sub-users via email invite (sub-user clicks link, signs in with Google, auto-joins the enterprise); an Individual user can later upgrade/join an Enterprise (not locked in forever)
-20. All logged-in users (either tier) eventually see the same set of tools on the home screen (4–6 tools: Box Scanner, Item Barcode, Box Code, etc. — exact list TBD) — **but during the pilot phase, only Box Scanner is shown; other tiles stay hidden until each is migrated in turn**
-21. Fix the current data-isolation gap: today anyone with Google Sheet access can see all users' scanned data mixed together with no separation — Supabase migration must enforce per-user/per-enterprise data scoping (Row-Level Security)
-22. When a user or enterprise admin resets their data, it must be **actually deleted** from Supabase (not just hidden/flagged) to keep storage within free-tier limits while scaling toward 500 users
-23. Everything must stay on free tiers across all tools/services used
-24. App must keep functioning exactly as it does now through the migration
-25. **Decided schema (final, ready to implement):**
-    - `profiles` — one row per signed-in user: `id`, `email`, `display_name`, `tier` (`individual`/`enterprise_admin`/`enterprise_member`), `enterprise_id` (nullable)
-    - `enterprises` — one row per org: `id`, `name`, `admin_user_id`
-    - `enterprise_invites` — pending email invites: `id`, `enterprise_id`, `invited_email`, `status`, `token`, `expires_at`
-    - `scans` — replaces both IndexedDB and the Google Sheet, same fields the app already uses (`store_id`, `store_name`, `staff_name`, `remark`, `box_number`, `barcode`, `qty`, `box_status`, `timestamp`, `scan_uid`), plus `user_id` and `enterprise_id` for ownership
-    - RLS: individuals and enterprise members only see their own `scans`; enterprise admins see every `scans` row tagged with their `enterprise_id`; Reset performs a real `DELETE`, not a soft-delete flag
-    - Net effect: replaces the current IndexedDB-then-sync-to-Sheets dual-write complexity with a single direct write to Supabase — simpler than what exists today, not more complex
+17. Convert to multi-tenant SaaS — support ~100–200 users initially, scaling to ~500 — **built**, live on branch `saas-pilot`
+18. Migrate database from Google Sheets to Supabase — **done for Box Scanner**: it now reads/writes Supabase directly, no more IndexedDB-then-sync-to-Sheets dual-write. Other tools (Item Barcode, Box Code, Photo Capture, Box Segregate, Price Check, Year/Season Sort) are unchanged, still on the old Apps Script backend — see Phase 3.
+19. Two account tiers — **built**: self-serve at signup (Individual vs. Enterprise), enterprise admin invites sub-users by email (invitee clicks link, signs in with Google, auto-joins), admin can cancel a pending invite or remove an active member. An Individual can upgrade to Enterprise via the same "Create an Enterprise" flow.
+20. Home screen still shows only Box Scanner during the pilot phase — other tiles stay hidden until each is migrated (unchanged, still accurate)
+21. Data-isolation gap — **fixed**: `profiles`/`enterprises`/`enterprise_invites`/`scans` tables in `supabase/schema.sql`, with Row-Level Security scoping every table to the caller's own rows or their enterprise's rows. Verified against a local Postgres instance including simulated attacks (privilege escalation via direct column UPDATE, forged `enterprise_id` on insert, cross-tenant reads) — all correctly blocked.
+22. Reset-deletes-data — **done**: Box Scanner's Reset performs a real `DELETE`, not a soft-delete flag. The Team console's per-member/per-box/bulk "Reset Selected" (item 29) follows the same download-then-delete pattern.
+23. Everything on free tiers — **holding**: Supabase free tier, Netlify, Google OAuth all free as used so far
+24. App functions as before through the migration — confirmed by the user in production (real Google sign-in, real scan, real box-close)
+25. **Schema — shipped** (`supabase/schema.sql`), matches the originally decided shape plus what building it in practice required:
+    - `profiles`, `enterprises`, `enterprise_invites`, `scans` tables as originally decided, RLS as originally decided
+    - Plus, added during the build: `current_user_enterprise_id()`, `current_user_is_enterprise_admin()`, `current_user_email()` helper functions; `create_enterprise()`, `accept_enterprise_invite()`, `remove_enterprise_member()` RPCs; `scans.user_id` points at `public.profiles(id)` rather than `auth.users(id)` so PostgREST can auto-embed member names onto scan rows; `team_member_stats()` and `search_team_scans()` RPCs added for the Team console (item 26)
+    - Column-level privilege lockdown added beyond the original plan: `tier`/`enterprise_id` on `profiles` can only change via the `SECURITY DEFINER` RPCs above, not by a user directly `UPDATE`-ing their own row
 
-## E. Auth
+## D2. Team Management console — ✅ done
 
-25. Login via Google account (Google OAuth)
-26. Password reset via Google account OTP — **needs clarification**: if login is pure Google OAuth, there's no separate app password to reset; Google handles its own account recovery. What's actually wanted here needs to be pinned down before building it.
+26. Unified admin console (single `#teamModal`, replacing earlier separate Account-modal team sections and a Team Scans popup): per-member stats (boxes closed, qty scanned) via `team_member_stats()`, members rendered as a spreadsheet-style table (sticky header, alternating rows) instead of a card list
+27. Inline, nested expand/collapse (members → boxes → items) with no drill-down popups — the earlier `#boxDetailModal` was removed entirely
+28. Server-side search (`search_team_scans()`) across box number, barcode, and user — scales to thousands of rows by computing stats and search in Postgres instead of loading the whole team's scan history into the browser
+29. Download icon on every row that holds data (per member, per box, reached either via a member's drill-down or via search results) plus bulk "Download Selected" / "Reset Selected" (reset = download then delete) for checkbox-selected members
+30. Single-overlay modal behavior: Account and Team modals no longer stack — opening Team closes Account, closing Team doesn't pop Account back up
+31. Verified against a local Postgres instance (6,000 synthetic rows across 5 users: correct aggregates, correct search matches, non-admin callers rejected) and a headless-browser pass over the frontend with mocked data (expand/collapse, selection, per-row and bulk downloads, search grouping)
+
+## D3. Still pending from the SaaS migration
+
+32. **Real offline support with IndexedDB** — explicitly requested after scanning felt less responsive than the old IndexedDB-backed version ("the crispness fix"). Box Scanner is currently online-only against Supabase. Flagged repeatedly as the single biggest remaining piece of this migration; not yet designed or built.
+33. Five admin-management gaps, explicitly deferred by the user for a later round: multiple admins per enterprise, an audit trail, invite expiration handling, enterprise settings/rename, billing/seat-count hooks.
+
+## E. Auth — ✅ done
+
+34. Login via Google account (Google OAuth) — **built**, replaces Store ID login entirely on Box Scanner
+35. Password reset via Google account OTP — **resolved as moot**: login is pure Google OAuth now, there's no separate app password to reset; Google handles its own account recovery. Nothing further to build here.
 
 ## F. Monetization — AdSense
 
-27. Google AdSense account to be added across `arwaenterprises.com` and all its subdomains (this Utility app, plus an "attendance app" mentioned in passing — separate product, not in this repo)
-28. App needs ad placements designed in; exact placement/timing strategy TBD beyond the two specifics below
-29. Box Scanner: show an ad after a box is closed, during the natural ~5–10 second gap while the user tapes/places the box before scanning the next one — **not** a gate blocking the close-box action itself
-30. Desktop layout: the app renders as a centered mobile-width card with empty space on both sides on wide screens — use that space for display ads
-31. AdSense is not a near-term priority — explicitly deferred until after the Supabase migration is stable; flagged here so the policy nuances already discussed (forced-view policy, internal-tool traffic gray area) aren't lost when the time comes
+36. Google AdSense account to be added across `arwaenterprises.com` and all its subdomains (this Utility app, plus an "attendance app" mentioned in passing — separate product, not in this repo)
+37. App needs ad placements designed in; exact placement/timing strategy TBD beyond the two specifics below
+38. Box Scanner: show an ad after a box is closed, during the natural ~5–10 second gap while the user tapes/places the box before scanning the next one — **not** a gate blocking the close-box action itself
+39. Desktop layout: the app renders as a centered mobile-width card with empty space on both sides on wide screens — use that space for display ads
+40. AdSense is not a near-term priority — explicitly deferred until after the Supabase migration is stable. The core migration (section D) is done, but item 32 (offline support) was called out as part of that same effort and is still open, so AdSense stays deferred until that's resolved too, unless the user says otherwise.
 
 ## G. Domain compliance (outside this repo)
 
-32. `arwaenterprises.com` is missing a Privacy Policy and Terms of Service page — needed for both AdSense approval and Google OAuth consent screen verification (blocks items 25 and 27). No About page either (minor). This is work on the main marketing site, not in the `Utility` repo, but flagged here so it isn't lost.
+41. `arwaenterprises.com` is missing a Privacy Policy and Terms of Service page — needed for both AdSense approval and Google OAuth consent screen verification (blocks items 34 and 36). No About page either (minor). This is work on the main marketing site, not in the `Utility` repo, but flagged here so it isn't lost.
 
 ## Phasing (agreed approach)
 
-1. **Phase 1 — done:** Cloned the app on branch `saas-pilot`, hid every tool tile except Box Scanner, deployed that branch to a second Netlify site, pointed `utility.arwaenterprises.com` at it. Live over HTTP; HTTPS cert issuance deferred (DNS now correct, just needs a retry in Netlify when convenient — not blocking). Still talks to the same Google Apps Script — no backend changes yet.
-2. **Phase 2 (next up):** Design and build the Supabase migration for Box Scanner only — accounts, Google OAuth, Row-Level Security multi-tenancy, data-reset-deletes-data behavior (items 17–26). This needs its own dedicated design session before implementation starts.
-3. **Phase 3:** Once Box Scanner on Supabase is proven stable, decide on rolling the same pattern out to the remaining tools, revealing each tile as it's migrated.
-4. **Phase 4:** Add Google AdSense once the Supabase migration is stable (items 27–31).
+1. **Phase 1 — done:** Cloned the app on branch `saas-pilot`, hid every tool tile except Box Scanner, deployed that branch to a second Netlify site, pointed `utility.arwaenterprises.com` at it.
+2. **Phase 2 — done:** Supabase migration for Box Scanner — accounts, Google OAuth, Row-Level Security multi-tenancy, data-reset-deletes-data behavior, enterprise invite/accept/remove, and the unified Team Management console (items 17–31). Verified live in production by the user. What's left from this phase: real offline support (item 32) and the deferred admin-management gaps (item 33).
+3. **Phase 3 (next up):** Roll the same Supabase pattern out to the remaining tools (Item Barcode, Box Code, Photo Capture, Box Segregate, Price Check, Year/Season Sort), revealing each tile as it's migrated. Not started.
+4. **Phase 4:** Add Google AdSense once the migration is fully stable, including offline support (items 36–40).
 5. **Phase 5:** Retire the old Netlify + Google Apps Script version once the new one is fully proven.
 
-Independent of the phases above: item 32 (Privacy Policy/Terms on the main domain) can be done any time — it isn't blocking Phase 1.
+Independent of the phases above: item 41 (Privacy Policy/Terms on the main domain) can be done any time — it isn't blocking any phase.
