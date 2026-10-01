@@ -6,7 +6,7 @@
 //
 // BUMP CACHE_VERSION every time you deploy a change to index.html/js/css,
 // same as the ?v= numbers in index.html's script tags.
-const CACHE_VERSION = 'ak-utility-v34';
+const CACHE_VERSION = 'ak-utility-v35';
 
 const APP_SHELL = [
     './',
@@ -61,6 +61,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
     if (new URL(event.request.url).origin !== self.location.origin) return;
+    if (new URL(event.request.url).searchParams.has('check')) return;   // the app's "is there a newer version?" request: never cache it
 
     event.respondWith(
         fetch(event.request)

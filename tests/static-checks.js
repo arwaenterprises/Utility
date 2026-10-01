@@ -25,6 +25,8 @@ const tags = [...html.matchAll(/<script src="(js\/[^"?]+)\?v=(\d+)"><\/script>/g
 check('index.html loads app scripts', tags.length >= 8, tags.length);
 check('every script file exists', tags.every(t => fs.existsSync(path.join(APP, t.file))), tags.filter(t => !fs.existsSync(path.join(APP, t.file))).map(t => t.file).join());
 check('all script tags use the same ?v= number', new Set(tags.map(t => t.v)).size === 1, [...new Set(tags.map(t => t.v))].join());
+const swVersionNum = Number((sw.match(/CACHE_VERSION\s*=\s*'ak-utility-v(\d+)'/) || [])[1]);
+check('sw.js CACHE_VERSION number equals the ?v= number on the script tags (the in-app "new version" check compares them)', tags.length > 0 && tags.every(t => Number(t.v) === swVersionNum), `sw=${swVersionNum} tags=${[...new Set(tags.map(t => t.v))].join()}`);
 check('every js file is loaded by index.html', jsFiles.every(f => tags.some(t => t.file === 'js/' + f)), jsFiles.filter(f => !tags.some(t => t.file === 'js/' + f)).join());
 const shell = [...sw.matchAll(/'\.\/(js\/[^']+)'/g)].map(m => m[1]);
 check('service worker caches every script', tags.every(t => shell.includes(t.file)), tags.filter(t => !shell.includes(t.file)).map(t => t.file).join());
@@ -86,6 +88,7 @@ check('internal files are not in the published folder', !fs.readdirSync(APP).som
 // 5. Security headers stay in place.
 const toml = fs.readFileSync(path.join(ROOT, 'netlify.toml'), 'utf8');
 check('netlify.toml: X-Frame-Options', /X-Frame-Options\s*=\s*"DENY"/.test(toml));
+check('netlify.toml: manifest served as application/manifest+json', /for = "\/manifest\.webmanifest"[\s\S]*?application\/manifest\+json/.test(toml));
 check('netlify.toml: nosniff', /X-Content-Type-Options\s*=\s*"nosniff"/.test(toml));
 check('netlify.toml: Content-Security-Policy present', /Content-Security-Policy(-Report-Only)?\s*=/.test(toml));
 

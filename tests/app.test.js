@@ -233,6 +233,28 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     // ---------- account deletion was rolled back ----------
     ok('no Delete-account button, modal or code in the app', !document.getElementById('openDeleteAccountBtn') && !document.getElementById('deleteAccountModal') && typeof openDeleteAccount === 'undefined' && typeof confirmDeleteAccount === 'undefined');
 
+    // ---------- app updates ----------
+    AppState.isOnline = true;
+    const realFetch = window.fetch;
+    const swText = v => `const CACHE_VERSION = 'ak-utility-v${v}';`;
+    const running = runningAppVersion();
+    ok('the running version is read from the script tags', running > 0 && Number.isInteger(running), running);
+    ok('against the real server file: up to date, no banner', (await checkForAppUpdate()) === 'current' && document.getElementById('updateBanner').style.display === 'none');
+    window.fetch = async (u, o) => /sw\.js/.test(u) ? new Response(swText(running + 1)) : realFetch(u, o);
+    ok('a newer version on the server shows the banner with its number', (await checkForAppUpdate()) === 'newer' && document.getElementById('updateBanner').style.display === 'flex' && document.getElementById('updateBannerText').textContent.includes('v' + (running + 1)), document.getElementById('updateBannerText').textContent);
+    window.fetch = async (u, o) => /sw\.js/.test(u) ? new Response(swText(running)) : realFetch(u, o);
+    ok('same version again hides the banner', (await checkForAppUpdate()) === 'current' && document.getElementById('updateBanner').style.display === 'none');
+    window.fetch = async () => { throw new TypeError('Failed to fetch'); };
+    ok('a failed check is harmless ("unknown", no banner)', (await checkForAppUpdate()) === 'unknown' && document.getElementById('updateBanner').style.display === 'none');
+    window.fetch = realFetch; AppState.isOnline = false;
+    ok('offline: no check is made', (await checkForAppUpdate()) === 'offline'); AppState.isOnline = true;
+    AppState.user = { id: 'u1', email: 'a@b.c' }; AppState.profile = { display_name: 'Ann', enterprise_id: null, tier: 'individual' };
+    await openAccountModal();
+    ok('Account screen shows the running version and a Check for updates button', document.getElementById('appVersionDisp').textContent === 'v' + running && !!document.getElementById('checkUpdateBtn'), document.getElementById('appVersionDisp').textContent);
+    await checkUpdateFromAccount();
+    ok('Check for updates reports "latest version" when current', /latest version/.test(document.getElementById('appVersionStatus').textContent), document.getElementById('appVersionStatus').textContent);
+    document.getElementById('accountModal').classList.remove('active');
+
     // ---------- Box Scanner badge % ----------
     ok('uids valid UUIDs', /^[0-9a-f-]{36}$/.test(newScanUid()));
     return log;

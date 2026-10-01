@@ -37,3 +37,9 @@
   for = "/sw.js"
   [headers.values]
     Cache-Control = "no-cache"
+
+# The manifest must be served as a web manifest (Netlify's default for .webmanifest is a generic type).
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"

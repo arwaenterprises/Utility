@@ -32,6 +32,8 @@ const { start, openApp, report, stop } = require('./helpers/harness');
   log.push({ pass: sw === 'active', name: 'service worker is active (offline files cached)', extra: sw });
   const cached = await page.evaluate(async () => { const keys = await caches.keys(); const c = await caches.open(keys[0]); return (await c.keys()).map(r => new URL(r.url).pathname); });
   log.push({ pass: cached.some(p => p.endsWith('manifest.webmanifest')) && cached.some(p => p.endsWith('icon-512.png')), name: 'manifest and icons are in the offline cache', extra: cached.length + ' files' });
+  const cleared = await page.evaluate(async () => { await clearAppCaches(); return { regs: (await navigator.serviceWorker.getRegistrations()).length, caches: (await caches.keys()).length }; });
+  log.push({ pass: cleared.regs === 0 && cleared.caches === 0, name: '"Update now" step clears the old service worker and the offline file cache', extra: JSON.stringify(cleared) });
   const failures = report(log, errors.filter(e => !/Failed to load resource/.test(e)));
   await stop(ctx);
   process.exit(failures ? 1 : 0);

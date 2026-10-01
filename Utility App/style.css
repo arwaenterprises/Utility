@@ -2343,3 +2343,27 @@ body.rtl .form-select {
 .sync-status-line.warn { color: #8a4b00; background: #fff3e0; border: 1px solid #ffcc80; border-radius: 8px; padding: 6px 8px; font-weight: 600; }
 .sync-status-line.tappable { cursor: pointer; }
 #ysSyncStatusLine { margin: 0 0 6px; padding: 0 2px; }
+
+/* New-version banner (bottom of the screen, above everything but modals) */
+.update-banner {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    z-index: 900;
+    max-width: 580px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--ak-maroon);
+    color: var(--ak-white);
+    border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+    font-size: 13px;
+    font-weight: 600;
+}
+.update-banner span { flex: 1; }
+.update-banner .btn { padding: 8px 14px; background: var(--ak-white); color: var(--ak-maroon); font-size: 13px; }
+.update-banner .update-later { background: none; border: none; color: var(--ak-white); font-size: 16px; cursor: pointer; padding: 4px 6px; }

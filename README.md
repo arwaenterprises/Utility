@@ -41,6 +41,15 @@ The site is an installable app: it opens full-screen with its own icon and works
 - Updates arrive by themselves the next time the app is opened with internet.
 The logo is original artwork in `Utility App/icons/` (`icon.svg` is the master; PNG sizes are generated from it). To use a different logo, replace those files and keep the same file names and sizes (the tests check this).
 
+## Getting a new version onto a device
+
+The app tells the user when a newer version exists (banner at the bottom: **Update now**), and **Account -> Check for updates** does the same on demand. The running version is shown under Account -> App version.
+Devices running a version older than v35 do not have that yet - refresh them once by hand:
+1. **Make sure everything is uploaded first** (Box Scanner / Year-Season sync badge shows the green tick; the status line says "All uploaded") - clearing a device's storage also removes anything not yet uploaded.
+2. **Android (Chrome / installed app):** close the app completely (swipe it away) and open it again with internet on; if still old: Chrome -> open the site in a normal tab -> menu -> Settings -> Site settings -> this site -> **Clear & reset**, or reinstall the app (uninstall, then Chrome menu -> Install app).
+3. **iPhone / iPad (home-screen app):** swipe the app away, reopen with internet; if still old: delete the home-screen icon, open the site in Safari, Share -> Add to Home Screen again.
+4. **Windows / Mac:** hard refresh (Ctrl+Shift+R / Cmd+Shift+R).
+
 ## Releasing a change
 
 1. Change the app files in `Utility App/`.

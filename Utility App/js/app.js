@@ -84,6 +84,7 @@ function tierDisplayText(profile) {
 
 async function openAccountModal() {
     document.getElementById('accountEmailDisp').textContent = AppState.user?.email || '';
+    showAppVersionInAccount();
     document.getElementById('accountTierDisp').textContent = tierDisplayText(AppState.profile);
 
     const isIndividual = AppState.profile?.tier === 'individual';
@@ -821,6 +822,9 @@ function setupEventListeners() {
     document.getElementById('goToSessionBtn').addEventListener('click', () => { if (AppState.activeSessionApp) openApp(AppState.activeSessionApp); });
     document.getElementById('accountBtn').addEventListener('click', openAccountModal);
     document.getElementById('closeAccountBtn').addEventListener('click', closeAccountModal);
+    document.getElementById('checkUpdateBtn').addEventListener('click', checkUpdateFromAccount);
+    document.getElementById('updateNowBtn').addEventListener('click', updateAppNow);
+    document.getElementById('updateLaterBtn').addEventListener('click', () => { document.getElementById('updateBanner').style.display = 'none'; });
     document.getElementById('createEnterpriseBtn').addEventListener('click', createEnterprise);
     document.getElementById('sendInviteBtn').addEventListener('click', sendInvite);
     document.getElementById('acceptInviteBtn').addEventListener('click', acceptMyInvite);
@@ -890,6 +894,91 @@ function setupEventListeners() {
 // ============================================
 // Registers sw.js so every browser/tablet checks for and picks up the latest
 // deployed files, with an offline fallback to the last-known-good copy.
+// ============================================
+// APP UPDATES
+// ============================================
+// An installed app (PWA) that stays in the background keeps running the page it loaded, so a new
+// deploy can go unnoticed for days. Every deploy bumps the version number (the ?v= on the script tags
+// and CACHE_VERSION in sw.js). The app compares the version it is running with the one on the server
+// when it opens, when it comes back to the foreground and when the connection returns, and shows a
+// banner instead of reloading by itself (a reload in the middle of a scan would be worse).
+function runningAppVersion() {
+    const tag = document.querySelector('script[src*="js/app.js"]');
+    const m = tag && tag.getAttribute('src').match(/[?&]v=(\d+)/);
+    return m ? Number(m[1]) : 0;
+}
+
+async function fetchServerAppVersion() {
+    const res = await fetch('sw.js?check=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const m = (await res.text()).match(/CACHE_VERSION\s*=\s*'ak-utility-v(\d+)'/);
+    return m ? Number(m[1]) : 0;
+}
+
+// Returns 'newer' | 'current' | 'offline' | 'unknown'.
+async function checkForAppUpdate() {
+    if (!AppState.isOnline) return 'offline';
+    try {
+        const server = await fetchServerAppVersion();
+        const running = runningAppVersion();
+        if (!server || !running) return 'unknown';
+        if (server > running) {
+            document.getElementById('updateBannerText').textContent = `A new version (v${server}) is available.`;
+            document.getElementById('updateBanner').style.display = 'flex';
+            return 'newer';
+        }
+        document.getElementById('updateBanner').style.display = 'none';
+        return 'current';
+    } catch (e) {
+        return 'unknown';
+    }
+}
+
+// Forget the offline copy of the app files (NOT your scans or settings) and the old service worker.
+async function clearAppCaches() {
+    try {
+        if ('serviceWorker' in navigator) {
+            for (const reg of await navigator.serviceWorker.getRegistrations()) await reg.unregister();
+        }
+        if (window.caches) {
+            for (const key of await caches.keys()) await caches.delete(key);
+        }
+    } catch (e) { /* reload anyway */ }
+}
+
+async function updateAppNow() {
+    if (!AppState.isOnline) { alert('You are offline. Connect to the internet to update the app.'); return; }
+    await clearAppCaches();
+    window.location.reload();
+}
+
+let lastUpdateCheck = 0;
+function scheduleUpdateChecks() {
+    const run = () => { lastUpdateCheck = Date.now(); checkForAppUpdate(); };
+    setTimeout(run, 4000);                                           // shortly after opening
+    document.addEventListener('visibilitychange', () => {            // coming back to the foreground
+        if (document.visibilityState === 'visible' && Date.now() - lastUpdateCheck > 5 * 60000) run();
+    });
+    window.addEventListener('online', () => setTimeout(run, 2000));
+}
+
+async function showAppVersionInAccount() {
+    document.getElementById('appVersionDisp').textContent = 'v' + runningAppVersion();
+    document.getElementById('appVersionStatus').textContent = '';
+}
+
+async function checkUpdateFromAccount() {
+    const btn = document.getElementById('checkUpdateBtn');
+    const status = document.getElementById('appVersionStatus');
+    btn.disabled = true; status.textContent = '· checking…';
+    const result = await checkForAppUpdate();
+    btn.disabled = false;
+    if (result === 'newer') { closeAccountModal(); status.textContent = ''; }
+    else if (result === 'current') status.textContent = '· you have the latest version';
+    else if (result === 'offline') status.textContent = '· offline - cannot check';
+    else status.textContent = '· could not check, try again';
+}
+
 function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
 
@@ -919,6 +1008,7 @@ async function initApp() {
     updateOnlineStatus();
     setupEventListeners();
     registerServiceWorker();
+    scheduleUpdateChecks();
 
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (session) {
