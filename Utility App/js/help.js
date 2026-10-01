@@ -184,8 +184,8 @@ const HELP = {
 };
 
 const HELP_UI = {
-    en: { title: 'How to use', before: 'Before you start:', steps: 'Step by step', tips: 'Good to know', ok: 'Got it' },
-    ar: { title: 'كيفية استخدام', before: 'قبل أن تبدأ:', steps: 'خطوة بخطوة', tips: 'معلومات مفيدة', ok: 'فهمت' }
+    en: { title: 'How to use', before: 'Before you start:', steps: 'Step by step', tips: 'Good to know', ok: 'Got it', hold: 'Tip: press and hold any icon button to see what it does.' },
+    ar: { title: 'كيفية استخدام', before: 'قبل أن تبدأ:', steps: 'خطوة بخطوة', tips: 'معلومات مفيدة', ok: 'فهمت', hold: 'نصيحة: اضغط مطولًا على أي زر أيقونة لمعرفة وظيفته.' }
 };
 let helpLang = 'en';
 let helpAppId = null;
@@ -218,7 +218,8 @@ function helpRender() {
         '<p class="help-intro">' + c.intro + '</p>' +
         (c.before ? '<div class="help-before"><b>' + t.before + '</b> ' + c.before + '</div>' : '') +
         '<h4>' + t.steps + '</h4>' + list(c.steps, 'ol') +
-        (c.tips && c.tips.length ? '<h4>' + t.tips + '</h4>' + list(c.tips, 'ul') : '');
+        (c.tips && c.tips.length ? '<h4>' + t.tips + '</h4>' + list(c.tips, 'ul') : '') +
+        '<p class="help-hold">' + t.hold + '</p>';
     body.scrollTop = 0;
     document.getElementById('helpCloseBtn').textContent = t.ok;
     document.querySelectorAll('#helpLang .lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === helpLang));

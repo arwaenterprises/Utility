@@ -617,7 +617,7 @@ function updateScansTable() {
     recent.forEach(scan => {
         const tr = document.createElement('tr');
         const time = new Date(scan.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        tr.innerHTML = `<td>${scan.barcode}</td><td>${time}</td><td><button class="delete-scan-btn" data-id="${scan.scan_uid}" data-barcode="${scan.barcode}">✕</button></td>`;
+        tr.innerHTML = `<td>${scan.barcode}</td><td>${time}</td><td><button class="delete-scan-btn" title="Delete this scan" data-id="${scan.scan_uid}" data-barcode="${scan.barcode}">✕</button></td>`;
         tbody.appendChild(tr);
     });
 }

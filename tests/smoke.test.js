@@ -37,6 +37,28 @@ const { start, openApp, report, stop } = require('./helpers/harness');
       ok('English toggle brings it back: ' + id, document.getElementById('helpBody').dir === 'ltr' && !/[\u0600-\u06FF]/.test(document.getElementById('helpBody').textContent));
       document.getElementById('helpCloseBtn').click();
     }
+    // Long-press hints for icon buttons (phones have no hover).
+    const touch = (el, type) => el.dispatchEvent(new PointerEvent(type, { pointerType: 'touch', bubbles: true, cancelable: true, clientX: 50, clientY: 50 }));
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    localStorage.clear(); openApp('boxSegregate'); document.getElementById('helpCloseBtn').click();
+    const hb = document.getElementById('helpBtn');
+    touch(hb, 'pointerdown'); await wait(650);
+    const bubble = document.querySelector('.longpress-tip');
+    ok('long-press on an icon shows what it does', !!bubble && bubble.textContent === 'How to use this tool', bubble && bubble.textContent);
+    touch(hb, 'pointerup'); hb.click();
+    ok('the release after a long press does not press the button', !document.getElementById('helpModal').classList.contains('active'));
+    await wait(100); touch(hb, 'pointerdown'); touch(hb, 'pointerup'); hb.click();
+    ok('a normal quick tap still works', document.getElementById('helpModal').classList.contains('active') && !document.querySelector('.longpress-tip'));
+    document.getElementById('helpCloseBtn').click();
+    localStorage.setItem('aku_help_lang', 'ar');
+    touch(hb, 'pointerdown'); await wait(650); touch(hb, 'pointerup'); hb.click();
+    const ab = document.querySelector('.longpress-tip');
+    ok('long-press hint appears in Arabic when Arabic is chosen', !!ab && /[\u0600-\u06FF]/.test(ab.textContent) && ab.dir === 'rtl', ab && ab.textContent);
+    localStorage.clear();
+    const dyn = document.createElement('button'); dyn.className = 'delete-scan-btn'; dyn.textContent = '✕'; document.body.appendChild(dyn);
+    touch(dyn, 'pointerdown'); await wait(650); touch(dyn, 'pointerup');
+    ok('buttons created later (no title) still get a hint', document.querySelector('.longpress-tip') && document.querySelector('.longpress-tip').textContent === 'Delete this scan');
+    dyn.remove();
     ok('Year/Season store id comes from the Google account', AppState.storeId === 'a@b.c' && AppState.storeName === 'Ann');
     ok('no Google Apps Script / hard-coded admin code left in the app', typeof CONFIG.GOOGLE_SCRIPT_URL === 'undefined' && typeof CONFIG.ADMIN_CODE === 'undefined' && typeof CONFIG.YS_SCRIPT_URL === 'undefined' && typeof CONFIG.PC_SCRIPT_URL === 'undefined');
     return log;

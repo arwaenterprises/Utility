@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=44"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=44"></script>
-    <script src="vendor/qrcode.min.js?v=44"></script>
-    <script src="vendor/html5-qrcode.min.js?v=44"></script>
-    <script src="vendor/supabase.js?v=44"></script>
+    <script src="vendor/xlsx.full.min.js?v=45"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=45"></script>
+    <script src="vendor/qrcode.min.js?v=45"></script>
+    <script src="vendor/html5-qrcode.min.js?v=45"></script>
+    <script src="vendor/supabase.js?v=45"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -77,7 +77,7 @@
     <div class="update-banner" id="updateBanner" style="display:none;" role="status">
         <span id="updateBannerText">A new version is available.</span>
         <button class="btn" id="updateNowBtn" type="button">Update now</button>
-        <button class="update-later" id="updateLaterBtn" type="button" aria-label="Later">✕</button>
+        <button class="update-later" id="updateLaterBtn" type="button" title="Later" aria-label="Later">✕</button>
     </div>
 
     <!-- TEAM MODAL (unified management + scans, scales to thousands of rows) -->
@@ -315,7 +315,7 @@
                     <div class="scans-table-container">
                         <div class="scans-table-header">
                             <span class="scans-table-title" id="lblRecentScans">Last 5 Scans</span>
-                            <span class="sync-badge synced" id="syncBadge">✓</span>
+                            <span class="sync-badge synced" id="syncBadge" title="Sync status (a tick means saved to the server)">✓</span>
                         </div>
                         <div class="sync-status-line" id="syncStatusLine"></div>
                         <table class="scans-table">
@@ -728,7 +728,7 @@
                             <span class="ys-im-count" id="ysImCount">— items</span>
                             <button class="ys-im-sync-btn" id="ysImSyncBtn" title="Refresh Item Master & HU Config">↻</button>
                             <button class="ys-voice-lang-btn" id="ysVoiceLangBtn" onclick="ysCycleVoiceLang()" title="Voice language">🌐 Off</button>
-                            <span class="sync-badge synced" id="ysSyncBadge">✓</span>
+                            <span class="sync-badge synced" id="ysSyncBadge" title="Sync status (a tick means saved to the server)">✓</span>
                         </div>
                     </div>
                     <div class="sync-status-line" id="ysSyncStatusLine"></div>
@@ -1055,18 +1055,19 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=44"></script>
-    <script src="js/supabaseClient.js?v=44"></script>
-    <script src="js/lists.js?v=44"></script>
-    <script src="js/usage.js?v=44"></script>
-    <script src="js/syncstatus.js?v=44"></script>
-    <script src="js/help.js?v=44"></script>
-    <script src="js/app.js?v=44"></script>
-    <script src="js/boxScanner.js?v=44"></script>
-    <script src="js/itemBarcode.js?v=44"></script>
-    <script src="js/boxCode.js?v=44"></script>
-    <script src="js/boxSegregate.js?v=44"></script>
-    <script src="js/priceCheck.js?v=44"></script>
-    <script src="js/yearSegregate.js?v=44"></script>
+    <script src="js/config.js?v=45"></script>
+    <script src="js/supabaseClient.js?v=45"></script>
+    <script src="js/lists.js?v=45"></script>
+    <script src="js/usage.js?v=45"></script>
+    <script src="js/syncstatus.js?v=45"></script>
+    <script src="js/help.js?v=45"></script>
+    <script src="js/tooltip.js?v=45"></script>
+    <script src="js/app.js?v=45"></script>
+    <script src="js/boxScanner.js?v=45"></script>
+    <script src="js/itemBarcode.js?v=45"></script>
+    <script src="js/boxCode.js?v=45"></script>
+    <script src="js/boxSegregate.js?v=45"></script>
+    <script src="js/priceCheck.js?v=45"></script>
+    <script src="js/yearSegregate.js?v=45"></script>
 </body>
 </html>

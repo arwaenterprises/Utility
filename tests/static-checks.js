@@ -96,6 +96,15 @@ for (const pg of ['about.html', 'privacy.html', 'terms.html', 'security.html']) 
   check(`public page ${pg} exists, is cached offline and linked from the login page`, fs.existsSync(path.join(APP, pg)) && sw.includes(`./${pg}`) && fs.readFileSync(path.join(APP, 'index.html'), 'utf8').includes(`href="${pg}"`));
 }
 check('public pages show the contact email', ['about.html', 'privacy.html', 'security.html'].every(pg => fs.readFileSync(path.join(APP, pg), 'utf8').includes('connect.arwaenterprises@gmail.com')));
+{ // every hover text (title) in the app has an Arabic long-press hint
+  const tip = fs.readFileSync(path.join(APP, 'js', 'tooltip.js'), 'utf8');
+  const arKeys = [...tip.matchAll(/^\s*(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"):\s*'/gm)].map(m => (m[1] || m[2]).replace(/\\'/g, "'"));
+  const sources = ['index.html', ...fs.readdirSync(path.join(APP, 'js')).filter(f => f.endsWith('.js') && f !== 'tooltip.js').map(f => 'js/' + f)];
+  const titles = new Set();
+  for (const f of sources) for (const m of fs.readFileSync(path.join(APP, f), 'utf8').matchAll(/\btitle="([^"$]+)"/g)) titles.add(m[1]);
+  const missing = [...titles].filter(t => !arKeys.includes(t.replace(/&amp;/g, '&')));
+  check('every title="..." hint has an Arabic version in tooltip.js', missing.length === 0, 'missing: ' + missing.join(' | '));
+}
 check('security.txt present', fs.existsSync(path.join(APP, '.well-known', 'security.txt')));
 check('CSP script-src allows only this site', !/script-src[^;]*https?:/.test(toml));
 

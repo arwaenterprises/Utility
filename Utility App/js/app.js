@@ -385,7 +385,7 @@ function renderBoxTableHtml(boxes, scope, ownerId) {
         const isExpanded = expandedBoxKeys.has(key);
         const rowsHtml = [`
             <tr class="team-row">
-                <td style="width:30px;"><button class="expand-btn" data-expand-box="${key}">${isExpanded ? '−' : '+'}</button></td>
+                <td style="width:30px;"><button class="expand-btn" title="Show / hide details" data-expand-box="${key}">${isExpanded ? '−' : '+'}</button></td>
                 <td><strong>${escapeHtml(b.boxNumber)}</strong></td>
                 <td>${escapeHtml(b.status)}</td>
                 <td>${b.items.length}</td>
@@ -440,7 +440,7 @@ function renderTeamMemberList() {
         const rows = [`
             <tr class="team-row">
                 <td style="width:26px;"><input type="checkbox" class="team-member-checkbox" data-member-id="${m.user_id}" ${selectedMemberIds.has(m.user_id) ? 'checked' : ''}></td>
-                <td style="width:30px;"><button class="expand-btn" data-expand-member="${m.user_id}">${isExpanded ? '−' : '+'}</button></td>
+                <td style="width:30px;"><button class="expand-btn" title="Show / hide details" data-expand-member="${m.user_id}">${isExpanded ? '−' : '+'}</button></td>
                 <td>${escapeHtml(teamMemberDisplayName(m))}</td>
                 <td>${m.boxes_closed}</td>
                 <td>${m.total_qty}</td>
