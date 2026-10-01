@@ -50,7 +50,7 @@ Facts about the Utility app to feed into the Privacy Policy (all true as of toda
 - Stored in Supabase (cloud database): scan records (box numbers, barcodes, remarks, quantities, timestamps), uploaded lists (box lists, price lists, item master, PTL config, TRN#/box lists), enterprise membership and invites, and **usage counts** (per user per day: boxes closed, labels printed, lookups — counts only, readable only by the owner).
 - Stored **on the user's device**: an offline copy of scans and lists (IndexedDB), settings and session state (localStorage), and a service-worker cache of the app files.
 - Hosting: Netlify (site) and Supabase (database/auth). The camera is used only for barcode scanning on the device. **No advertising or third-party tracking inside the app today.**
-- Data deletion: users can reset (delete) their own data; enterprise admins can delete their team's data; **users can delete their whole account themselves** (Account → Delete my account; scans made for an enterprise stay with the enterprise's admin, everything else is deleted).
+- Data deletion: users can reset (delete) their own data; enterprise admins can delete their team's data. **There is no self-service account deletion** (it was built and then rolled back by the owner); the owner can delete an account by hand in the Supabase dashboard (Authentication → Users), which also removes that user's data — mention a contact route for deletion requests in the Privacy Policy.
 Also publish the **homepage URL and Privacy Policy URL** where Google's OAuth consent screen asks for them (see roadmap items 41, 46).
 
 ### Phase 2 — Real content (the part that decides approval)

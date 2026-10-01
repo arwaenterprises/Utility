@@ -230,38 +230,8 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('usage: an event the server rejects is dropped, not retried forever', Object.keys(Storage.getJSON('usage_pending_u1') || {}).length === 0);
     bsSetPalletMode(false);
 
-    // ---------- delete my account ----------
-    AppState.user = { id: 'u1', email: 'a@b.c' }; AppState.isOnline = true; window.__fail = false;
-    const alertsBefore = __alerts.length;
-    AppState.profile = { display_name: 'Ann', enterprise_id: null, tier: 'individual' };
-    await refOpenDB(); await refCachePut('box_list', [{ box_number: 'KEEP-ME-NOT' }]);
-    Storage.set('scanner_session', 'x'); Storage.setJSON('usage_pending_u1', { a: 1 });
-    ok('Account screen has a Delete my account button', !!document.getElementById('openDeleteAccountBtn'));
-    openDeleteAccount();
-    ok('delete: explanation for an individual', /permanently deletes your account and your data/.test(document.getElementById('deleteAccountText').textContent) && !/enterprise/i.test(document.getElementById('deleteAccountText').textContent), document.getElementById('deleteAccountText').textContent);
-    const delBtn = document.getElementById('deleteAccountConfirmBtn'), delIn = document.getElementById('deleteAccountConfirmInput');
-    ok('delete: the confirm button is off until DELETE is typed', delBtn.disabled && document.getElementById('deleteAccountModal').classList.contains('active'));
-    delIn.value = 'delete'; delIn.dispatchEvent(new Event('input')); ok('delete: lower-case "delete" is not enough', delBtn.disabled);
-    delIn.value = 'DELETE'; delIn.dispatchEvent(new Event('input')); ok('delete: typing DELETE enables the red button', !delBtn.disabled);
-    AppState.profile = { enterprise_id: 'E1', tier: 'enterprise_member' }; ok('delete: member is told enterprise scans stay with the enterprise', /stay with the enterprise/.test(deleteAccountExplanation()));
-    AppState.profile = { enterprise_id: 'E1', tier: 'enterprise_admin' }; ok('delete: admin is told members must be removed first', /no other members are left/.test(deleteAccountExplanation()));
-    AppState.profile = { display_name: 'Ann', enterprise_id: null, tier: 'individual' };
-    // the server refuses (admin with a team): nothing is wiped, the message is shown
-    window.__deleteError = 'You are the enterprise admin and your team still has 3 member(s).'; delBtn.click(); await sleep(100);
-    ok('delete refused by the server: message shown, data and login kept', __alerts.slice(alertsBefore).some(a => /still has 3 member/.test(a)) && AppState.user && (await refCacheGet('box_list')).length === 1 && Storage.get('scanner_session') === 'x' && !window.__deleted, __alerts.slice(-1).join());
-    window.__deleteError = ''; delBtn.disabled = false;
-    // offline: refused with an explanation, nothing happens
-    AppState.isOnline = false; delBtn.click(); await sleep(50);
-    ok('delete offline: asks to connect, nothing deleted', __alerts.slice(-1)[0].includes('offline') && !window.__deleted && !!AppState.user);
-    AppState.isOnline = true; delBtn.disabled = false;
-    // success
-    delBtn.click(); await sleep(400);
-    ok('delete: server function called and account deleted', window.__deleted === true && __rpcCalls.includes('delete_my_account'));
-    ok('delete: this device is wiped (saved settings, usage queue)', Storage.get('scanner_session') === null && Storage.getJSON('usage_pending_u1') === null && Object.keys(localStorage).filter(k => k.startsWith(CONFIG.STORAGE_PREFIX)).length === 0);
-    const dbs = (await indexedDB.databases()).map(d => d.name);
-    ok('delete: offline databases of this user are removed', !dbs.includes('AKRef_u1') && !dbs.includes('AKBoxScannerDB_u1') && !dbs.includes('AKYSSegregateDB_u1') && !dbs.includes('AKPriceCheckDB_u1'), dbs.join());
-    ok('delete: signed out, back on the login screen, confirmation shown', AppState.user === null && document.getElementById('loginScreen').classList.contains('active') && __alerts.slice(-1)[0].includes('deleted'), __alerts.slice(-1)[0]);
-    document.getElementById('deleteAccountModal').classList.remove('active');
+    // ---------- account deletion was rolled back ----------
+    ok('no Delete-account button, modal or code in the app', !document.getElementById('openDeleteAccountBtn') && !document.getElementById('deleteAccountModal') && typeof openDeleteAccount === 'undefined' && typeof confirmDeleteAccount === 'undefined');
 
     // ---------- Box Scanner badge % ----------
     ok('uids valid UUIDs', /^[0-9a-f-]{36}$/.test(newScanUid()));

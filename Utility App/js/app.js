@@ -20,8 +20,8 @@ async function signInWithGoogle() {
     if (error) showError(errorDiv, error.message);
 }
 
-async function signOut(options) {
-    await supabaseClient.auth.signOut(options);
+async function signOut() {
+    await supabaseClient.auth.signOut();
     AppState.user = null;
     AppState.profile = null;
     updateHeaderUser();
@@ -96,68 +96,6 @@ async function openAccountModal() {
 
 function closeAccountModal() {
     document.getElementById('accountModal').classList.remove('active');
-}
-
-// ============================================
-// DELETE MY ACCOUNT
-// ============================================
-// The server (delete_my_account() in supabase/schema.sql) deletes the account and its data and decides
-// what is allowed (an enterprise admin with team members is refused, with a clear message). Here we
-// explain it, ask for a typed confirmation, and afterwards wipe everything stored on this device.
-function deleteAccountExplanation() {
-    const p = AppState.profile || {};
-    let text = 'This permanently deletes your account and your data: scans, uploaded lists and usage history. It cannot be undone. Download anything you need first (Box Scanner → Download).';
-    if (p.tier === 'enterprise_member') {
-        text += ' Scans you made for your enterprise are business records: they stay with the enterprise (your admin keeps them). Everything else is deleted.';
-    } else if (p.tier === 'enterprise_admin') {
-        text += ' You are the enterprise admin: this works only when no other members are left (remove them in Team first). The enterprise and all its data are deleted with your account.';
-    }
-    return text;
-}
-
-function openDeleteAccount() {
-    closeAccountModal();
-    document.getElementById('deleteAccountText').textContent = deleteAccountExplanation();
-    document.getElementById('deleteAccountConfirmInput').value = '';
-    document.getElementById('deleteAccountConfirmBtn').disabled = true;
-    document.getElementById('deleteAccountModal').classList.add('active');
-    setTimeout(() => document.getElementById('deleteAccountConfirmInput').focus(), 100);
-}
-
-function closeDeleteAccount() {
-    document.getElementById('deleteAccountModal').classList.remove('active');
-}
-
-// Removes this user's data from the device: offline databases and saved settings.
-async function wipeLocalDataForUser(userId) {
-    try { if (typeof scannerDB !== 'undefined' && scannerDB) { scannerDB.close(); scannerDB = null; } } catch (e) {}
-    try { if (typeof refDB !== 'undefined' && refDB) { refDB.close(); refDB = null; } } catch (e) {}
-    try { if (typeof pcDb !== 'undefined' && pcDb) { pcDb.close(); pcDb = null; } } catch (e) {}
-    try { if (typeof ysDB !== 'undefined' && ysDB) { ysDB.close(); ysDB = null; } } catch (e) {}
-    for (const name of ['AKBoxScannerDB_', 'AKRef_', 'AKPriceCheckDB_', 'AKYSSegregateDB_']) {
-        try { indexedDB.deleteDatabase(name + userId); } catch (e) {}
-    }
-    try {
-        Object.keys(localStorage).filter(k => k.startsWith(CONFIG.STORAGE_PREFIX)).forEach(k => localStorage.removeItem(k));
-    } catch (e) {}
-}
-
-async function confirmDeleteAccount() {
-    if (document.getElementById('deleteAccountConfirmInput').value.trim() !== 'DELETE') return;
-    const btn = document.getElementById('deleteAccountConfirmBtn');
-    btn.disabled = true;
-    if (!AppState.isOnline) { alert('You are offline. Connect to the internet to delete your account.'); btn.disabled = false; return; }
-    const userId = AppState.user.id;
-    const { error } = await supabaseClient.rpc('delete_my_account');
-    if (error) {
-        alert(error.message);                       // e.g. "You are the enterprise admin and your team still has 3 member(s)..."
-        btn.disabled = false;
-        return;
-    }
-    closeDeleteAccount();
-    await wipeLocalDataForUser(userId);
-    await signOut({ scope: 'local' });             // the account no longer exists on the server: just clear this device's session
-    alert('Your account and data have been deleted.');
 }
 
 async function createEnterprise() {
@@ -883,12 +821,6 @@ function setupEventListeners() {
     document.getElementById('goToSessionBtn').addEventListener('click', () => { if (AppState.activeSessionApp) openApp(AppState.activeSessionApp); });
     document.getElementById('accountBtn').addEventListener('click', openAccountModal);
     document.getElementById('closeAccountBtn').addEventListener('click', closeAccountModal);
-    document.getElementById('openDeleteAccountBtn').addEventListener('click', openDeleteAccount);
-    document.getElementById('deleteAccountCancelBtn').addEventListener('click', closeDeleteAccount);
-    document.getElementById('deleteAccountConfirmBtn').addEventListener('click', confirmDeleteAccount);
-    document.getElementById('deleteAccountConfirmInput').addEventListener('input', (e) => {
-        document.getElementById('deleteAccountConfirmBtn').disabled = e.target.value.trim() !== 'DELETE';
-    });
     document.getElementById('createEnterpriseBtn').addEventListener('click', createEnterprise);
     document.getElementById('sendInviteBtn').addEventListener('click', sendInvite);
     document.getElementById('acceptInviteBtn').addEventListener('click', acceptMyInvite);

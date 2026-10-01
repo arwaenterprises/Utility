@@ -142,45 +142,7 @@ select _t_err('users cannot read the usage report view', '00000000-0000-0000-000
 select _t_err('users cannot write usage rows directly', '00000000-0000-0000-0000-0000000000b1', $$insert into usage_daily(user_id,day,tool,action,event_count) values ('00000000-0000-0000-0000-0000000000b1', current_date, 'box_scanner','box_closed',999999)$$, 'permission denied');
 select _t_eq('owner view shows names and enterprise', (select count(*) from usage_report where email='member1@x.com' and enterprise='New Name'), 3);
 
--- ============ delete my account ============
-insert into auth.users(id,email) values
-  ('00000000-0000-0000-0000-0000000000d1','solo2@x.com'),
-  ('00000000-0000-0000-0000-0000000000d2','admin3@x.com'),
-  ('00000000-0000-0000-0000-0000000000d3','member3@x.com');
-insert into enterprises(id,name,admin_user_id) values ('33333333-3333-3333-3333-333333333333','E3','00000000-0000-0000-0000-0000000000d2');
-update profiles set tier='enterprise_admin',  enterprise_id='33333333-3333-3333-3333-333333333333' where email='admin3@x.com';
-update profiles set tier='enterprise_member', enterprise_id='33333333-3333-3333-3333-333333333333' where email='member3@x.com';
-
--- an individual with a scan, a Year/Season scan, a list and usage
-select _t_do('00000000-0000-0000-0000-0000000000d1', $$insert into scans(user_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000d1','B','1'); insert into ys_scans(scan_uid,user_id,barcode) values (gen_random_uuid(),'00000000-0000-0000-0000-0000000000d1','Y'); select begin_list_upload('box_list'); select append_list_chunk('box_list',0,'[{"box_number":"X"}]'); select commit_list_upload('box_list'); select log_usage('price_check','lookup_found',1,0)$$);
-select _t_err('signed-out caller cannot delete an account', null::uuid, $$select delete_my_account()$$, 'Not signed in');
-select _t_do('00000000-0000-0000-0000-0000000000d1', $$select delete_my_account()$$);
-select _t_eq('individual: account is gone', (select count(*) from auth.users where email='solo2@x.com'), 0);
-select _t_eq('individual: profile, scans, Year/Season scans, lists and usage are all gone',
-  (select (select count(*) from profiles where email='solo2@x.com') + (select count(*) from scans where user_id='00000000-0000-0000-0000-0000000000d1') + (select count(*) from ys_scans where user_id='00000000-0000-0000-0000-0000000000d1') + (select count(*) from reference_chunks where user_id='00000000-0000-0000-0000-0000000000d1') + (select count(*) from usage_daily where user_id='00000000-0000-0000-0000-0000000000d1')), 0);
-
--- a member: 2 scans made for the enterprise + 1 personal scan from before joining
-select _t_do('00000000-0000-0000-0000-0000000000d3', $$insert into scans(user_id,enterprise_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000d3','33333333-3333-3333-3333-333333333333','E','1'),('00000000-0000-0000-0000-0000000000d3','33333333-3333-3333-3333-333333333333','E','2'); insert into scans(user_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000d3','P','9'); insert into ys_scans(scan_uid,user_id,enterprise_id,barcode) values (gen_random_uuid(),'00000000-0000-0000-0000-0000000000d3','33333333-3333-3333-3333-333333333333','Y')$$);
-select _t_err('admin with team members cannot delete the account', '00000000-0000-0000-0000-0000000000d2', $$select delete_my_account()$$, 'still has 1 member');
-select _t_eq('...and nothing was deleted', (select count(*) from auth.users where email='admin3@x.com'), 1);
-select _t_do('00000000-0000-0000-0000-0000000000d3', $$select delete_my_account()$$);
-select _t_eq('member: account is gone', (select count(*) from auth.users where email='member3@x.com'), 0);
-select _t_eq('member: scans made for the enterprise stay, handed to the admin', (select count(*) from scans where user_id='00000000-0000-0000-0000-0000000000d2' and enterprise_id='33333333-3333-3333-3333-333333333333'), 2);
-select _t_eq('member: Year/Season scans for the enterprise stay too', (select count(*) from ys_scans where user_id='00000000-0000-0000-0000-0000000000d2'), 1);
-select _t_eq('member: personal data (scan without an enterprise) is deleted', (select count(*) from scans where box_number='P'), 0);
-select _t_eq('the admin can still see and manage those records', _t_val('00000000-0000-0000-0000-0000000000d2', $$select count(*) from scans where enterprise_id='33333333-3333-3333-3333-333333333333'$$), 2);
-
--- the admin, now alone
-select _t_do('00000000-0000-0000-0000-0000000000d2', $$select delete_my_account()$$);
-select _t_eq('admin alone: account deleted', (select count(*) from auth.users where email='admin3@x.com'), 0);
-select _t_eq('admin alone: the enterprise and its records go with it', (select count(*) from enterprises where name='E3') + (select count(*) from scans where enterprise_id='33333333-3333-3333-3333-333333333333') + (select count(*) from scans where user_id='00000000-0000-0000-0000-0000000000d2'), 0);
-
--- an ex-member (removed by the admin) deleting later: their enterprise work still stays with the enterprise
-insert into auth.users(id,email) values ('00000000-0000-0000-0000-0000000000d4','ex@x.com');
-update profiles set tier='enterprise_member', enterprise_id='11111111-1111-1111-1111-111111111111' where email='ex@x.com';
-select _t_do('00000000-0000-0000-0000-0000000000d4', $$insert into scans(user_id,enterprise_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000d4','11111111-1111-1111-1111-111111111111','Z','1')$$);
-update profiles set tier='individual', enterprise_id=null where email='ex@x.com';              -- what remove_enterprise_member does
-select _t_do('00000000-0000-0000-0000-0000000000d4', $$select delete_my_account()$$);
-select _t_eq('ex-member: their enterprise scans are kept for the admin', (select count(*) from scans where box_number='Z' and user_id='00000000-0000-0000-0000-0000000000e1'), 1);
+-- ============ account deletion was rolled back ============
+select _t_eq('delete_my_account() does not exist (feature rolled back)', (select count(*) from pg_proc where proname = 'delete_my_account'), 0);
 
 \echo All access-rule tests passed
