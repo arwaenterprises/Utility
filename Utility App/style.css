@@ -2358,3 +2358,37 @@ body.rtl .form-select {
     min-height: 46px;
     padding: 0;
 }
+
+/* ---- Reference lists: upload button, % progress bar, Pallet mode ---- */
+.bs-upload-btn { background: var(--ak-gray-700, #555); }
+.ys-upload-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.ref-progress {
+    height: 6px;
+    background: var(--ak-gray-200, #e5e5e5);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 4px 0 8px;
+}
+.ref-progress-fill {
+    height: 100%;
+    width: 0;
+    background: var(--ak-maroon);
+    transition: width 0.2s;
+}
+.bs-pallet-toggle { margin: 6px 0 10px; }
+.bs-doc-result {
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    margin-bottom: 12px;
+}
+.bs-doc-result.ok { background: #e8f5e9; border: 2px solid var(--ak-success, #2e7d32); }
+.bs-doc-result.dup { background: #fff3e0; border: 2px solid var(--ak-warning, #ef6c00); }
+.bs-doc-flag { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 6px; }
+.bs-doc-store { font-size: 26px; font-weight: 800; color: var(--ak-maroon); line-height: 1.15; margin-bottom: 6px; word-break: break-word; }
+.bs-doc-meta { font-size: 13px; color: var(--ak-text-light); margin-top: 2px; }
+.bs-doc-total { font-weight: 700; font-size: 14px; margin: 4px 0 8px; }
+.bs-doc-done td { background: #e8f5e9; }
+.bs-doc-empty { color: var(--ak-text-light); font-size: 13px; text-align: center; padding: 12px; }
+.bs-doc-actions { display: flex; gap: 8px; margin-top: 12px; }
+.bs-doc-actions .btn { flex: 1; }

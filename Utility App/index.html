@@ -82,6 +82,14 @@
                     <div id="teamMemberList"></div>
                     <div id="teamSearchResults" style="display:none;"></div>
                 </div>
+            <div class="settings-section" id="teamYsSection" style="border-top:1px solid var(--ak-gray-200); padding-top:12px; margin-top:12px; text-align:left;">
+                <h4>Year/Season Sort scans</h4>
+                <div id="teamYsList"><p style="font-size:13px; color: var(--ak-text-light);">Loading...</p></div>
+                <div style="display:flex; gap:8px; margin-top:8px;">
+                    <button class="btn btn-secondary" id="downloadTeamYsBtn">⬇ Download Selected</button>
+                    <button class="btn btn-secondary" id="resetTeamYsBtn" style="background: var(--ak-danger); color: white; border: none;">Reset Selected</button>
+                </div>
+            </div>
             </div>
             <div class="modal-buttons">
                 <button class="btn btn-secondary" id="downloadTeamSelectedBtn">⬇ Download Selected</button>
@@ -582,6 +590,7 @@
                 <div class="bs-wrap">
                     <div class="bs-top-bar">
                         <button class="bs-sync-btn" id="pcRefreshBtn" onclick="refreshPcData()">↻ Sync Data</button>
+                        <button class="bs-sync-btn bs-upload-btn" id="pcUploadBtn" onclick="uploadPcList()" style="display:none;">⬆ Upload List</button>
                         <span id="pcTimestamp" class="bs-ts">No data</span>
                     </div>
                     <div class="bs-search-row">
@@ -604,8 +613,12 @@
                 <div class="card">
                 <div class="bs-wrap">
                     <div class="bs-top-bar">
-                        <button class="bs-sync-btn" id="bsRefreshBtn" onclick="refreshBsFromSheets()">↻ Sync Data</button>
+                        <button class="bs-sync-btn" id="bsRefreshBtn" onclick="refreshBsData()">↻ Sync Data</button>
+                        <button class="bs-sync-btn bs-upload-btn" id="bsUploadBtn" onclick="uploadBsList()" style="display:none;">⬆ Upload List</button>
                         <span id="bsTimestamp" class="bs-ts">No data</span>
+                    </div>
+                    <div class="unique-toggle bs-pallet-toggle">
+                        <label><input type="checkbox" id="bsPalletToggle"> <span>Pallet mode (document list)</span></label>
                     </div>
                     <div class="bs-search-row">
                         <input type="text" id="bsBarcodeInput" inputmode="none" placeholder="Point camera or HHT scan…" autocomplete="off" autocorrect="off" spellcheck="false">
@@ -617,7 +630,17 @@
                         <div id="bsQrReader"></div>
                         <button class="bs-cam-close" onclick="stopBsCamera()">✕ Close Camera</button>
                     </div>
-                    <div id="bsResultCard" class="bs-result" style="display:none;"></div>
+                    <div id="bsNormalWrap">
+                        <div id="bsResultCard" class="bs-result" style="display:none;"></div>
+                    </div>
+                    <div id="bsPalletWrap" style="display:none;">
+                        <div id="bsDocResult" class="bs-doc-result" style="display:none;"></div>
+                        <div id="bsDocSummary"></div>
+                        <div class="bs-doc-actions">
+                            <button class="btn btn-secondary" onclick="downloadPalletExcel()">⬇ Download</button>
+                            <button class="btn btn-secondary" onclick="resetPalletScans()" style="background: var(--ak-danger); color: white; border: none;">Reset</button>
+                        </div>
+                    </div>
                     <div id="bsNotFound" class="bs-notfound" style="display:none;"></div>
                 </div>
                 </div>
@@ -639,9 +662,14 @@
                             <label>Remark</label>
                             <input type="text" id="ysRemarkInput" class="form-input" placeholder="e.g., FW2025 returns sorting" autocomplete="off">
                         </div>
+                        <div id="ysUploadRow" class="ys-upload-row" style="display:none;">
+                            <button class="bs-sync-btn bs-upload-btn" id="ysUploadItemsBtn" type="button">⬆ Upload Item Master</button>
+                            <button class="bs-sync-btn bs-upload-btn" id="ysUploadPtlBtn" type="button">⬆ Upload PTL Config</button>
+                        </div>
                         <div id="ysSyncStatus" class="ys-sync-status" style="display:none;">
                             <span class="spinner"></span> <span id="ysSyncMsg">Syncing item data...</span>
                         </div>
+                        <div class="ref-progress" id="ysSyncBar" style="display:none;"><div class="ref-progress-fill"></div></div>
                         <div id="ysSyncError" class="error-msg" style="display:none;"></div>
                         <button class="btn btn-primary btn-block" id="ysStartSessionBtn">Start Session</button>
                     </div>
@@ -941,10 +969,6 @@
                         <h3 class="modal-title">Reset Session?</h3>
                         <div class="modal-body">
                             <p>This will download your data and start a new session. All PTL states will be cleared.</p>
-                            <div id="ysAdminSection">
-                                <p>Admin code required:</p>
-                                <input type="password" id="ysAdminCodeInput" class="form-input" placeholder="Enter admin code" style="margin-top:8px;">
-                            </div>
                         </div>
                         <div class="modal-buttons">
                             <button class="btn btn-primary" id="ysResetConfirmBtn">Reset</button>
@@ -988,15 +1012,16 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=21"></script>
-    <script src="js/supabaseClient.js?v=21"></script>
-    <script src="js/app.js?v=21"></script>
-    <script src="js/boxScanner.js?v=21"></script>
-    <script src="js/itemBarcode.js?v=21"></script>
-    <script src="js/boxCode.js?v=21"></script>
-    <script src="js/photoCapture.js?v=21"></script>
-    <script src="js/boxSegregate.js?v=21"></script>
-    <script src="js/priceCheck.js?v=21"></script>
-    <script src="js/yearSegregate.js?v=21"></script>
+    <script src="js/config.js?v=22"></script>
+    <script src="js/supabaseClient.js?v=22"></script>
+    <script src="js/lists.js?v=22"></script>
+    <script src="js/app.js?v=22"></script>
+    <script src="js/boxScanner.js?v=22"></script>
+    <script src="js/itemBarcode.js?v=22"></script>
+    <script src="js/boxCode.js?v=22"></script>
+    <script src="js/photoCapture.js?v=22"></script>
+    <script src="js/boxSegregate.js?v=22"></script>
+    <script src="js/priceCheck.js?v=22"></script>
+    <script src="js/yearSegregate.js?v=22"></script>
 </body>
 </html>

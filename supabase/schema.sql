@@ -445,3 +445,260 @@ create policy "scans_delete_team" on public.scans for delete
         public.current_user_is_enterprise_admin()
         and enterprise_id = public.current_user_enterprise_id()
     );
+
+
+-- ============================================
+-- REFERENCE LISTS (Box Segregate, Price Check, Year/Season Sort)
+-- ============================================
+-- Each enterprise (or individual account) owns its own copy of each list, uploaded
+-- by the enterprise admin / the individual. An upload REPLACES the whole list and
+-- the old rows are deleted. Lists are stored as chunks (a few thousand records per
+-- row, as a JSON array) so a 100,000-row list is ~50 rows: fast to upload, fast to
+-- download with a progress %, and replaced atomically.
+--
+--   list_type        columns (inside the JSON records)
+--   box_list         box_number, trn, increff_order_id, store_name, region, store_code, brand
+--   price_list       barcode, current_price, original_price, style, color, size, year, season
+--   ys_item_master   barcode, year, season, brand
+--   ys_ptl_config    ptl_number, season, year, year_logic
+--   doc_boxes        document_number, box_number, store_name   (Box Segregate Document/Pallet mode)
+--
+-- Owner: enterprise lists have enterprise_id set (user_id = the admin who uploaded);
+-- individual lists have enterprise_id null and user_id = the owner.
+
+create table if not exists public.reference_chunks (
+    id uuid primary key default gen_random_uuid(),
+    list_type text not null check (list_type in ('box_list', 'price_list', 'ys_item_master', 'ys_ptl_config', 'doc_boxes')),
+    user_id uuid not null references public.profiles(id) on delete cascade,
+    enterprise_id uuid references public.enterprises(id) on delete cascade,
+    seq integer not null,
+    row_count integer not null,
+    rows jsonb not null,
+    is_active boolean not null default false,
+    uploaded_at timestamptz not null default now()
+);
+
+create index if not exists reference_chunks_owner_idx
+    on public.reference_chunks(list_type, enterprise_id, user_id, is_active);
+
+alter table public.reference_chunks enable row level security;
+
+-- Read: the active list of your enterprise, or your own individual list.
+-- No insert/update/delete policies on purpose: the only way to change a list is
+-- through the three upload functions below, which check who is allowed to.
+drop policy if exists "reference_chunks_select" on public.reference_chunks;
+create policy "reference_chunks_select" on public.reference_chunks for select
+    using (
+        is_active
+        and (
+            (enterprise_id is null and user_id = auth.uid())
+            or enterprise_id = public.current_user_enterprise_id()
+        )
+    );
+
+-- Who may upload: an individual (no enterprise) or the enterprise admin.
+create or replace function public.can_upload_reference_list()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select case
+        when auth.uid() is null then false
+        when public.current_user_enterprise_id() is null then true
+        else public.current_user_is_enterprise_admin()
+    end;
+$$;
+
+-- Step 1: start an upload (clears any half-finished previous attempt).
+create or replace function public.begin_list_upload(p_list_type text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_eid uuid := public.current_user_enterprise_id();
+begin
+    if not public.can_upload_reference_list() then
+        raise exception 'Only an enterprise admin or an individual account can upload lists';
+    end if;
+    delete from public.reference_chunks
+    where list_type = p_list_type and not is_active
+      and ((v_eid is null and enterprise_id is null and user_id = auth.uid()) or enterprise_id = v_eid);
+end;
+$$;
+
+-- Step 2 (repeat): add one chunk of records.
+create or replace function public.append_list_chunk(p_list_type text, p_seq integer, p_rows jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_eid uuid := public.current_user_enterprise_id();
+begin
+    if not public.can_upload_reference_list() then
+        raise exception 'Only an enterprise admin or an individual account can upload lists';
+    end if;
+    if jsonb_typeof(p_rows) <> 'array' then
+        raise exception 'rows must be a JSON array';
+    end if;
+    if jsonb_array_length(p_rows) > 5000 then
+        raise exception 'chunk too large (max 5000 records)';
+    end if;
+    insert into public.reference_chunks (list_type, user_id, enterprise_id, seq, row_count, rows, is_active)
+    values (p_list_type, auth.uid(), v_eid, p_seq, jsonb_array_length(p_rows), p_rows, false);
+end;
+$$;
+
+-- Step 3: swap. In ONE transaction, delete the old active list and activate the
+-- new chunks, so a failed upload never leaves a half list. Returns the record count.
+create or replace function public.commit_list_upload(p_list_type text)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_eid uuid := public.current_user_enterprise_id();
+    v_staged integer;
+    v_total integer;
+begin
+    if not public.can_upload_reference_list() then
+        raise exception 'Only an enterprise admin or an individual account can upload lists';
+    end if;
+    select count(*), coalesce(sum(row_count), 0) into v_staged, v_total
+    from public.reference_chunks
+    where list_type = p_list_type and not is_active
+      and ((v_eid is null and enterprise_id is null and user_id = auth.uid()) or enterprise_id = v_eid);
+    if v_staged = 0 then
+        raise exception 'Nothing was uploaded';
+    end if;
+
+    delete from public.reference_chunks
+    where list_type = p_list_type and is_active
+      and ((v_eid is null and enterprise_id is null and user_id = auth.uid()) or enterprise_id = v_eid);
+
+    update public.reference_chunks
+    set is_active = true, uploaded_at = now()
+    where list_type = p_list_type and not is_active
+      and ((v_eid is null and enterprise_id is null and user_id = auth.uid()) or enterprise_id = v_eid);
+
+    return v_total;
+end;
+$$;
+
+grant execute on function public.can_upload_reference_list() to authenticated;
+grant execute on function public.begin_list_upload(text) to authenticated;
+grant execute on function public.append_list_chunk(text, integer, jsonb) to authenticated;
+grant execute on function public.commit_list_upload(text) to authenticated;
+
+
+-- ============================================
+-- YEAR/SEASON SORT SCANS
+-- ============================================
+-- Same shape and rules as `scans` (Box Scanner): own rows always, enterprise admin
+-- sees and can delete the team's rows. scan_uid makes background-sync retries safe.
+
+create table if not exists public.ys_scans (
+    id uuid primary key default gen_random_uuid(),
+    scan_uid uuid not null unique,
+    user_id uuid not null references public.profiles(id) on delete cascade,
+    enterprise_id uuid references public.enterprises(id) on delete set null,
+    staff_name text,
+    remark text,
+    ptl_number text,
+    season text,
+    year integer,
+    brand text,
+    barcode text not null,
+    qty integer not null default 1,
+    box_barcode text,
+    box_status text not null default 'Open' check (box_status in ('Open', 'Closed')),
+    scan_timestamp text,
+    scanned_at timestamptz not null default now()
+);
+
+create index if not exists ys_scans_user_id_idx on public.ys_scans(user_id);
+create index if not exists ys_scans_enterprise_id_idx on public.ys_scans(enterprise_id);
+
+alter table public.ys_scans enable row level security;
+
+drop policy if exists "ys_scans_select_own" on public.ys_scans;
+create policy "ys_scans_select_own" on public.ys_scans for select
+    using (user_id = auth.uid());
+
+drop policy if exists "ys_scans_select_team" on public.ys_scans;
+create policy "ys_scans_select_team" on public.ys_scans for select
+    using (
+        public.current_user_is_enterprise_admin()
+        and enterprise_id = public.current_user_enterprise_id()
+    );
+
+drop policy if exists "ys_scans_insert_own" on public.ys_scans;
+create policy "ys_scans_insert_own" on public.ys_scans for insert
+    with check (
+        user_id = auth.uid()
+        and (enterprise_id is null or enterprise_id = public.current_user_enterprise_id())
+    );
+
+drop policy if exists "ys_scans_update_own" on public.ys_scans;
+create policy "ys_scans_update_own" on public.ys_scans for update
+    using (user_id = auth.uid())
+    with check (
+        user_id = auth.uid()
+        and (enterprise_id is null or enterprise_id = public.current_user_enterprise_id())
+    );
+
+-- Delete: individuals (no enterprise) may delete their own rows; enterprise members
+-- may NOT (their Reset only clears their device) - only the enterprise admin deletes
+-- team rows, from the Team console.
+drop policy if exists "ys_scans_delete_own" on public.ys_scans;
+create policy "ys_scans_delete_own" on public.ys_scans for delete
+    using (user_id = auth.uid() and enterprise_id is null);
+
+drop policy if exists "ys_scans_delete_team" on public.ys_scans;
+create policy "ys_scans_delete_team" on public.ys_scans for delete
+    using (
+        public.current_user_is_enterprise_admin()
+        and enterprise_id = public.current_user_enterprise_id()
+    );
+
+-- Per-member summary for the Team console's Year/Season section.
+create or replace function public.team_ys_member_stats()
+returns table (
+    user_id uuid,
+    display_name text,
+    email text,
+    boxes_closed bigint,
+    total_qty bigint
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    with my_scans as (
+        select * from public.ys_scans
+        where enterprise_id = public.current_user_enterprise_id()
+    ),
+    box_status_per_user as (
+        select user_id, ptl_number, box_barcode, bool_and(box_status = 'Closed') as closed
+        from my_scans
+        group by user_id, ptl_number, box_barcode
+    )
+    select
+        p.id as user_id,
+        p.display_name,
+        p.email,
+        coalesce((select count(*) from box_status_per_user b where b.user_id = p.id and b.closed), 0) as boxes_closed,
+        coalesce((select sum(qty) from my_scans s where s.user_id = p.id), 0) as total_qty
+    from public.profiles p
+    where p.enterprise_id = public.current_user_enterprise_id()
+      and public.current_user_is_enterprise_admin();
+$$;
+
+grant execute on function public.team_ys_member_stats() to authenticated;

@@ -16,18 +16,6 @@ const ScannerState = {
     syncIntervalId: null
 };
 
-// Unique ID for every scan. Generated once at scan time and never regenerated, so a
-// resent batch carries the same IDs and Supabase upserts it onto the row it already
-// wrote instead of creating a duplicate. Must be a valid UUID (scans.scan_uid is uuid).
-function newScanUid() {
-    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-    // Fallback for non-secure contexts where crypto.randomUUID is unavailable
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = Math.random() * 16 | 0;
-        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-    });
-}
-
 const ScannerT = {
     en: {
         lblRemark: "Remark", lblStartSession: "Start Session",
@@ -143,11 +131,12 @@ const SCANNER_SYNC_INTERVAL_MS = 10000;
 
 // Upserting on scan_uid makes a retry safe: a batch that reached Supabase but whose
 // response was lost is simply written onto the same rows again.
-async function pushScansToServer(scans) {
+async function pushScansToServer(scans, onProgress) {
     for (let i = 0; i < scans.length; i += SCANNER_SYNC_BATCH) {
         const rows = scans.slice(i, i + SCANNER_SYNC_BATCH).map(({ synced, ...row }) => row);
         const { error } = await supabaseClient.from('scans').upsert(rows, { onConflict: 'scan_uid' });
         if (error) throw error;
+        if (onProgress) onProgress(Math.min(i + SCANNER_SYNC_BATCH, scans.length) / scans.length * 100);
     }
 }
 
@@ -170,7 +159,9 @@ async function runAutoSync() {
         const all = await getAllScans();
         const unsynced = all.filter(s => !s.synced && s.box_status === 'Closed');
         if (unsynced.length === 0) return;
-        await pushScansToServer(unsynced);
+        // While uploading, the sync badge shows a percentage instead of the pending count.
+        const badge = document.getElementById('syncBadge');
+        await pushScansToServer(unsynced, (pct) => { if (badge) badge.textContent = Math.round(pct) + '%'; });
         for (const scan of unsynced) {
             scan.synced = true;
             await updateScan(scan);

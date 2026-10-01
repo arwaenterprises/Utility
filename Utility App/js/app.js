@@ -8,25 +8,6 @@ function showScreen(screenId) {
 }
 
 // ============================================
-// GOOGLE SHEETS API
-// ============================================
-// Still used by tools not yet migrated to Supabase (Item Barcode, Box Code,
-// Price Check, Box Segregate, Year/Season Sort - hidden in this pilot build).
-async function fetchFromGoogleSheets(action, params = {}) {
-    if (!AppState.isOnline) return null;
-    try {
-        const url = new URL(CONFIG.GOOGLE_SCRIPT_URL);
-        url.searchParams.append('action', action);
-        Object.keys(params).forEach(k => url.searchParams.append(k, params[k]));
-        const response = await fetch(url.toString());
-        return await response.json();
-    } catch (e) {
-        console.error('Google Sheets fetch error:', e);
-        return null;
-    }
-}
-
-// ============================================
 // AUTH (Google sign-in via Supabase)
 // ============================================
 async function signInWithGoogle() {
@@ -200,6 +181,21 @@ function escapeHtml(str) {
     return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// Supabase returns at most ~1000 rows per request, so anything that exports (and then
+// possibly deletes) a member's data must page through ALL of it, or rows would be
+// deleted without ever having been exported. makeQuery(from, to) builds one page.
+async function fetchAllPages(makeQuery) {
+    const pageSize = 1000;
+    const rows = [];
+    for (let from = 0; ; from += pageSize) {
+        const { data, error } = await makeQuery(from, from + pageSize - 1);
+        if (error) return { data: null, error };
+        rows.push(...data);
+        if (data.length < pageSize) break;
+    }
+    return { data: rows, error: null };
+}
+
 function exportScansToExcel(rows, filenamePrefix) {
     if (!rows || rows.length === 0) {
         alert('No data to download.');
@@ -239,6 +235,89 @@ async function openTeamModal() {
 
     await loadPendingInvitesList();
     await refreshTeamMemberStats();
+    await refreshTeamYsStats();
+}
+
+// ---- Year/Season Sort scans (separate from Box Scanner scans) ----
+let teamYsStatsCache = [];
+const selectedYsMemberIds = new Set();
+
+async function refreshTeamYsStats() {
+    const el = document.getElementById('teamYsList');
+    selectedYsMemberIds.clear();
+    const { data, error } = await supabaseClient.rpc('team_ys_member_stats');
+    if (error) { el.innerHTML = '<p style="font-size:13px;">Could not load Year/Season stats.</p>'; return; }
+    teamYsStatsCache = (data || []).sort((a, b) => teamMemberDisplayName(a).localeCompare(teamMemberDisplayName(b)));
+    if (teamYsStatsCache.length === 0) { el.innerHTML = '<div class="team-table-empty">No team members yet</div>'; return; }
+    el.innerHTML = `
+        <table class="team-table">
+            <thead><tr><th></th><th>Member</th><th>Boxes closed</th><th>Qty</th><th></th></tr></thead>
+            <tbody>${teamYsStatsCache.map(m => `
+                <tr class="team-row">
+                    <td style="width:26px;"><input type="checkbox" class="team-ys-checkbox" data-ys-member="${m.user_id}"></td>
+                    <td>${escapeHtml(teamMemberDisplayName(m))}</td>
+                    <td>${m.boxes_closed}</td>
+                    <td>${m.total_qty}</td>
+                    <td style="width:36px;"><button class="icon-btn" data-ys-download="${m.user_id}" title="Download this member's Year/Season data">⬇</button></td>
+                </tr>`).join('')}
+            </tbody>
+        </table>`;
+}
+
+async function fetchTeamYsScans(userIds) {
+    const { data, error } = await fetchAllPages((from, to) => supabaseClient
+        .from('ys_scans')
+        .select('id, staff_name, remark, ptl_number, season, year, brand, barcode, qty, box_barcode, box_status, scan_timestamp, scanned_at, user_id, profiles(display_name, email)')
+        .eq('enterprise_id', AppState.profile.enterprise_id)
+        .in('user_id', userIds)
+        .order('scanned_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to));
+    if (error) { alert(error.message); return null; }
+    return data || [];
+}
+
+function exportYsScansToExcel(rows, filenamePrefix) {
+    if (!rows || rows.length === 0) { alert('No data to download.'); return false; }
+    const sheetRows = rows.map(s => ({
+        'Scanned By': s.profiles?.display_name || s.profiles?.email || '—',
+        'Staff': s.staff_name || '',
+        'Remark': s.remark || '',
+        'PTL Number': s.ptl_number,
+        'Season': s.season,
+        'Year': s.year,
+        'Brand': s.brand || '',
+        'Barcode': s.barcode,
+        'Qty': s.qty,
+        'Box Barcode': s.box_barcode,
+        'Box Status': s.box_status,
+        'Scan Timestamp': s.scan_timestamp || new Date(s.scanned_at).toLocaleString()
+    }));
+    const ws = XLSX.utils.json_to_sheet(sheetRows);
+    ws['!cols'] = [{wch:20},{wch:16},{wch:20},{wch:10},{wch:8},{wch:6},{wch:14},{wch:18},{wch:5},{wch:16},{wch:10},{wch:20}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Year-Season Scans');
+    XLSX.writeFile(wb, `${filenamePrefix}_${new Date().toISOString().slice(0,10)}.xlsx`);
+    return true;
+}
+
+async function downloadTeamYs(userIds, prefix) {
+    const rows = await fetchTeamYsScans(userIds);
+    if (rows) exportYsScansToExcel(rows, prefix);
+}
+
+async function resetSelectedTeamYs() {
+    const ids = Array.from(selectedYsMemberIds);
+    if (ids.length === 0) { alert('Select at least one team member first.'); return; }
+    if (!confirm(`Download and then permanently delete Year/Season scan data for ${ids.length} selected member(s)?`)) return;
+    const rows = await fetchTeamYsScans(ids);
+    if (!rows) return;
+    // Only delete once the export has actually been produced.
+    if (rows.length > 0 && !exportYsScansToExcel(rows, 'team_year_season_reset')) return;
+    const { error } = await supabaseClient.from('ys_scans').delete()
+        .eq('enterprise_id', AppState.profile.enterprise_id).in('user_id', ids);
+    if (error) { alert(error.message); return; }
+    await refreshTeamYsStats();
 }
 
 function closeTeamModal() {
@@ -419,12 +498,14 @@ function downloadMemberData(userId) {
         return;
     }
     // Not expanded yet (nothing cached) - fetch fresh for the download.
-    supabaseClient
+    fetchAllPages((from, to) => supabaseClient
         .from('scans')
         .select('id, remark, barcode, box_number, box_status, qty, scanned_at')
         .eq('enterprise_id', AppState.profile.enterprise_id)
         .eq('user_id', userId)
-        .limit(5000)
+        .order('scanned_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to))
         .then(({ data, error }) => {
             if (error) { alert(error.message); return; }
             (data || []).forEach(s => { s.display_name = name; });
@@ -488,11 +569,14 @@ function renderTeamSearchResults() {
 
 async function fetchSelectedTeamScans() {
     const ids = Array.from(selectedMemberIds);
-    const { data, error } = await supabaseClient
+    const { data, error } = await fetchAllPages((from, to) => supabaseClient
         .from('scans')
         .select('id, remark, barcode, box_number, box_status, qty, scanned_at, user_id, profiles(display_name, email)')
         .eq('enterprise_id', AppState.profile.enterprise_id)
-        .in('user_id', ids);
+        .in('user_id', ids)
+        .order('scanned_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to));
     if (error) {
         alert(error.message);
         return null;
@@ -714,6 +798,24 @@ function setupEventListeners() {
     document.getElementById('teamSelectAllCheckbox').addEventListener('change', (e) => toggleSelectAll(e.target.checked));
 
     document.getElementById('downloadTeamSelectedBtn').addEventListener('click', downloadSelectedTeamData);
+    document.getElementById('teamYsList').addEventListener('change', (e) => {
+        const id = e.target.dataset.ysMember;
+        if (!id) return;
+        if (e.target.checked) selectedYsMemberIds.add(id); else selectedYsMemberIds.delete(id);
+    });
+    document.getElementById('teamYsList').addEventListener('click', (e) => {
+        const id = e.target.dataset.ysDownload;
+        if (id) {
+            const m = teamYsStatsCache.find(x => x.user_id === id);
+            downloadTeamYs([id], 'team_year_season_' + teamMemberDisplayName(m || {}).replace(/[^a-z0-9]/gi, '_'));
+        }
+    });
+    document.getElementById('downloadTeamYsBtn').addEventListener('click', () => {
+        const ids = Array.from(selectedYsMemberIds);
+        if (ids.length === 0) { alert('Select at least one team member first.'); return; }
+        downloadTeamYs(ids, 'team_year_season');
+    });
+    document.getElementById('resetTeamYsBtn').addEventListener('click', resetSelectedTeamYs);
     document.getElementById('resetTeamSelectedBtn').addEventListener('click', resetSelectedTeamData);
 
     document.getElementById('teamMemberList').addEventListener('click', (e) => {

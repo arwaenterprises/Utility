@@ -27,15 +27,19 @@ function ysNow() {
 // YEAR/SEASON SEGREGATION — DATABASE
 // ============================================
 var ysDB;
-var YS_DB_NAME = 'AKYSSegregateDB';
+var YS_DB_PREFIX = 'AKYSSegregateDB_';   // one database per signed-in user
+var ysDBName = null;
 var YS_SCANS_STORE = 'ys_scans';
 var YS_ITEMS_STORE = 'ys_item_master';
 
 function initYsDB() {
+    const name = YS_DB_PREFIX + AppState.user.id;
+    if (ysDB && ysDBName === name) return Promise.resolve(ysDB);
+    if (ysDB) { ysDB.close(); ysDB = null; }
     return new Promise((resolve, reject) => {
-        const req = indexedDB.open(YS_DB_NAME, 1);
+        const req = indexedDB.open(name, 1);
         req.onerror = () => reject(req.error);
-        req.onsuccess = () => { ysDB = req.result; resolve(ysDB); };
+        req.onsuccess = () => { ysDB = req.result; ysDBName = name; resolve(ysDB); };
         req.onupgradeneeded = (e) => {
             const db = e.target.result;
             if (!db.objectStoreNames.contains(YS_SCANS_STORE)) {
@@ -132,6 +136,23 @@ function ysMarkBoxUsed(barcode) {
     localStorage.setItem(ysUsedBoxesKey(), JSON.stringify([...boxes]));
 }
 
+// Scans captured before sync used scan IDs get one now, before they are ever uploaded.
+async function ysBackfillScanUids() {
+    const all = await ysDbGetAll(YS_SCANS_STORE);
+    for (const scan of all) {
+        if (!scan.scanUid) { scan.scanUid = newScanUid(); await ysDbPut(YS_SCANS_STORE, scan); }
+    }
+}
+
+// Upload buttons (item master / PTL config) are only for individuals and enterprise admins.
+function ysSetupUploadButtons() {
+    document.getElementById('ysUploadRow').style.display = refCanUpload() ? 'flex' : 'none';
+    const itemsBtn = document.getElementById('ysUploadItemsBtn');
+    const ptlBtn = document.getElementById('ysUploadPtlBtn');
+    itemsBtn.onclick = () => refStartUpload('ys_item_master', itemsBtn, async () => { await syncItemMaster(null, true); await ysUpdateImCount(); });
+    ptlBtn.onclick = () => refStartUpload('ys_ptl_config', ptlBtn, async () => { await syncHuConfig(true); });
+}
+
 // Update all scan records for a given box (by ptlNumber + boxBarcode) to Closed
 async function ysCloseBoxScans(ptlNumber, boxBarcode) {
     const allScans = await ysDbGetAll(YS_SCANS_STORE);
@@ -189,100 +210,71 @@ function clearYsSession() {
 }
 
 // ============================================
-// GAS COMMUNICATION
+// ITEM MASTER & PTL CONFIG SYNC (shared list code in js/lists.js)
 // ============================================
-// 45s must stay comfortably above the Apps Script lock wait (20s) plus write time.
-// If the client gives up while the server is still working it resends a batch the
-// server has already written - the dedupKey check catches that, but a timeout that
-// never needed to happen is still a wasted round trip.
-const YS_POST_TIMEOUT_MS = 45000;
+// Both lists are owned per enterprise / individual account and uploaded by the admin.
+// Each device keeps its own copy for instant, offline lookups.
 
-async function ysPostToGas(action, data) {
-    if (!AppState.isOnline) return null;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), YS_POST_TIMEOUT_MS);
-    try {
-        const response = await fetch(CONFIG.YS_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action, ...data }),
-            signal: controller.signal
-        });
-        const result = await response.json();
-        return (result && result.success) ? result : null;
-    } catch (e) {
-        console.error('YS GAS post error:', e);
-        return null;
-    } finally {
-        clearTimeout(timeout);
-    }
-}
-
-async function ysGetFromGas(action, params = {}) {
-    if (!AppState.isOnline) return null;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    try {
-        const url = new URL(CONFIG.YS_SCRIPT_URL);
-        url.searchParams.append('action', action);
-        Object.keys(params).forEach(k => url.searchParams.append(k, params[k]));
-        const response = await fetch(url.toString(), { signal: controller.signal });
-        return await response.json();
-    } catch (e) {
-        console.error('YS GAS get error:', e);
-        return null;
-    } finally {
-        clearTimeout(timeout);
-    }
-}
-
-// ============================================
-// ITEM MASTER SYNC
-// ============================================
-async function syncItemMaster(onProgress) {
-    const result = await ysGetFromGas('getItemMaster');
-    if (!result || !result.success || !Array.isArray(result.data)) return false;
-
-    const rows = result.data
-        .filter(row => row.Barcode)
+// Saves the item master into this tool's lookup table (chunked, so progress can be shown).
+async function ysSaveItemMaster(rows, onProgress) {
+    const mapped = rows
+        .filter(row => row.barcode)
         .map(row => ({
-            barcode: String(row.Barcode).trim(),
-            year: Number(row.Year) || 0,
-            season: String(row.Season || '').trim().toUpperCase(),
-            brand: String(row.Brand || '').trim()
+            barcode: String(row.barcode).trim(),
+            year: Number(row.year) || 0,
+            season: String(row.season || '').trim().toUpperCase(),
+            brand: String(row.brand || '').trim()
         }));
 
     await ysDbClearStore(YS_ITEMS_STORE);
 
     const CHUNK = 5000;
-    for (let i = 0; i < rows.length; i += CHUNK) {
-        await ysDbBulkPut(YS_ITEMS_STORE, rows.slice(i, i + CHUNK));
-        if (onProgress) onProgress(Math.min(i + CHUNK, rows.length), rows.length);
+    for (let i = 0; i < mapped.length; i += CHUNK) {
+        await ysDbBulkPut(YS_ITEMS_STORE, mapped.slice(i, i + CHUNK));
+        if (onProgress) onProgress(Math.min(i + CHUNK, mapped.length) / mapped.length);
     }
-
+    if (onProgress) onProgress(1);
     Storage.set('ys_item_master_ts', ysNow());
-    return true;
 }
 
-// ============================================
-// HU CONFIG SYNC
-// ============================================
-async function syncHuConfig() {
-    const result = await ysGetFromGas('getHUConfig');
-    if (!result || !result.success || !Array.isArray(result.data)) return false;
-
-    const config = result.data
-        .filter(row => row.PTL_Number && String(row.PTL_Number).trim() !== '')
+function ysSavePtlConfig(rows) {
+    const config = rows
+        .filter(row => row.ptl_number && String(row.ptl_number).trim() !== '')
         .map(row => ({
-            ptlNumber: String(row.PTL_Number).trim().padStart(2, '0'),
-            season: String(row.Season || '').trim().toUpperCase(),
-            year: Number(row.Year) || 0,
-            yearLogic: String(row.Year_Logic || 'lte').trim().toLowerCase()
+            ptlNumber: String(row.ptl_number).trim().padStart(2, '0'),
+            season: String(row.season || '').trim().toUpperCase(),
+            year: Number(row.year) || 0,
+            yearLogic: String(row.year_logic || 'lte').trim().toLowerCase()
         }));
-
     YSState.huConfig = config;
     Storage.setJSON('ys_hu_config', config);
-    return true;
+}
+
+// Returns true on success (including "already up to date"), false on failure.
+// onProgress receives 0..100.
+async function syncItemMaster(onProgress, force) {
+    try {
+        await refSync('ys_item_master', { force: !!force, onProgress, saveRows: ysSaveItemMaster });
+        return true;
+    } catch (e) {
+        console.error('Item master sync failed:', e);
+        return false;
+    }
+}
+
+async function syncHuConfig(force) {
+    try {
+        await refSync('ys_ptl_config', {
+            force: !!force,
+            saveRows: async (rows) => ysSavePtlConfig(rows)
+        });
+        // "up to date" leaves the local copy untouched - make sure it is loaded.
+        if (!YSState.huConfig.length) loadCachedHuConfig();
+        return true;
+    } catch (e) {
+        console.error('PTL config sync failed:', e);
+        return false;
+    }
 }
 
 function loadCachedHuConfig() {
@@ -567,6 +559,8 @@ async function handleBoxBarcodeScan(barcode) {
     // Log the scan
     const scanTs = ysNow();
     const scanRecord = {
+        scanUid: newScanUid(),
+        scanIso: new Date().toISOString(),
         storeId: AppState.storeId,
         storeName: AppState.storeName,
         staffName: YSState.staffName,
@@ -698,8 +692,40 @@ function ysCancelClose() {
 }
 
 // ============================================
-// GOOGLE SHEETS SYNC
+// SUPABASE SYNC (closed boxes -> ys_scans)
 // ============================================
+const YS_SYNC_BATCH = 500;
+
+// Local scan record -> ys_scans row. scan_uid makes a resend land on the same row.
+function ysToServerRow(s) {
+    return {
+        scan_uid: s.scanUid,
+        user_id: AppState.user.id,
+        enterprise_id: AppState.profile?.enterprise_id || null,
+        staff_name: s.staffName,
+        remark: s.remark,
+        ptl_number: s.ptlNumber,
+        season: s.season,
+        year: s.year,
+        brand: s.brand,
+        barcode: s.barcode,
+        qty: s.qty || 1,
+        box_barcode: s.boxBarcode,
+        box_status: s.boxStatus,
+        scan_timestamp: s.scanTimestamp,
+        scanned_at: s.scanIso || new Date().toISOString()
+    };
+}
+
+function ysFromServerRow(r) {
+    return {
+        scanUid: r.scan_uid, storeId: AppState.storeId, storeName: AppState.storeName,
+        staffName: r.staff_name, remark: r.remark, ptlNumber: r.ptl_number, season: r.season,
+        year: r.year, brand: r.brand, barcode: r.barcode, qty: r.qty, boxBarcode: r.box_barcode,
+        boxStatus: r.box_status, scanTimestamp: r.scan_timestamp, scanIso: r.scanned_at, synced: true
+    };
+}
+
 // The in-page isSyncing flag cannot see a second tab or the installed PWA, which share
 // the same IndexedDB. The Web Lock is held across the whole origin, so only one instance
 // on the device can be syncing at a time.
@@ -712,7 +738,7 @@ async function ysAutoSync() {
 }
 
 async function ysRunAutoSync() {
-    if (!ysDB) return;
+    if (!ysDB || !AppState.user || !AppState.isOnline) return;
     if (YSState.isSyncing) return;
     YSState.isSyncing = true;
     try {
@@ -720,33 +746,20 @@ async function ysRunAutoSync() {
         const unsynced = allScans.filter(s => !s.synced && s.boxStatus === 'Closed');
         if (unsynced.length === 0) return;
 
-        // Random jitter 0–4s to spread concurrent users
-        await new Promise(r => setTimeout(r, Math.random() * 4000));
-
-        // Retrying is safe: every scan carries a dedupKey and the server skips keys it
-        // has already written, so a batch that landed but timed out is not written twice.
-        let result = null;
-        for (let attempt = 0; attempt < 3; attempt++) {
-            result = await ysPostToGas('addYSScans', { scans: unsynced });
-            if (result && result.success) break;
-            if (attempt < 2) await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
-        }
-
-        if (result && result.success) {
-            // Trust the server's list of what it now holds rather than assuming the whole
-            // batch landed. Older server versions don't return it - fall back to the batch.
-            const accepted = Array.isArray(result.acceptedKeys)
-                ? new Set(result.acceptedKeys)
-                : new Set(unsynced.map(s => s.dedupKey));
-            for (const scan of unsynced) {
-                // A scan with no key cannot be matched against the server's list; the
-                // request succeeded, so treat it as done rather than resending forever.
-                if (scan.dedupKey && !accepted.has(scan.dedupKey)) continue;
+        const badge = document.getElementById('ysSyncBadge');
+        for (let i = 0; i < unsynced.length; i += YS_SYNC_BATCH) {
+            const batch = unsynced.slice(i, i + YS_SYNC_BATCH);
+            const { error } = await supabaseClient.from('ys_scans')
+                .upsert(batch.map(ysToServerRow), { onConflict: 'scan_uid' });
+            if (error) throw error;
+            for (const scan of batch) {
                 scan.synced = true;
                 await ysDbPut(YS_SCANS_STORE, scan);
             }
+            if (badge) badge.textContent = Math.round(Math.min(i + YS_SYNC_BATCH, unsynced.length) / unsynced.length * 100) + '%';
         }
     } catch (e) {
+        // Scans stay synced=false and are retried on the next tick.
         console.error('YS auto-sync error:', e);
     } finally {
         YSState.isSyncing = false;
@@ -805,26 +818,54 @@ function ysShowResetModal() {
         ysShowError(`Cannot reset — ${openPtls.join(', ')} ${openPtls.length === 1 ? 'is' : 'are'} still open. Close all boxes before resetting.`);
         return;
     }
-    // All PTLs closed/empty — no admin code needed
-    const adminSection = document.getElementById('ysAdminSection');
-    adminSection.style.display = 'none';
-    document.getElementById('ysAdminCodeInput').value = '';
     document.getElementById('ysResetModal').classList.add('active');
 }
 
+// Individuals own their data: Reset clears this device AND their server copy.
+// Enterprise members only clear their own device - the data stays in Supabase until
+// the enterprise admin resets it from the Team console. Either way the data is
+// downloaded first, and an enterprise member's Reset waits until every closed box has
+// reached the server so nothing the admin should see is lost.
 async function ysExecuteReset() {
-    const adminSection = document.getElementById('ysAdminSection');
-    if (adminSection.style.display !== 'none') {
-        const code = document.getElementById('ysAdminCodeInput').value;
-        if (code !== CONFIG.ADMIN_CODE) {
-            ysShowError('Invalid admin code.');
-            document.getElementById('ysResetModal').classList.remove('active');
+    document.getElementById('ysResetModal').classList.remove('active');
+    const isEnterpriseMember = !!AppState.profile?.enterprise_id;
+
+    if (isEnterpriseMember) {
+        if (AppState.isOnline) await ysAutoSync();
+        const pending = (await ysDbGetAll(YS_SCANS_STORE)).filter(s => !s.synced && s.boxStatus === 'Closed');
+        if (pending.length > 0) {
+            ysUpdateSyncBadge();
+            ysShowError("Some closed boxes haven't uploaded to your admin yet. Connect to the internet and wait for the sync badge to show ✓, then reset.");
             return;
         }
+        await ysDownloadExcel();
+        await ysDbClearStore(YS_SCANS_STORE);
+    } else {
+        if (!AppState.isOnline) {
+            ysShowError('Reset needs an internet connection so your server data is cleared too.');
+            return;
+        }
+        try {
+            // Pull in anything on the server this device lacks so the export holds every
+            // row that the reset is about to delete.
+            const { data, error } = await supabaseClient.from('ys_scans').select('*').eq('user_id', AppState.user.id);
+            if (error) throw error;
+            const have = new Set((await ysDbGetAll(YS_SCANS_STORE)).map(s => s.scanUid));
+            for (const r of data || []) if (!have.has(r.scan_uid)) await ysDbAdd(YS_SCANS_STORE, ysFromServerRow(r));
+        } catch (err) {
+            console.error('Pre-reset refresh failed:', err);
+            ysShowError('Could not load your data from the server. Please try again.');
+            return;
+        }
+        await ysDownloadExcel();
+        const del = await supabaseClient.from('ys_scans').delete().eq('user_id', AppState.user.id);
+        if (del.error) {
+            console.error('Clear server scans failed:', del.error);
+            ysShowError('Could not clear your server data. Please try again.');
+            return;
+        }
+        await ysDbClearStore(YS_SCANS_STORE);
     }
-    document.getElementById('ysResetModal').classList.remove('active');
-    await ysDownloadExcel();
-    await ysDbClearStore(YS_SCANS_STORE);
     clearYsSession();
     setActiveSession('yearSegregate', false);
     ysShowScreen('ysSessionScreen');
@@ -1144,7 +1185,10 @@ async function ysRefreshItemMaster() {
     el.textContent = 'Syncing…';
     el.className = 'ys-im-count syncing';
 
-    const [imOk, huOk] = await Promise.all([syncItemMaster(), syncHuConfig()]);
+    const [imOk, huOk] = await Promise.all([
+        syncItemMaster((p) => { el.textContent = `Syncing… ${Math.round(p)}%`; }, true),
+        syncHuConfig(true)
+    ]);
 
     if (huOk) {
         buildHuStates();
@@ -1165,7 +1209,7 @@ async function ysRefreshItemMaster() {
     } else {
         el.textContent = 'Sync failed';
         el.className = 'ys-im-count';
-        ysShowError('Could not sync data from Google Sheets. Check your connection.');
+        ysShowError('Could not sync the item master and PTL config. Check your connection.');
     }
 }
 
@@ -1246,20 +1290,24 @@ async function ysStartSession() {
     } else {
         // First launch or cache cleared — must sync
         const syncMsg = document.getElementById('ysSyncMsg');
-        syncMsg.textContent = 'Syncing HU configuration… (1/2)';
+        syncMsg.textContent = 'Syncing PTL configuration… (1/2)';
         const huOk = await syncHuConfig();
 
         syncMsg.textContent = 'Downloading item master… 0%';
-        const imOk = await syncItemMaster((done, total) => {
-            syncMsg.textContent = `Saving item master… ${Math.round((done / total) * 100)}%`;
+        const bar = document.getElementById('ysSyncBar');
+        bar.style.display = 'block';
+        const imOk = await syncItemMaster((pct) => {
+            syncMsg.textContent = `Downloading item master… ${Math.round(pct)}%`;
+            bar.firstChild.style.width = Math.round(pct) + '%';
         });
+        bar.style.display = 'none';
 
         syncStatus.style.display = 'none';
         startBtn.disabled = false;
 
         if (!huOk || !imOk) {
             if (!loadCachedHuConfig()) {
-                syncError.textContent = 'Could not load data from Google Sheets. Check connection and try again.';
+                syncError.textContent = 'Could not load the item master / PTL config. Ask your admin to upload them, or check your connection.';
                 syncError.style.display = 'block';
                 return;
             }
@@ -1353,6 +1401,10 @@ function setupYsEventListeners() {
 // ============================================
 async function initYearSegregate() {
     if (YSState.initialized) {
+        // A different account on the same device gets its own database.
+        await initYsDB();
+        await refOpenDB();
+        ysSetupUploadButtons();
         // Already set up — just restore screen state
         const hasSession = loadYsSession();
         if (hasSession) {
@@ -1374,7 +1426,10 @@ async function initYearSegregate() {
     }
 
     await initYsDB();
+    await refOpenDB();
+    await ysBackfillScanUids();
     setupYsEventListeners();
+    ysSetupUploadButtons();
     YSState.initialized = true;
 
     const hasSession = loadYsSession();

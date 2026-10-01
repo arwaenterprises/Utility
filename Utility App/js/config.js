@@ -2,10 +2,6 @@
 // CONFIGURATION
 // ============================================
 const CONFIG = {
-    GOOGLE_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzOc6X_mxeknOoSppEelhR555OvJwKBShfUYxwmEzme-nuSlV3pSekTD_YbXUL2Smz9Rg/exec',
-    PC_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwR9bAvw92oKoxYSXXDfk6_euNC2XjhfxOIZ6h4wW7l3WblkY4doE7OtNlbaadjb2Xc/exec',
-    YS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwR9bAvw92oKoxYSXXDfk6_euNC2XjhfxOIZ6h4wW7l3WblkY4doE7OtNlbaadjb2Xc/exec',
-    ADMIN_CODE: 'AK@2026',
     STORAGE_PREFIX: 'aku_',
     SUPABASE_URL: 'https://pacqjqjigmepkycfjapa.supabase.co',
     SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhY3FqcWppZ21lcGt5Y2ZqYXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA4MzE0NzIsImV4cCI6MjEwNjQwNzQ3Mn0.v339tfTdsSoHOdrHRXGdgcjqV86ub8b_LKuTX2OP28A'

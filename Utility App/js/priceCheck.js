@@ -1,13 +1,11 @@
 // ============================================
 // PRICE CHECK MODULE
 // ============================================
-const PC_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lI4oXU5Riy6XzhqLq_eV9vc8XaAY0EMj-BNGCpVuG9k/pub?gid=0&single=true&output=csv';
-const PC_TS_KEY    = 'price_check_ts';
-const PC_COUNT_KEY = 'price_check_count';
-const PC_DB_NAME   = 'AKPriceCheckDB';
+const PC_DB_PREFIX = 'AKPriceCheckDB_';   // one lookup database per signed-in user
 const PC_STORE     = 'prices';
 
 let pcDb = null;
+let pcDbName = null;
 let pcListenerAdded = false;
 let pcHtml5Qr = null;
 let pcCameraActive = false;
@@ -16,16 +14,18 @@ let pcCameraActive = false;
 // INDEXEDDB
 // ============================================
 function openPcDb() {
-    if (pcDb) return Promise.resolve(pcDb);
+    const name = PC_DB_PREFIX + AppState.user.id;
+    if (pcDb && pcDbName === name) return Promise.resolve(pcDb);
+    if (pcDb) { pcDb.close(); pcDb = null; }
     return new Promise((resolve, reject) => {
-        const req = indexedDB.open(PC_DB_NAME, 1);
+        const req = indexedDB.open(name, 1);
         req.onupgradeneeded = function(e) {
             const db = e.target.result;
             if (!db.objectStoreNames.contains(PC_STORE)) {
                 db.createObjectStore(PC_STORE, { keyPath: 'Barcode' });
             }
         };
-        req.onsuccess = function(e) { pcDb = e.target.result; resolve(pcDb); };
+        req.onsuccess = function(e) { pcDb = e.target.result; pcDbName = name; resolve(pcDb); };
         req.onerror   = function(e) { reject(e.target.error); };
     });
 }
@@ -42,17 +42,27 @@ function pcDbGet(barcode) {
     });
 }
 
-function pcDbStoreAll(rows) {
-    return openPcDb().then(function(db) {
+// Replaces the whole lookup table. Written in chunks so a very large price list
+// can report progress (onProgress receives 0..1).
+async function pcDbStoreAll(rows, onProgress) {
+    const db = await openPcDb();
+    const run = function(fn) {
         return new Promise(function(resolve, reject) {
-            const tx    = db.transaction(PC_STORE, 'readwrite');
-            const store = tx.objectStore(PC_STORE);
-            store.clear();
-            rows.forEach(function(r) { store.put(r); });
+            const tx = db.transaction(PC_STORE, 'readwrite');
+            fn(tx.objectStore(PC_STORE));
             tx.oncomplete = resolve;
-            tx.onerror    = reject;
+            tx.onerror    = function() { reject(tx.error); };
+            tx.onabort    = function() { reject(tx.error); };
         });
-    });
+    };
+    await run(function(store) { store.clear(); });
+    const CHUNK = 5000;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+        const part = rows.slice(i, i + CHUNK);
+        await run(function(store) { part.forEach(function(r) { store.put(r); }); });
+        if (onProgress) onProgress(Math.min(i + CHUNK, rows.length) / rows.length);
+    }
+    if (onProgress) onProgress(1);
 }
 
 // ============================================
@@ -60,7 +70,9 @@ function pcDbStoreAll(rows) {
 // ============================================
 async function initPriceCheck() {
     await openPcDb();
-    updatePcTimestamp();
+    await refOpenDB();
+    document.getElementById('pcUploadBtn').style.display = refCanUpload() ? '' : 'none';
+    await updatePcTimestamp();
 
     if (!pcListenerAdded) {
         const input = document.getElementById('pcBarcodeInput');
@@ -78,6 +90,9 @@ async function initPriceCheck() {
     document.getElementById('pcResultCard').style.display = 'none';
     document.getElementById('pcNotFound').style.display   = 'none';
     setTimeout(function() { document.getElementById('pcBarcodeInput').focus(); }, 150);
+
+    // Check for a newer list once a day (or when this device has never downloaded it).
+    if (navigator.onLine && await refIsStale('price_list')) pcSyncList(true);
 }
 
 // ============================================
@@ -200,101 +215,53 @@ function showPcNotFound(barcode) {
 }
 
 // ============================================
-// SYNC FROM SHEETS
+// SYNC & UPLOAD (shared list code in js/lists.js, with % progress)
 // ============================================
-async function refreshPcData(silent) {
-    silent = silent === true;
+// The price list is owned per enterprise / individual account. The admin uploads it;
+// every device copies it into its own lookup table below.
+async function pcSaveRows(rows, onProgress) {
+    const mapped = rows.map(function(r) {
+        return {
+            Barcode: String(r.barcode || '').trim(),
+            Current_Price: r.current_price, Original_Price: r.original_price,
+            Style: r.style, Color: r.color, Size: r.size, Year: r.year, Season: r.season
+        };
+    }).filter(function(r) { return r.Barcode; });
+    await pcDbStoreAll(mapped, onProgress);
+}
 
-    if (!navigator.onLine) {
-        if (!silent) alert('You are offline. Using cached data.');
-        return;
-    }
-
+async function pcSyncList(silent) {
     const btn = document.getElementById('pcRefreshBtn');
-    if (btn) { btn.textContent = '⏳ Syncing...'; btn.disabled = true; }
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-
+    const progress = refProgress(btn, 'Syncing');
     try {
-        const resp = await fetch(CONFIG.PC_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action: 'getPriceCsv' }),
-            signal: controller.signal
+        const result = await refSync('price_list', {
+            force: !silent,
+            onProgress: function(p) { progress.update(p, 'Syncing'); },
+            saveRows: pcSaveRows
         });
-
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-
-        const text = await resp.text();
-        const rows = parsePcCsv(text);
-
-        await pcDbStoreAll(rows);
-
-        Storage.set(PC_TS_KEY,    new Date().toLocaleString());
-        Storage.set(PC_COUNT_KEY, String(rows.length));
-        updatePcTimestamp();
-
-        if (!silent) alert('✅ Synced — ' + rows.length + ' items loaded.');
-    } catch (err) {
+        await updatePcTimestamp();
+        const meta = await refMetaGet('price_list');
         if (!silent) {
-            const isLocal = location.protocol === 'file:';
-            alert(isLocal
-                ? 'Sync blocked — open the app via Netlify, not as a local file.'
-                : 'Sync failed: ' + err.message);
+            if (result === 'offline') alert('You are offline. Using cached data.');
+            else if (result === 'empty') alert('No price list has been uploaded yet.');
+            else alert('✅ Synced — ' + (meta ? meta.count : 0) + ' items loaded.');
         }
+    } catch (err) {
+        console.error('Price Check sync failed:', err);
+        if (!silent) alert('Sync failed: ' + (err.message || err));
     } finally {
-        clearTimeout(timeout);
-        if (btn) { btn.textContent = '↻ Sync Data'; btn.disabled = false; }
+        progress.done();
     }
 }
 
-// ============================================
-// CSV PARSER (same as boxSegregate)
-// ============================================
-function parsePcCsv(text) {
-    const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-    if (lines.length < 2) return [];
-    const headers = parsePcCsvLine(lines[0]).map(function(h) {
-        return h.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-    });
-    const rows = [];
-    for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-        const vals = parsePcCsvLine(line);
-        const obj  = {};
-        headers.forEach(function(h, idx) { obj[h] = (vals[idx] || '').trim(); });
-        if (obj.Barcode) rows.push(obj);
-    }
-    return rows;
+function refreshPcData() { return pcSyncList(false); }
+
+function uploadPcList() {
+    refStartUpload('price_list', document.getElementById('pcUploadBtn'), function() { return pcSyncList(false); });
 }
 
-function parsePcCsvLine(line) {
-    const result = [];
-    let cur = '', inQuote = false;
-    for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (ch === '"') {
-            if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
-            else { inQuote = !inQuote; }
-        } else if (ch === ',' && !inQuote) {
-            result.push(cur); cur = '';
-        } else { cur += ch; }
-    }
-    result.push(cur);
-    return result;
-}
-
-// ============================================
-// TIMESTAMP
-// ============================================
-function updatePcTimestamp() {
-    const ts    = Storage.get(PC_TS_KEY);
-    const count = Storage.get(PC_COUNT_KEY) || '0';
-    const el    = document.getElementById('pcTimestamp');
+async function updatePcTimestamp() {
+    const el = document.getElementById('pcTimestamp');
     if (!el) return;
-    if (ts) { el.innerHTML = count + ' items<br>' + ts; }
-    else    { el.textContent = 'No data — tap Sync'; }
+    el.innerHTML = await refStatusText('price_list', 'items');
 }
-
