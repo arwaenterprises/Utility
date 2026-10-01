@@ -109,8 +109,12 @@ async function openAccountModal() {
     const isAdmin = AppState.profile?.tier === 'enterprise_admin';
     document.getElementById('createEnterpriseSection').style.display = isIndividual ? 'block' : 'none';
     document.getElementById('inviteTeammateSection').style.display = isAdmin ? 'block' : 'none';
+    document.getElementById('teamMembersSection').style.display = isAdmin ? 'block' : 'none';
 
-    if (isAdmin) await loadPendingInvitesList();
+    if (isAdmin) {
+        await loadPendingInvitesList();
+        await loadTeamMembersList();
+    }
 
     document.getElementById('accountModal').classList.add('active');
 }
@@ -153,16 +157,87 @@ async function loadPendingInvitesList() {
     const listEl = document.getElementById('pendingInvitesList');
     const { data, error } = await supabaseClient
         .from('enterprise_invites')
-        .select('invited_email, status')
+        .select('id, invited_email, status')
         .eq('enterprise_id', AppState.profile.enterprise_id)
         .order('created_at', { ascending: false });
     if (error) {
         listEl.textContent = '';
         return;
     }
-    listEl.innerHTML = data.map(inv =>
-        `<div style="font-size: 13px; padding: 4px 0;">${inv.invited_email} — ${inv.status}</div>`
-    ).join('') || '<div style="font-size: 13px; color: var(--ak-text-light);">No invites yet</div>';
+    listEl.innerHTML = data.map(inv => `
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size: 13px; padding: 4px 0;">
+            <span>${inv.invited_email} — ${inv.status}</span>
+            ${inv.status === 'pending' ? `<button class="delete-scan-btn" data-cancel-invite="${inv.id}">✕</button>` : ''}
+        </div>
+    `).join('') || '<div style="font-size: 13px; color: var(--ak-text-light);">No invites yet</div>';
+}
+
+async function cancelInvite(inviteId) {
+    const { error } = await supabaseClient.from('enterprise_invites').delete().eq('id', inviteId);
+    if (error) {
+        alert(error.message);
+        return;
+    }
+    await loadPendingInvitesList();
+}
+
+async function loadTeamMembersList() {
+    const listEl = document.getElementById('teamMembersList');
+    const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('id, display_name, email, tier')
+        .eq('enterprise_id', AppState.profile.enterprise_id)
+        .neq('id', AppState.user.id);
+    if (error) {
+        listEl.textContent = '';
+        return;
+    }
+    listEl.innerHTML = data.map(member => `
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size: 13px; padding: 4px 0;">
+            <span>${member.display_name || member.email}</span>
+            <button class="delete-scan-btn" data-remove-member="${member.id}">✕</button>
+        </div>
+    `).join('') || '<div style="font-size: 13px; color: var(--ak-text-light);">No team members yet</div>';
+}
+
+async function removeMember(memberId) {
+    if (!confirm('Remove this teammate from your enterprise?')) return;
+    const { error } = await supabaseClient.rpc('remove_enterprise_member', { member_user_id: memberId });
+    if (error) {
+        alert(error.message);
+        return;
+    }
+    await loadTeamMembersList();
+}
+
+async function openTeamScansModal() {
+    const tbody = document.getElementById('teamScansTableBody');
+    tbody.innerHTML = '<tr><td colspan="4">Loading...</td></tr>';
+    document.getElementById('teamScansModal').classList.add('active');
+
+    const { data, error } = await supabaseClient
+        .from('scans')
+        .select('barcode, box_number, box_status, profiles(display_name, email)')
+        .eq('enterprise_id', AppState.profile.enterprise_id)
+        .order('scanned_at', { ascending: false })
+        .limit(200);
+
+    if (error) {
+        tbody.innerHTML = `<tr><td colspan="4">Could not load team scans</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = data.map(s => `
+        <tr>
+            <td>${s.profiles?.display_name || s.profiles?.email || '—'}</td>
+            <td>${s.box_number}</td>
+            <td>${s.barcode}</td>
+            <td>${s.box_status}</td>
+        </tr>
+    `).join('') || '<tr><td colspan="4">No scans yet</td></tr>';
+}
+
+function closeTeamScansModal() {
+    document.getElementById('teamScansModal').classList.remove('active');
 }
 
 async function checkForMyPendingInvite() {
@@ -315,6 +390,16 @@ function setupEventListeners() {
     document.getElementById('createEnterpriseBtn').addEventListener('click', createEnterprise);
     document.getElementById('sendInviteBtn').addEventListener('click', sendInvite);
     document.getElementById('acceptInviteBtn').addEventListener('click', acceptMyInvite);
+    document.getElementById('viewTeamScansBtn').addEventListener('click', openTeamScansModal);
+    document.getElementById('closeTeamScansBtn').addEventListener('click', closeTeamScansModal);
+    document.getElementById('pendingInvitesList').addEventListener('click', (e) => {
+        const id = e.target.dataset.cancelInvite;
+        if (id) cancelInvite(id);
+    });
+    document.getElementById('teamMembersList').addEventListener('click', (e) => {
+        const id = e.target.dataset.removeMember;
+        if (id) removeMember(id);
+    });
 }
 
 // ============================================

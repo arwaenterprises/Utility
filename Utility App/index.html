@@ -54,9 +54,38 @@
                     <button class="btn btn-primary btn-block" id="sendInviteBtn">Send Invite</button>
                     <div id="pendingInvitesList" style="margin-top: 12px;"></div>
                 </div>
+
+                <div class="settings-section" id="teamMembersSection" style="display:none;">
+                    <h4>Team Members</h4>
+                    <div id="teamMembersList"></div>
+                    <button class="btn btn-secondary btn-block" id="viewTeamScansBtn" style="margin-top: 10px;">View Team Scans</button>
+                </div>
             </div>
             <div class="modal-buttons">
                 <button class="btn btn-primary btn-block" id="closeAccountBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TEAM SCANS MODAL -->
+    <div class="modal-overlay" id="teamScansModal">
+        <div class="modal" style="max-width: 500px;">
+            <h3 class="modal-title">📦 Team Scans</h3>
+            <div class="modal-body" style="text-align: left; max-height: 50vh; overflow-y: auto;">
+                <table class="scans-table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>By</th>
+                            <th>Box</th>
+                            <th>Barcode</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="teamScansTableBody"></tbody>
+                </table>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-primary btn-block" id="closeTeamScansBtn">Close</button>
             </div>
         </div>
     </div>
@@ -957,15 +986,15 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=14"></script>
-    <script src="js/supabaseClient.js?v=14"></script>
-    <script src="js/app.js?v=14"></script>
-    <script src="js/boxScanner.js?v=14"></script>
-    <script src="js/itemBarcode.js?v=14"></script>
-    <script src="js/boxCode.js?v=14"></script>
-    <script src="js/photoCapture.js?v=14"></script>
-    <script src="js/boxSegregate.js?v=14"></script>
-    <script src="js/priceCheck.js?v=14"></script>
-    <script src="js/yearSegregate.js?v=14"></script>
+    <script src="js/config.js?v=15"></script>
+    <script src="js/supabaseClient.js?v=15"></script>
+    <script src="js/app.js?v=15"></script>
+    <script src="js/boxScanner.js?v=15"></script>
+    <script src="js/itemBarcode.js?v=15"></script>
+    <script src="js/boxCode.js?v=15"></script>
+    <script src="js/photoCapture.js?v=15"></script>
+    <script src="js/boxSegregate.js?v=15"></script>
+    <script src="js/priceCheck.js?v=15"></script>
+    <script src="js/yearSegregate.js?v=15"></script>
 </body>
 </html>
