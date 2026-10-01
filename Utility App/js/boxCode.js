@@ -124,6 +124,7 @@ async function printBoxLabels() {
         
         await sleep(100);
         window.print();
+        Usage.log('box_code', 'print_job', 1, qty);
         
         showBoxStatus('success', `✓ ${qty} codes on ${physicalLabels} label(s) sent to printer`);
         document.getElementById('trnInput').value = '';

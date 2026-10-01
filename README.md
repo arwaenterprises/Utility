@@ -12,6 +12,7 @@ what is pending.
 | `Utility App/` | The website itself (this is the only folder Netlify publishes) |
 | `supabase/schema.sql` | The whole database: tables, access rules, functions. Safe to re-run in the Supabase SQL editor |
 | `tests/` | Automated tests (never published) |
+| `stats/` | Weekly usage report emailed to the owner - see `stats/README.md` |
 | `legacy/` | Old files kept for reference (old Apps Script, backups); not published |
 
 ## Tests

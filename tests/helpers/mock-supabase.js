@@ -1,5 +1,5 @@
 // In-memory Supabase mock injected before the app scripts.
-window.__db = { reference_chunks: [], ys_scans: [], scans: [], enterprises: [{ id: 'E1', name: 'Acme' }], enterprise_invites: [] };
+window.__db = { reference_chunks: [], ys_scans: [], scans: [], enterprises: [{ id: 'E1', name: 'Acme' }], enterprise_invites: [], usage_daily: [] };
 window.__me = { id: 'u1', enterprise_id: null, tier: 'individual', email: 'a@b.c' };
 window.__rpcCalls = [];
 (function () {
@@ -54,6 +54,14 @@ window.__rpcCalls = [];
       db.reference_chunks = db.reference_chunks.filter(r => !(r.list_type === p_list_type && r.is_active && owned(r)));
       staged.forEach(r => { r.is_active = true; r.uploaded_at = new Date().toISOString(); });
       return staged.reduce((n, r) => n + r.row_count, 0);
+    },
+    log_usage: ({ p_tool, p_action, p_count, p_qty, p_day }) => {
+      if (window.__fail) throw { message: 'network down (test)' };
+      const allowed = ['box_scanner/box_closed','year_season/box_closed','item_barcode/print_job','box_code/print_job','box_segregate/lookup_found','box_segregate/lookup_not_found','box_segregate_pallet/box_scanned','box_segregate_pallet/box_duplicate','box_segregate_pallet/box_not_found','price_check/lookup_found','price_check/lookup_not_found'];
+      if (!allowed.includes(p_tool + '/' + p_action)) throw { message: 'Invalid usage event: ' + p_tool + '/' + p_action };
+      let r = db.usage_daily.find(x => x.user_id === window.__me.id && x.day === p_day && x.tool === p_tool && x.action === p_action);
+      if (!r) { r = { user_id: window.__me.id, day: p_day, tool: p_tool, action: p_action, event_count: 0, qty: 0 }; db.usage_daily.push(r); }
+      r.event_count += p_count; r.qty += p_qty;
     },
     rename_enterprise: ({ new_name }) => { db.enterprises[0].name = new_name.trim(); },
     team_member_stats: () => [{ user_id: 'u1', display_name: 'Ann', email: 'a@b.c', boxes_closed: 0, total_qty: 0 }, { user_id: 'u2', display_name: 'Bob', email: 'b@b.c', boxes_closed: 0, total_qty: 0 }],

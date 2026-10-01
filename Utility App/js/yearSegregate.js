@@ -663,7 +663,9 @@ async function ysExecuteCloseBox(confirmedBoxBarcode) {
     try {
         const hu = YSState.huStates[YSState.pendingHuIdx];
 
+        const closedQty = hu.itemCount;
         await ysCloseBoxScans(hu.ptlNumber, hu.boxBarcode);
+        Usage.log('year_season', 'box_closed', 1, closedQty);
 
         hu.status = 'Closed';
         hu.itemCount = 0;

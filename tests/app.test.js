@@ -191,6 +191,30 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('6 tools + scanner tiles', APPS.length === 6, APPS.map(a => a.id).join());
     ok('NO content-security-policy violations during the whole run', window.__csp.length === 0, JSON.stringify(window.__csp));
 
+    // ---------- usage statistics ----------
+    AppState.profile = { display_name: 'Ann', enterprise_id: null, tier: 'individual' }; __me.enterprise_id = null; __me.id = 'u1'; AppState.user = { id: 'u1', email: 'a@b.c' };
+    __db.usage_daily.length = 0; Storage.setJSON('usage_pending_u1', {}); window.__fail = false; AppState.isOnline = true;
+    await bsSyncList('box_list', true);
+    bsSetPalletMode(false);
+    for (const v of ['x1', 'x2', 'nope']) { document.getElementById('bsBarcodeInput').value = v; bsIsLooking = false; lookupSegregateBox(); }
+    await initPriceCheck(); for (let i = 0; i < 40 && !(await refMetaGet('price_list')); i++) await sleep(100);
+    for (const v of ['PB1', 'PB2', 'PB3', 'zzz']) { document.getElementById('pcBarcodeInput').value = v; await lookupPriceCheck(); }
+    bsDocScans = []; bsSetPalletMode(true);
+    for (const v of ['p2', 'P2', 'q9']) { document.getElementById('bsBarcodeInput').value = v; bsIsLooking = false; lookupSegregateBox(); }
+    window.__fail = true; await Usage.flush();
+    ok('usage: nothing is lost when the server is unreachable', __db.usage_daily.length === 0 && Object.keys(Storage.getJSON('usage_pending_u1')).length === 7, Object.keys(Storage.getJSON('usage_pending_u1')).join());
+    window.__fail = false; await Usage.flush();
+    const u = (t, a) => __db.usage_daily.find(x => x.tool === t && x.action === a);
+    ok('usage: Box Segregate lookups counted (2 found, 1 not found)', u('box_segregate', 'lookup_found')?.event_count === 2 && u('box_segregate', 'lookup_not_found')?.event_count === 1);
+    ok('usage: Price Check lookups counted (3 found, 1 not found)', u('price_check', 'lookup_found')?.event_count === 3 && u('price_check', 'lookup_not_found')?.event_count === 1);
+    ok('usage: Pallet scans counted (1 scanned, 1 duplicate, 1 unknown)', u('box_segregate_pallet', 'box_scanned')?.event_count === 1 && u('box_segregate_pallet', 'box_duplicate')?.event_count === 1 && u('box_segregate_pallet', 'box_not_found')?.event_count === 1);
+    ok('usage: rows carry the user and a YYYY-MM-DD day', __db.usage_daily.every(x => x.user_id === 'u1' && /^\d{4}-\d{2}-\d{2}$/.test(x.day)));
+    const sentRows = __db.usage_daily.length; await Usage.flush();
+    ok('usage: flushing again sends nothing twice', __db.usage_daily.length === sentRows && __db.usage_daily.reduce((n, x) => n + x.event_count, 0) === 10);
+    Usage.log('hacking', 'x', 1, 0); await Usage.flush();
+    ok('usage: an event the server rejects is dropped, not retried forever', Object.keys(Storage.getJSON('usage_pending_u1') || {}).length === 0);
+    bsSetPalletMode(false);
+
     // ---------- Box Scanner badge % ----------
     ok('uids valid UUIDs', /^[0-9a-f-]{36}$/.test(newScanUid()));
     return log;

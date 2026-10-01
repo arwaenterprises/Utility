@@ -3,7 +3,6 @@
 \set QUIET on
 set client_min_messages = notice;
 
-grant all on all tables in schema public to authenticated;   -- Supabase grants this by default; RLS is what restricts
 
 create function pg_temp.pass(name text) returns void language plpgsql as $$ begin raise notice 'PASS %', name; end $$;
 create function public._t_eq(name text, actual bigint, expected bigint) returns void language plpgsql as $$
@@ -122,5 +121,25 @@ select _t_err('invite for another email cannot be accepted', '00000000-0000-0000
 select _t_err('someone already in an enterprise cannot accept another invite', '00000000-0000-0000-0000-0000000000e2', $$select accept_enterprise_invite('dddddddd-dddd-4ddd-8ddd-dddddddddddd')$$, 'already belong');
 select _t_do('00000000-0000-0000-0000-00000000000a', $$select accept_enterprise_invite('dddddddd-dddd-4ddd-8ddd-dddddddddddd')$$);
 select _t_eq('valid invite makes the person an enterprise member', (select count(*) from profiles where email='indiv@x.com' and tier='enterprise_member'), 1);
+
+-- ============ usage statistics ============
+select _t_do('00000000-0000-0000-0000-0000000000b1', $$select log_usage('box_scanner','box_closed',1,40); select log_usage('box_scanner','box_closed',2,25)$$);
+select _t_eq('log_usage adds up: event count', (select event_count from usage_daily where tool='box_scanner' and user_id='00000000-0000-0000-0000-0000000000b1'), 3);
+select _t_eq('log_usage adds up: quantity', (select qty from usage_daily where tool='box_scanner' and user_id='00000000-0000-0000-0000-0000000000b1'), 65);
+select _t_eq('log_usage records the enterprise', (select count(*) from usage_daily where enterprise_id='11111111-1111-1111-1111-111111111111'), 1);
+select _t_do('00000000-0000-0000-0000-0000000000b1', $$select log_usage('price_check','lookup_found',5,0,(current_date - 3))$$);
+select _t_eq('log_usage keeps an explicit recent day', (select count(*) from usage_daily where tool='price_check' and day = current_date - 3), 1);
+select _t_do('00000000-0000-0000-0000-0000000000b1', $$select log_usage('price_check','lookup_found',1,0,date '2001-01-01')$$);
+select _t_eq('a far-away day (wrong tablet clock) is replaced by today', (select count(*) from usage_daily where day = date '2001-01-01'), 0);
+select _t_err('unknown tool/action rejected', '00000000-0000-0000-0000-0000000000b1', $$select log_usage('hacking','box_closed',1,0)$$, 'Invalid usage event');
+select _t_err('wrong action for a tool rejected', '00000000-0000-0000-0000-0000000000b1', $$select log_usage('price_check','box_closed',1,0)$$, 'Invalid usage event');
+select _t_err('zero count rejected', '00000000-0000-0000-0000-0000000000b1', $$select log_usage('box_scanner','box_closed',0,0)$$, 'Invalid usage amounts');
+select _t_err('absurd count rejected', '00000000-0000-0000-0000-0000000000b1', $$select log_usage('box_scanner','box_closed',1000000,0)$$, 'Invalid usage amounts');
+select _t_err('signed-out caller rejected', null::uuid, $$select log_usage('box_scanner','box_closed',1,0)$$, 'Not signed in');
+select _t_err('users cannot read the usage table (not even their own)', '00000000-0000-0000-0000-0000000000b1', $$select count(*) from usage_daily$$, 'permission denied');
+select _t_err('enterprise admins cannot read the usage table', '00000000-0000-0000-0000-0000000000e1', $$select count(*) from usage_daily$$, 'permission denied');
+select _t_err('users cannot read the usage report view', '00000000-0000-0000-0000-0000000000b1', $$select count(*) from usage_report$$, 'permission denied');
+select _t_err('users cannot write usage rows directly', '00000000-0000-0000-0000-0000000000b1', $$insert into usage_daily(user_id,day,tool,action,event_count) values ('00000000-0000-0000-0000-0000000000b1', current_date, 'box_scanner','box_closed',999999)$$, 'permission denied');
+select _t_eq('owner view shows names and enterprise', (select count(*) from usage_report where email='member1@x.com' and enterprise='New Name'), 3);
 
 \echo All access-rule tests passed

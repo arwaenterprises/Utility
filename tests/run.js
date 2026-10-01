@@ -9,6 +9,7 @@ const steps = [
   ['App: lists, Box Segregate, Price Check, Year/Season, Team, security policy', 'node', ['tests/app.test.js']],
   ['App: Box Scanner offline sync and Reset', 'node', ['tests/scanner.test.js']],
   ['App: every tool opens', 'node', ['tests/smoke.test.js']],
+  ['Weekly usage report', 'node', ['tests/stats.test.js']],
 ];
 
 const hasPsql = spawnSync('psql', ['--version'], { stdio: 'ignore' }).status === 0;

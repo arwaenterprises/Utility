@@ -30,6 +30,7 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ScannerState.uniqueMode = false;
     await executeCloseBox();
     ok('closed box is pending sync (badge shows count)', badge() === '2' && serverScans() === 0, badge());
+    ok('usage statistics wait on the device while offline', __db.usage_daily.length === 0 && Object.keys(Storage.getJSON('usage_pending_u1') || {}).length === 1);
 
     AppState.isOnline = true; await autoSyncScans();                           // online but server failing
     ok('failed upload keeps scans pending', badge() === '2' && serverScans() === 0);
@@ -38,6 +39,10 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     (await getAllScans()).forEach(s => s.synced = false); for (const s of await getAllScans()) await updateScan(s);
     await autoSyncScans();
     ok('resending the same scans does not duplicate rows', serverScans() === 2);
+    await Usage.flush(); await Usage.flush();
+    const bc = __db.usage_daily.filter(u => u.tool === 'box_scanner' && u.action === 'box_closed');
+    ok('usage: closed box counted once with its quantity', bc.length === 1 && bc[0].event_count === 1 && bc[0].qty === 2, JSON.stringify(bc));
+    ok('usage: pending list is emptied after sending', Object.keys(Storage.getJSON('usage_pending_u1') || {}).length === 0);
     ok('scan ids are valid UUIDs', __db.scans.every(s => /^[0-9a-f-]{36}$/.test(s.scan_uid)));
 
     await executeResetSession(true);

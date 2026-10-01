@@ -36,6 +36,25 @@ for (const word of ['photoCapture', 'GOOGLE_SCRIPT_URL', 'PC_SCRIPT_URL', 'YS_SC
   check('no leftover: ' + word, !appText.includes(word));
 }
 
+// 3b. Usage statistics: every tracked action is still wired into its tool (a missing call would silently
+//     leave a hole in the weekly report), and every pair is one the database accepts.
+const usageWiring = {
+  'boxScanner.js': ["Usage.log('box_scanner', 'box_closed'"],
+  'yearSegregate.js': ["Usage.log('year_season', 'box_closed'"],
+  'itemBarcode.js': ["Usage.log('item_barcode', 'print_job', 1, qty)", "Usage.log('item_barcode', 'print_job', 1, totalLabels)"],
+  'boxCode.js': ["Usage.log('box_code', 'print_job'"],
+  'boxSegregate.js': ["Usage.log('box_segregate', row ?", "Usage.log('box_segregate_pallet', 'box_scanned'", "Usage.log('box_segregate_pallet', 'box_duplicate'", "Usage.log('box_segregate_pallet', 'box_not_found'"],
+  'priceCheck.js': ["Usage.log('price_check', row ?"],
+};
+for (const [file, needles] of Object.entries(usageWiring)) {
+  const src = fs.readFileSync(path.join(APP, 'js', file), 'utf8');
+  for (const n of needles) check(`usage logged in ${file}: ${n.slice(0, 48)}`, src.includes(n));
+}
+const schemaText = fs.readFileSync(path.join(ROOT, 'supabase', 'schema.sql'), 'utf8');
+const allowed = new Set([...schemaText.matchAll(/'([a-z_]+\/[a-z_]+)'/g)].map(m => m[1]));
+const used = new Set([...appText.matchAll(/Usage\.log\('([a-z_]+)',\s*(?:'([a-z_]+)'|[^,]*\?\s*'([a-z_]+)'\s*:\s*'([a-z_]+)')/g)].flatMap(m => m[2] ? [m[1] + '/' + m[2]] : [m[1] + '/' + m[3], m[1] + '/' + m[4]]));
+check('every logged tool/action is accepted by log_usage() in schema.sql', used.size >= 9 && [...used].every(u => allowed.has(u)), [...used].filter(u => !allowed.has(u)).join());
+
 // 4. Secrets: only the public anon key may ever be in the published site.
 check('no service_role key in the published site', !/service_role/i.test(appText) && !/"role":"service_role"/.test(appText));
 const keyMatch = appText.match(/SUPABASE_ANON_KEY:\s*'([^']+)'/);

@@ -9,3 +9,8 @@ create table auth.users (id uuid primary key default gen_random_uuid(), email te
 -- auth.uid() reads the "current user" the tests set with set_config('request.uid', ...)
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.uid', true), '')::uuid $$;
 grant usage on schema public, auth to anon, authenticated;
+
+-- Supabase gives the API roles access to every new table / function in "public" by default; Row-Level
+-- Security (and explicit REVOKEs in schema.sql) are what restrict it. Reproduce that default here.
+alter default privileges in schema public grant all on tables to anon, authenticated;
+alter default privileges in schema public grant all on functions to anon, authenticated;

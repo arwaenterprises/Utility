@@ -5,11 +5,15 @@
   "scripts": {
     "test": "node tests/run.js",
     "test:static": "node tests/static-checks.js",
-    "test:app": "node tests/app.test.js && node tests/scanner.test.js && node tests/smoke.test.js",
-    "test:sql": "bash tests/sql/run.sh"
+    "test:app": "node tests/app.test.js && node tests/scanner.test.js && node tests/smoke.test.js && node tests/stats.test.js",
+    "test:sql": "bash tests/sql/run.sh",
+    "stats:sample": "node stats/weekly-report.js --sample"
   },
   "devDependencies": {
     "playwright": "1.56.1",
     "xlsx": "0.18.5"
+  },
+  "dependencies": {
+    "nodemailer": "^6.10.1"
   }
 }

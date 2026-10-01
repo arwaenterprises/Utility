@@ -169,6 +169,7 @@ function lookupSegregateBox() {
     if (bsPalletMode) lookupPalletBox(barcode);
     else {
         const row = bsMap.get(barcode.toLowerCase());
+        Usage.log('box_segregate', row ? 'lookup_found' : 'lookup_not_found', 1, 0);
         if (row) showBsResult(row); else showBsNotFound(barcode);
     }
     input.select();
@@ -228,13 +229,15 @@ function bsDocTotals() {
 
 function lookupPalletBox(barcode) {
     const rec = bsDocMap.get(barcode.toLowerCase());
-    if (!rec) { showBsNotFound(barcode); return; }
+    if (!rec) { Usage.log('box_segregate_pallet', 'box_not_found', 1, 0); showBsNotFound(barcode); return; }
 
     const already = bsDocScans.find(s => s.box_number.toLowerCase() === String(rec.box_number).toLowerCase());
     let duplicate = false;
     if (already) {
         duplicate = true;
+        Usage.log('box_segregate_pallet', 'box_duplicate', 1, 0);
     } else {
+        Usage.log('box_segregate_pallet', 'box_scanned', 1, 1);
         bsDocScans.push({
             box_number: rec.box_number,
             document_number: rec.document_number,

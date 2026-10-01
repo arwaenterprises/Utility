@@ -731,3 +731,86 @@ end;
 $$;
 
 grant execute on function public.rename_enterprise(text) to authenticated;
+
+
+-- ============================================
+-- USAGE STATISTICS (owner-only)
+-- ============================================
+-- Daily counters of what each user did - counts only, never scan contents:
+--   tool                  action              event_count        qty
+--   box_scanner           box_closed          boxes closed       items in those boxes
+--   year_season           box_closed          boxes closed       items in those boxes
+--   item_barcode          print_job           print jobs         labels printed
+--   box_code              print_job           print jobs         box codes printed
+--   box_segregate         lookup_found / lookup_not_found         lookups
+--   box_segregate_pallet  box_scanned / box_duplicate / box_not_found   scans
+--   price_check           lookup_found / lookup_not_found         lookups
+-- Users can only ADD to their own counters through log_usage(); nobody (not even the
+-- user themselves, not an enterprise admin) can read the table through the API. The
+-- platform owner reads it with the service-role key (weekly report script) or in the
+-- Supabase SQL editor (view usage_report).
+
+create table if not exists public.usage_daily (
+    user_id uuid not null references public.profiles(id) on delete cascade,
+    day date not null,
+    tool text not null,
+    action text not null,
+    enterprise_id uuid references public.enterprises(id) on delete set null,
+    event_count bigint not null default 0,
+    qty bigint not null default 0,
+    primary key (user_id, day, tool, action)
+);
+
+create index if not exists usage_daily_day_idx on public.usage_daily(day);
+
+alter table public.usage_daily enable row level security;   -- no policies: the API can never read or write it directly
+revoke all on public.usage_daily from anon, authenticated;
+
+create or replace function public.log_usage(p_tool text, p_action text, p_count integer, p_qty integer, p_day date default null)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_day date := coalesce(p_day, current_date);
+begin
+    if auth.uid() is null then
+        raise exception 'Not signed in';
+    end if;
+    if not ((p_tool || '/' || p_action) = any (array[
+        'box_scanner/box_closed', 'year_season/box_closed',
+        'item_barcode/print_job', 'box_code/print_job',
+        'box_segregate/lookup_found', 'box_segregate/lookup_not_found',
+        'box_segregate_pallet/box_scanned', 'box_segregate_pallet/box_duplicate', 'box_segregate_pallet/box_not_found',
+        'price_check/lookup_found', 'price_check/lookup_not_found'
+    ])) then
+        raise exception 'Invalid usage event: %/%', p_tool, p_action;
+    end if;
+    if p_count is null or p_count < 1 or p_count > 100000 or p_qty is null or p_qty < 0 or p_qty > 1000000 then
+        raise exception 'Invalid usage amounts';
+    end if;
+    -- the device's date is trusted only within a sane window (a tablet with a wrong clock cannot write far-away days)
+    if v_day > current_date + 1 or v_day < current_date - 60 then
+        v_day := current_date;
+    end if;
+
+    insert into public.usage_daily (user_id, day, tool, action, enterprise_id, event_count, qty)
+    values (auth.uid(), v_day, p_tool, p_action, public.current_user_enterprise_id(), p_count, p_qty)
+    on conflict (user_id, day, tool, action) do update
+        set event_count = public.usage_daily.event_count + excluded.event_count,
+            qty = public.usage_daily.qty + excluded.qty,
+            enterprise_id = excluded.enterprise_id;
+end;
+$$;
+
+grant execute on function public.log_usage(text, text, integer, integer, date) to authenticated;
+
+-- Readable report for the Supabase SQL editor (run as the project owner). Never exposed to the API.
+create or replace view public.usage_report as
+select u.day, p.email, p.display_name, e.name as enterprise, u.tool, u.action, u.event_count, u.qty
+from public.usage_daily u
+join public.profiles p on p.id = u.user_id
+left join public.enterprises e on e.id = u.enterprise_id;
+
+revoke all on public.usage_report from anon, authenticated;

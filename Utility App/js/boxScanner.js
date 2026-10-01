@@ -501,6 +501,9 @@ async function executeCloseBox() {
 
     try {
         const closedBox = ScannerState.currentBox;
+        const closedQty = ScannerState.scans
+            .filter(s => s.box_number === closedBox)
+            .reduce((n, s) => n + (s.qty || 1), 0);
         for (const scan of ScannerState.scans) {
             if (scan.box_number === closedBox && scan.box_status === 'Open') {
                 scan.box_status = 'Closed';
@@ -508,6 +511,7 @@ async function executeCloseBox() {
                 await updateScan(scan);
             }
         }
+        Usage.log('box_scanner', 'box_closed', 1, closedQty);
         if (closedBox) ScannerState.completedBoxes.add(closedBox);
         ScannerState.currentBox = null;
         ScannerState.boxScanning = false;

@@ -169,6 +169,7 @@ async function lookupPriceCheck() {
     if (!barcode) return;
 
     const row = await pcDbGet(barcode);
+    Usage.log('price_check', row ? 'lookup_found' : 'lookup_not_found', 1, 0);
     if (row) showPcResult(row);
     else     showPcNotFound(barcode);
 

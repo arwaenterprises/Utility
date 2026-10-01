@@ -180,6 +180,7 @@ async function printItemLabel() {
         
         await sleep(100);
         window.print();
+        Usage.log('item_barcode', 'print_job', 1, qty);
         
         showItemStatus('success', `✓ ${qty} label(s) sent to printer`);
         document.getElementById('itemBarcodeInput').value = '';
@@ -298,6 +299,7 @@ async function printFromCSV() {
         
         await sleep(100);
         window.print();
+        Usage.log('item_barcode', 'print_job', 1, totalLabels);
         showItemStatus('success', `✓ ${totalLabels} labels sent to printer`);
         PrintState.csvData = [];
         setTimeout(() => hideItemStatus(), 2000);
