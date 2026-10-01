@@ -34,6 +34,7 @@ A running, numbered backlog of everything discussed for this app, so it isn't ju
 19. Two account tiers:
     - **Single/individual user** — scans and sees only their own data
     - **Enterprise** — an enterprise admin oversees ~10–15 sub-users under their org, can view all their data, and can reset it
+    - **Decided:** self-serve at signup (user picks Individual or Enterprise, no approval needed); enterprise admin adds sub-users via email invite (sub-user clicks link, signs in with Google, auto-joins the enterprise); an Individual user can later upgrade/join an Enterprise (not locked in forever)
 20. All logged-in users (either tier) eventually see the same set of tools on the home screen (4–6 tools: Box Scanner, Item Barcode, Box Code, etc. — exact list TBD) — **but during the pilot phase, only Box Scanner is shown; other tiles stay hidden until each is migrated in turn**
 21. Fix the current data-isolation gap: today anyone with Google Sheet access can see all users' scanned data mixed together with no separation — Supabase migration must enforce per-user/per-enterprise data scoping (Row-Level Security)
 22. When a user or enterprise admin resets their data, it must be **actually deleted** from Supabase (not just hidden/flagged) to keep storage within free-tier limits while scaling toward 500 users
