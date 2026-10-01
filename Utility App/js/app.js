@@ -179,24 +179,58 @@ async function cancelInvite(inviteId) {
 // TEAM MODAL (unified management + scans; scales to thousands of rows by
 // computing stats server-side and fetching box/item detail only on demand,
 // instead of loading the whole team's scan history into the browser)
+//
+// Rendered as a spreadsheet-style nested table: Members -> Boxes -> Items,
+// each level expand/collapse in place (no drill-down popups), with a
+// download icon on every row so any slice of data can be exported on its own.
 // ============================================
 let teamMemberStatsCache = [];       // [{user_id, display_name, email, boxes_closed, total_qty}]
-const teamMemberBoxesCache = new Map(); // user_id -> [{box_number, status, items:[...]}] (lazy-loaded on expand)
+const teamMemberBoxesCache = new Map(); // user_id -> [{boxNumber, status, items:[...]}] (lazy-loaded on expand)
 const expandedMemberIds = new Set();
+const expandedBoxKeys = new Set();      // `${scope}:${ownerId}:${boxNumber}` where scope is 'member' or 'search'
 const selectedMemberIds = new Set();
 let teamSearchDebounceTimer = null;
-let teamSearchResultsCache = []; // rows from the last search_team_scans() call
+let teamSearchResultsCache = []; // flat rows from the last search_team_scans() call
 
 function teamMemberDisplayName(m) {
     return m.display_name || m.email || '—';
 }
 
+function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function exportScansToExcel(rows, filenamePrefix) {
+    if (!rows || rows.length === 0) {
+        alert('No data to download.');
+        return;
+    }
+    const sheetRows = rows.map(s => ({
+        'Scanned By': s.display_name || s.email || s.profiles?.display_name || s.profiles?.email || '—',
+        'Box Number': s.box_number,
+        'Barcode': s.barcode,
+        'Qty': s.qty,
+        'Status': s.box_status,
+        'Scanned At': new Date(s.scanned_at).toLocaleString()
+    }));
+    const ws = XLSX.utils.json_to_sheet(sheetRows);
+    ws['!cols'] = [{wch:20},{wch:12},{wch:20},{wch:5},{wch:8},{wch:18}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Team Scans');
+    XLSX.writeFile(wb, `${filenamePrefix}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
 async function openTeamModal() {
+    closeAccountModal();
+
     document.getElementById('teamSearchInput').value = '';
     document.getElementById('teamSearchResults').style.display = 'none';
     document.getElementById('teamSelectAllCheckbox').checked = false;
+    document.getElementById('teamSelectAllCheckbox').parentElement.style.display = 'flex';
+    document.getElementById('teamMemberList').style.display = 'block';
     selectedMemberIds.clear();
     expandedMemberIds.clear();
+    expandedBoxKeys.clear();
     teamMemberBoxesCache.clear();
 
     document.getElementById('teamMemberList').innerHTML = '<p style="font-size:13px; color: var(--ak-text-light);">Loading...</p>';
@@ -220,31 +254,103 @@ async function refreshTeamMemberStats() {
     renderTeamMemberList();
 }
 
+// Renders a nested box/item sub-table (shared by the member-expand path and
+// the search-results path) inside a <tr><td colspan="..."> row.
+function renderBoxTableHtml(boxes, scope, ownerId) {
+    if (!boxes || boxes.length === 0) {
+        return '<div class="team-table-empty">No scans</div>';
+    }
+    const rows = boxes.map(b => {
+        const key = `${scope}:${ownerId}:${b.boxNumber}`;
+        const isExpanded = expandedBoxKeys.has(key);
+        const rowsHtml = [`
+            <tr class="team-row">
+                <td style="width:30px;"><button class="expand-btn" data-expand-box="${key}">${isExpanded ? '−' : '+'}</button></td>
+                <td><strong>${escapeHtml(b.boxNumber)}</strong></td>
+                <td>${escapeHtml(b.status)}</td>
+                <td>${b.items.length}</td>
+                <td style="width:36px;"><button class="icon-btn" data-download-box="${key}" title="Download this box">⬇</button></td>
+            </tr>
+        `];
+        if (isExpanded) {
+            rowsHtml.push(`
+                <tr class="team-row">
+                    <td class="nested-cell" colspan="5">
+                        <div class="nested-table-wrap">
+                            <table class="team-table">
+                                <thead><tr><th>Barcode</th><th>By</th><th>Time</th></tr></thead>
+                                <tbody>
+                                    ${b.items.map(s => `
+                                        <tr class="team-row">
+                                            <td>${escapeHtml(s.barcode)}</td>
+                                            <td>${escapeHtml(s.display_name || s.email || '')}</td>
+                                            <td>${new Date(s.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+            `);
+        }
+        return rowsHtml.join('');
+    }).join('');
+
+    return `
+        <div class="nested-table-wrap">
+            <table class="team-table">
+                <thead><tr><th></th><th>Box Number</th><th>Status</th><th>Items</th><th></th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    `;
+}
+
 function renderTeamMemberList() {
     const listEl = document.getElementById('teamMemberList');
     if (teamMemberStatsCache.length === 0) {
-        listEl.innerHTML = '<div style="font-size: 13px; color: var(--ak-text-light);">No team members yet</div>';
+        listEl.innerHTML = '<div class="team-table-empty">No team members yet</div>';
         return;
     }
 
-    listEl.innerHTML = teamMemberStatsCache.map(m => {
+    const bodyRows = teamMemberStatsCache.map(m => {
         const isExpanded = expandedMemberIds.has(m.user_id);
         const isSelf = m.user_id === AppState.user?.id;
-        return `
-            <div class="box-group-row" style="display:flex; align-items:center; gap:8px; padding:10px; border:1px solid var(--ak-gray-200); border-radius:8px; margin-bottom:6px;">
-                <input type="checkbox" class="team-member-checkbox" data-member-id="${m.user_id}" ${selectedMemberIds.has(m.user_id) ? 'checked' : ''}>
-                <button class="delete-scan-btn" data-expand-member="${m.user_id}" style="flex-shrink:0;">${isExpanded ? '−' : '+'}</button>
-                <div style="flex:1; cursor:pointer;" data-expand-member="${m.user_id}">
-                    <strong>${teamMemberDisplayName(m)}</strong>
-                    <div style="font-size:12px; color: var(--ak-text-light);">${m.boxes_closed} boxes closed · ${m.total_qty} qty scanned</div>
-                </div>
-                ${isSelf ? '' : `<button class="delete-scan-btn" data-remove-member="${m.user_id}" title="Remove from team">✕</button>`}
-            </div>
-            <div class="member-detail" id="memberDetail_${m.user_id}" style="display:${isExpanded ? 'block' : 'none'}; margin: -2px 0 8px 32px;"></div>
-        `;
+        const rows = [`
+            <tr class="team-row">
+                <td style="width:26px;"><input type="checkbox" class="team-member-checkbox" data-member-id="${m.user_id}" ${selectedMemberIds.has(m.user_id) ? 'checked' : ''}></td>
+                <td style="width:30px;"><button class="expand-btn" data-expand-member="${m.user_id}">${isExpanded ? '−' : '+'}</button></td>
+                <td>${escapeHtml(teamMemberDisplayName(m))}</td>
+                <td>${m.boxes_closed}</td>
+                <td>${m.total_qty}</td>
+                <td style="width:36px;"><button class="icon-btn" data-download-member="${m.user_id}" title="Download this member's data">⬇</button></td>
+                <td style="width:36px;">${isSelf ? '' : `<button class="icon-btn icon-btn-danger" data-remove-member="${m.user_id}" title="Remove from team">✕</button>`}</td>
+            </tr>
+        `];
+        if (isExpanded) {
+            const boxes = teamMemberBoxesCache.get(m.user_id);
+            rows.push(`
+                <tr class="team-row">
+                    <td class="nested-cell" colspan="7">
+                        <div id="memberBoxes_${m.user_id}">${boxes ? renderBoxTableHtml(boxes, 'member', m.user_id) : '<p style="font-size:12px; color: var(--ak-text-light); padding:8px;">Loading...</p>'}</div>
+                    </td>
+                </tr>
+            `);
+        }
+        return rows.join('');
     }).join('');
 
-    expandedMemberIds.forEach(id => renderMemberBoxes(id));
+    listEl.innerHTML = `
+        <div class="team-table-scroll">
+            <table class="team-table">
+                <thead>
+                    <tr><th></th><th></th><th>Member</th><th>Boxes Closed</th><th>Qty Scanned</th><th></th><th></th></tr>
+                </thead>
+                <tbody>${bodyRows}</tbody>
+            </table>
+        </div>
+    `;
 }
 
 async function toggleMemberExpand(userId) {
@@ -257,9 +363,6 @@ async function toggleMemberExpand(userId) {
     renderTeamMemberList();
 
     if (!teamMemberBoxesCache.has(userId)) {
-        const detailEl = document.getElementById(`memberDetail_${userId}`);
-        if (detailEl) detailEl.innerHTML = '<p style="font-size:12px; color: var(--ak-text-light);">Loading...</p>';
-
         const { data, error } = await supabaseClient
             .from('scans')
             .select('id, barcode, box_number, box_status, qty, scanned_at')
@@ -271,8 +374,11 @@ async function toggleMemberExpand(userId) {
         if (error) {
             teamMemberBoxesCache.set(userId, []);
         } else {
+            const member = teamMemberStatsCache.find(m => m.user_id === userId);
+            const memberName = member ? teamMemberDisplayName(member) : '';
             const groups = new Map();
             (data || []).forEach(s => {
+                s.display_name = memberName;
                 if (!groups.has(s.box_number)) groups.set(s.box_number, []);
                 groups.get(s.box_number).push(s);
             });
@@ -280,33 +386,57 @@ async function toggleMemberExpand(userId) {
                 boxNumber, status: items[0].box_status, items
             })));
         }
+        renderTeamMemberList();
     }
-    renderMemberBoxes(userId);
 }
 
-function renderMemberBoxes(userId) {
-    const detailEl = document.getElementById(`memberDetail_${userId}`);
-    if (!detailEl) return;
-    const boxes = teamMemberBoxesCache.get(userId);
-    if (!boxes) return; // still loading
+function toggleBoxExpand(key) {
+    if (expandedBoxKeys.has(key)) expandedBoxKeys.delete(key);
+    else expandedBoxKeys.add(key);
 
-    if (boxes.length === 0) {
-        detailEl.innerHTML = '<p style="font-size:12px; color: var(--ak-text-light);">No scans yet</p>';
-        return;
+    // Both the member-expand path and the search-results path share this
+    // toggle; re-render whichever one is currently on screen.
+    if (document.getElementById('teamSearchResults').style.display !== 'none') {
+        renderTeamSearchResults();
+    } else {
+        renderTeamMemberList();
     }
-
-    detailEl.innerHTML = boxes.map(b => `
-        <div class="box-group-row" data-member="${userId}" data-box="${b.boxNumber}" style="display:flex; justify-content:space-between; align-items:center; padding:8px; border:1px solid var(--ak-gray-200); border-radius:6px; margin-bottom:4px; cursor:pointer; font-size:12px;">
-            <span><strong>${b.boxNumber}</strong> · ${b.status}</span>
-            <span>${b.items.length} items</span>
-        </div>
-    `).join('');
 }
 
 function toggleSelectAll(checked) {
     selectedMemberIds.clear();
     if (checked) teamMemberStatsCache.forEach(m => selectedMemberIds.add(m.user_id));
     renderTeamMemberList();
+}
+
+function downloadMemberData(userId) {
+    const boxes = teamMemberBoxesCache.get(userId);
+    const member = teamMemberStatsCache.find(m => m.user_id === userId);
+    const name = member ? teamMemberDisplayName(member) : userId;
+    if (boxes) {
+        exportScansToExcel(boxes.flatMap(b => b.items), `team_scans_${name.replace(/[^a-z0-9]/gi, '_')}`);
+        return;
+    }
+    // Not expanded yet (nothing cached) - fetch fresh for the download.
+    supabaseClient
+        .from('scans')
+        .select('id, barcode, box_number, box_status, qty, scanned_at')
+        .eq('enterprise_id', AppState.profile.enterprise_id)
+        .eq('user_id', userId)
+        .limit(5000)
+        .then(({ data, error }) => {
+            if (error) { alert(error.message); return; }
+            (data || []).forEach(s => { s.display_name = name; });
+            exportScansToExcel(data || [], `team_scans_${name.replace(/[^a-z0-9]/gi, '_')}`);
+        });
+}
+
+function downloadBoxData(key) {
+    const [scope, ownerId, boxNumber] = key.split(':');
+    const items = scope === 'member'
+        ? (teamMemberBoxesCache.get(ownerId) || []).find(b => b.boxNumber === boxNumber)?.items || []
+        : teamSearchResultsCache.filter(s => s.box_number === boxNumber);
+    exportScansToExcel(items, `box_${boxNumber.replace(/[^a-z0-9]/gi, '_')}`);
 }
 
 function runTeamSearch(term) {
@@ -334,32 +464,25 @@ async function executeTeamSearch(term) {
         return;
     }
     teamSearchResultsCache = data || [];
+    expandedBoxKeys.forEach(k => { if (k.startsWith('search:')) expandedBoxKeys.delete(k); });
+    renderTeamSearchResults();
+}
+
+function renderTeamSearchResults() {
+    const resultsEl = document.getElementById('teamSearchResults');
     if (teamSearchResultsCache.length === 0) {
-        resultsEl.innerHTML = '<p style="font-size:13px; color: var(--ak-text-light);">No matches</p>';
+        resultsEl.innerHTML = '<div class="team-table-empty">No matches</div>';
         return;
     }
-    resultsEl.innerHTML = teamSearchResultsCache.map(s => `
-        <div class="box-group-row" data-search-box="${s.box_number}" style="display:flex; justify-content:space-between; align-items:center; padding:8px; border:1px solid var(--ak-gray-200); border-radius:6px; margin-bottom:4px; cursor:pointer; font-size:12px;">
-            <span><strong>${s.box_number}</strong> · ${s.barcode} · ${s.display_name || s.email}</span>
-            <span>${s.box_status}</span>
-        </div>
-    `).join('');
-}
-
-function openBoxDetail(boxNumber, items) {
-    document.getElementById('boxDetailTitle').textContent = `Box ${boxNumber}`;
-    document.getElementById('boxDetailTableBody').innerHTML = items.map(s => `
-        <tr>
-            <td>${s.barcode}</td>
-            <td>${s.display_name || s.email || ''}</td>
-            <td>${new Date(s.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-        </tr>
-    `).join('') || '<tr><td colspan="3">No items</td></tr>';
-    document.getElementById('boxDetailModal').classList.add('active');
-}
-
-function closeBoxDetailModal() {
-    document.getElementById('boxDetailModal').classList.remove('active');
+    const groups = new Map();
+    teamSearchResultsCache.forEach(s => {
+        if (!groups.has(s.box_number)) groups.set(s.box_number, []);
+        groups.get(s.box_number).push(s);
+    });
+    const boxes = Array.from(groups.entries()).map(([boxNumber, items]) => ({
+        boxNumber, status: items[0].box_status, items
+    }));
+    resultsEl.innerHTML = renderBoxTableHtml(boxes, 'search', 'results');
 }
 
 async function fetchSelectedTeamScans() {
@@ -383,24 +506,7 @@ async function downloadSelectedTeamData() {
     }
     const data = await fetchSelectedTeamScans();
     if (!data) return;
-    if (data.length === 0) {
-        alert('No scans found for the selected members.');
-        return;
-    }
-
-    const rows = data.map(s => ({
-        'Scanned By': s.profiles?.display_name || s.profiles?.email || '—',
-        'Box Number': s.box_number,
-        'Barcode': s.barcode,
-        'Qty': s.qty,
-        'Status': s.box_status,
-        'Scanned At': new Date(s.scanned_at).toLocaleString()
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{wch:20},{wch:12},{wch:20},{wch:5},{wch:8},{wch:18}];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Team Scans');
-    XLSX.writeFile(wb, `team_scans_${new Date().toISOString().slice(0,10)}.xlsx`);
+    exportScansToExcel(data, 'team_scans');
 }
 
 async function resetSelectedTeamData() {
@@ -412,21 +518,7 @@ async function resetSelectedTeamData() {
 
     const data = await fetchSelectedTeamScans();
     if (!data) return;
-    if (data.length > 0) {
-        const rows = data.map(s => ({
-            'Scanned By': s.profiles?.display_name || s.profiles?.email || '—',
-            'Box Number': s.box_number,
-            'Barcode': s.barcode,
-            'Qty': s.qty,
-            'Status': s.box_status,
-            'Scanned At': new Date(s.scanned_at).toLocaleString()
-        }));
-        const ws = XLSX.utils.json_to_sheet(rows);
-        ws['!cols'] = [{wch:20},{wch:12},{wch:20},{wch:5},{wch:8},{wch:18}];
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Team Scans');
-        XLSX.writeFile(wb, `team_scans_reset_${new Date().toISOString().slice(0,10)}.xlsx`);
-    }
+    if (data.length > 0) exportScansToExcel(data, 'team_scans_reset');
 
     const ids = Array.from(selectedMemberIds);
     const { error } = await supabaseClient
@@ -611,7 +703,6 @@ function setupEventListeners() {
     document.getElementById('acceptInviteBtn').addEventListener('click', acceptMyInvite);
     document.getElementById('openTeamModalBtn').addEventListener('click', openTeamModal);
     document.getElementById('closeTeamBtn').addEventListener('click', closeTeamModal);
-    document.getElementById('closeBoxDetailBtn').addEventListener('click', closeBoxDetailModal);
     document.getElementById('pendingInvitesList').addEventListener('click', (e) => {
         const id = e.target.dataset.cancelInvite;
         if (id) cancelInvite(id);
@@ -632,26 +723,21 @@ function setupEventListeners() {
         }
         const removeId = e.target.dataset.removeMember;
         if (removeId) { removeMember(removeId); return; }
-        const expandTarget = e.target.closest('[data-expand-member]');
-        if (expandTarget) toggleMemberExpand(expandTarget.dataset.expandMember);
-    });
-
-    document.getElementById('teamMemberList').addEventListener('click', (e) => {
-        const boxRow = e.target.closest('[data-member][data-box]');
-        if (!boxRow) return;
-        const userId = boxRow.dataset.member;
-        const boxNumber = boxRow.dataset.box;
-        const boxes = teamMemberBoxesCache.get(userId) || [];
-        const box = boxes.find(b => b.boxNumber === boxNumber);
-        if (box) openBoxDetail(boxNumber, box.items.map(i => ({ ...i, display_name: teamMemberDisplayName(teamMemberStatsCache.find(m => m.user_id === userId) || {}) })));
+        const downloadMemberId = e.target.dataset.downloadMember;
+        if (downloadMemberId) { downloadMemberData(downloadMemberId); return; }
+        const downloadBoxKey = e.target.dataset.downloadBox;
+        if (downloadBoxKey) { downloadBoxData(downloadBoxKey); return; }
+        const expandBoxKey = e.target.dataset.expandBox;
+        if (expandBoxKey) { toggleBoxExpand(expandBoxKey); return; }
+        const expandMemberTarget = e.target.closest('[data-expand-member]');
+        if (expandMemberTarget) toggleMemberExpand(expandMemberTarget.dataset.expandMember);
     });
 
     document.getElementById('teamSearchResults').addEventListener('click', (e) => {
-        const row = e.target.closest('[data-search-box]');
-        if (!row) return;
-        const boxNumber = row.dataset.searchBox;
-        const items = teamSearchResultsCache.filter(s => s.box_number === boxNumber);
-        openBoxDetail(boxNumber, items);
+        const downloadBoxKey = e.target.dataset.downloadBox;
+        if (downloadBoxKey) { downloadBoxData(downloadBoxKey); return; }
+        const expandBoxKey = e.target.dataset.expandBox;
+        if (expandBoxKey) toggleBoxExpand(expandBoxKey);
     });
 }
 

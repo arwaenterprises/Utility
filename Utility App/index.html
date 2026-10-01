@@ -61,9 +61,9 @@
 
     <!-- TEAM MODAL (unified management + scans, scales to thousands of rows) -->
     <div class="modal-overlay" id="teamModal">
-        <div class="modal" style="max-width: 560px;">
+        <div class="modal" style="max-width: 720px;">
             <h3 class="modal-title">👥 Team</h3>
-            <div class="modal-body" style="text-align: left; max-height: 70vh; overflow-y: auto;">
+            <div class="modal-body" style="text-align: left; max-height: 75vh; overflow-y: auto;">
                 <div class="settings-section" id="teamInviteSection">
                     <h4>Invite a Teammate</h4>
                     <input type="email" id="inviteEmailInput" class="form-input" placeholder="teammate@email.com" style="margin-bottom: 10px;">
@@ -75,8 +75,8 @@
                     <input type="text" id="teamSearchInput" class="form-input" placeholder="🔍 Search box number, user, or item...">
                 </div>
 
-                <div class="settings-section">
-                    <label style="display:flex; align-items:center; gap:8px; margin-bottom: 10px; font-weight: 600;">
+                <div class="settings-section" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
+                    <label style="display:flex; align-items:center; gap:8px; margin-bottom: 8px; font-weight: 600; font-size: 13px;">
                         <input type="checkbox" id="teamSelectAllCheckbox"> <span>Select All</span>
                     </label>
                     <div id="teamMemberList"></div>
@@ -84,31 +84,9 @@
                 </div>
             </div>
             <div class="modal-buttons">
-                <button class="btn btn-secondary" id="downloadTeamSelectedBtn">Download</button>
-                <button class="btn btn-secondary" id="resetTeamSelectedBtn" style="background: var(--ak-danger); color: white; border: none;">Reset</button>
+                <button class="btn btn-secondary" id="downloadTeamSelectedBtn">⬇ Download Selected</button>
+                <button class="btn btn-secondary" id="resetTeamSelectedBtn" style="background: var(--ak-danger); color: white; border: none;">Reset Selected</button>
                 <button class="btn btn-primary" id="closeTeamBtn">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- BOX DETAIL MODAL (drill-down from Team Scans) -->
-    <div class="modal-overlay" id="boxDetailModal">
-        <div class="modal" style="max-width: 460px;">
-            <h3 class="modal-title">📦 <span id="boxDetailTitle"></span></h3>
-            <div class="modal-body" style="text-align: left; max-height: 55vh; overflow-y: auto;">
-                <table class="scans-table" style="width: 100%;">
-                    <thead>
-                        <tr>
-                            <th>Barcode</th>
-                            <th>By</th>
-                            <th>Time</th>
-                        </tr>
-                    </thead>
-                    <tbody id="boxDetailTableBody"></tbody>
-                </table>
-            </div>
-            <div class="modal-buttons">
-                <button class="btn btn-primary btn-block" id="closeBoxDetailBtn">Back</button>
             </div>
         </div>
     </div>
@@ -1009,15 +987,15 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=17"></script>
-    <script src="js/supabaseClient.js?v=17"></script>
-    <script src="js/app.js?v=17"></script>
-    <script src="js/boxScanner.js?v=17"></script>
-    <script src="js/itemBarcode.js?v=17"></script>
-    <script src="js/boxCode.js?v=17"></script>
-    <script src="js/photoCapture.js?v=17"></script>
-    <script src="js/boxSegregate.js?v=17"></script>
-    <script src="js/priceCheck.js?v=17"></script>
-    <script src="js/yearSegregate.js?v=17"></script>
+    <script src="js/config.js?v=18"></script>
+    <script src="js/supabaseClient.js?v=18"></script>
+    <script src="js/app.js?v=18"></script>
+    <script src="js/boxScanner.js?v=18"></script>
+    <script src="js/itemBarcode.js?v=18"></script>
+    <script src="js/boxCode.js?v=18"></script>
+    <script src="js/photoCapture.js?v=18"></script>
+    <script src="js/boxSegregate.js?v=18"></script>
+    <script src="js/priceCheck.js?v=18"></script>
+    <script src="js/yearSegregate.js?v=18"></script>
 </body>
 </html>

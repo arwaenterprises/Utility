@@ -889,6 +889,108 @@ body.rtl { direction: rtl; }
 
 .delete-scan-btn:hover { background: #c82333; }
 
+/* ============================================
+   TEAM TABLE (spreadsheet-style nested expand/collapse)
+   ============================================ */
+.team-table-scroll {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--ak-gray-200);
+    border-radius: 8px;
+}
+
+.team-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.team-table th {
+    position: sticky;
+    top: 0;
+    background: var(--ak-maroon);
+    color: var(--ak-white);
+    padding: 8px 6px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+}
+
+.team-table td {
+    padding: 7px 6px;
+    border-bottom: 1px solid var(--ak-gray-200);
+    vertical-align: middle;
+}
+
+.team-table > tbody > tr.team-row:hover { background: var(--ak-cream-light); }
+.team-table > tbody > tr.team-row:nth-child(4n+1) { background: rgba(0,0,0,0.015); }
+
+.team-table .nested-cell {
+    padding: 0 !important;
+    border-bottom: none;
+}
+
+.nested-table-wrap {
+    margin: 0 0 6px 20px;
+    border-left: 3px solid var(--ak-maroon-light);
+    background: var(--ak-cream-light);
+}
+
+.nested-table-wrap .team-table th {
+    background: var(--ak-maroon-light);
+    font-size: 10px;
+}
+
+.nested-table-wrap .nested-table-wrap {
+    background: var(--ak-white);
+}
+
+.icon-btn {
+    background: none;
+    border: 1px solid var(--ak-gray-300);
+    color: var(--ak-maroon);
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+}
+
+.icon-btn:hover { background: var(--ak-cream-light); border-color: var(--ak-maroon); }
+
+.icon-btn.icon-btn-danger { color: var(--ak-danger); }
+.icon-btn.icon-btn-danger:hover { background: #fdecea; border-color: var(--ak-danger); }
+
+.expand-btn {
+    background: var(--ak-maroon);
+    color: var(--ak-white);
+    border: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.expand-btn:hover { background: var(--ak-maroon-dark); }
+
+.team-table-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--ak-text-light);
+    font-size: 13px;
+}
+
 .action-row {
     display: flex;
     gap: 10px;
