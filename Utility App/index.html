@@ -26,9 +26,40 @@
         <div class="header-logo">U</div>
         <h1 class="header-title">Utility</h1>
         <div class="header-store" id="headerUser"></div>
+        <button class="btn-signout" id="accountBtn" title="Account">👤</button>
         <button class="btn-signout" id="signOutBtn" title="Sign out">⎋</button>
         <div class="online-status online" id="onlineStatus">Online</div>
     </header>
+
+    <!-- ACCOUNT MODAL -->
+    <div class="modal-overlay" id="accountModal">
+        <div class="modal">
+            <h3 class="modal-title">👤 Account</h3>
+            <div class="modal-body" style="text-align: left;">
+                <div class="settings-section">
+                    <p><strong id="accountEmailDisp"></strong></p>
+                    <p id="accountTierDisp" style="color: var(--ak-text-light); font-size: 13px;"></p>
+                </div>
+
+                <div class="settings-section" id="createEnterpriseSection" style="display:none;">
+                    <h4>Create an Enterprise</h4>
+                    <p style="font-size: 13px; color: var(--ak-text-light); margin-bottom: 10px;">Manage a team and see their scans.</p>
+                    <input type="text" id="enterpriseNameInput" class="form-input" placeholder="Enterprise name" style="margin-bottom: 10px;">
+                    <button class="btn btn-primary btn-block" id="createEnterpriseBtn">Create</button>
+                </div>
+
+                <div class="settings-section" id="inviteTeammateSection" style="display:none;">
+                    <h4>Invite a Teammate</h4>
+                    <input type="email" id="inviteEmailInput" class="form-input" placeholder="teammate@email.com" style="margin-bottom: 10px;">
+                    <button class="btn btn-primary btn-block" id="sendInviteBtn">Send Invite</button>
+                    <div id="pendingInvitesList" style="margin-top: 12px;"></div>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-primary btn-block" id="closeAccountBtn">Close</button>
+            </div>
+        </div>
+    </div>
 
     <!-- MAIN CONTAINER -->
     <main class="main-container">
@@ -62,7 +93,16 @@
                 </div>
                 <button class="session-banner-btn" id="goToSessionBtn">Go to Scanner</button>
             </div>
-            
+
+            <div class="session-banner" id="inviteBanner" style="display:none;">
+                <span class="session-banner-icon">✉️</span>
+                <div class="session-banner-text">
+                    <strong>You've been invited</strong>
+                    <span id="inviteBannerInfo">Join an enterprise</span>
+                </div>
+                <button class="session-banner-btn" id="acceptInviteBtn">Accept</button>
+            </div>
+
             <div class="app-grid" id="appGrid"></div>
         </div>
 
@@ -917,15 +957,15 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=11"></script>
-    <script src="js/supabaseClient.js?v=11"></script>
-    <script src="js/app.js?v=11"></script>
-    <script src="js/boxScanner.js?v=11"></script>
-    <script src="js/itemBarcode.js?v=11"></script>
-    <script src="js/boxCode.js?v=11"></script>
-    <script src="js/photoCapture.js?v=11"></script>
-    <script src="js/boxSegregate.js?v=11"></script>
-    <script src="js/priceCheck.js?v=11"></script>
-    <script src="js/yearSegregate.js?v=11"></script>
+    <script src="js/config.js?v=13"></script>
+    <script src="js/supabaseClient.js?v=13"></script>
+    <script src="js/app.js?v=13"></script>
+    <script src="js/boxScanner.js?v=13"></script>
+    <script src="js/itemBarcode.js?v=13"></script>
+    <script src="js/boxCode.js?v=13"></script>
+    <script src="js/photoCapture.js?v=13"></script>
+    <script src="js/boxSegregate.js?v=13"></script>
+    <script src="js/priceCheck.js?v=13"></script>
+    <script src="js/yearSegregate.js?v=13"></script>
 </body>
 </html>

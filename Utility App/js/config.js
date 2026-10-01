@@ -30,6 +30,7 @@ const APPS = [
 const AppState = {
     user: null,
     profile: null,
+    pendingInviteToken: null,
     currentApp: null,
     currentScreen: 'loginScreen',
     hasActiveSession: false,

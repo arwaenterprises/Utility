@@ -104,6 +104,18 @@ as $$
     select coalesce((select tier = 'enterprise_admin' from public.profiles where id = auth.uid()), false);
 $$;
 
+create or replace function public.current_user_email()
+returns text
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select email from auth.users where id = auth.uid();
+$$;
+
+grant execute on function public.current_user_email() to authenticated;
+
 -- ============================================
 -- CONTROLLED TIER/ENTERPRISE TRANSITIONS
 -- ============================================
@@ -248,6 +260,12 @@ create policy "invites_all_admin" on public.enterprise_invites for all
         and public.current_user_is_enterprise_admin()
         and invited_by = auth.uid()
     );
+
+-- An invited (not-yet-member) user needs to be able to see their own pending
+-- invite to accept it - the policy above only covers the inviting admin.
+drop policy if exists "invites_select_invitee" on public.enterprise_invites;
+create policy "invites_select_invitee" on public.enterprise_invites for select
+    using (lower(invited_email) = lower(public.current_user_email()));
 
 -- scans — own rows always visible/writable; enterprise admin also gets their team's rows
 drop policy if exists "scans_select_own" on public.scans;

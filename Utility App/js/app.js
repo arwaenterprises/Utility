@@ -65,6 +65,7 @@ async function enterAppAsSignedInUser(session) {
     await loadUserProfile();
     updateHeaderUser();
     checkExistingSession();
+    await checkForMyPendingInvite();
     showScreen('homeScreen');
     renderAppGrid();
 }
@@ -77,14 +78,118 @@ function showError(element, message) {
 function updateHeaderUser() {
     const el = document.getElementById('headerUser');
     const signOutBtn = document.getElementById('signOutBtn');
+    const accountBtn = document.getElementById('accountBtn');
     if (AppState.user) {
         el.textContent = AppState.profile?.display_name || AppState.user.email;
         el.classList.add('show');
         signOutBtn.classList.add('show');
+        accountBtn.classList.add('show');
     } else {
         el.classList.remove('show');
         signOutBtn.classList.remove('show');
+        accountBtn.classList.remove('show');
     }
+}
+
+// ============================================
+// ACCOUNT / ENTERPRISE
+// ============================================
+function tierDisplayText(profile) {
+    if (!profile) return '';
+    if (profile.tier === 'enterprise_admin') return 'Enterprise Admin';
+    if (profile.tier === 'enterprise_member') return 'Enterprise Member';
+    return 'Individual';
+}
+
+async function openAccountModal() {
+    document.getElementById('accountEmailDisp').textContent = AppState.user?.email || '';
+    document.getElementById('accountTierDisp').textContent = tierDisplayText(AppState.profile);
+
+    const isIndividual = AppState.profile?.tier === 'individual';
+    const isAdmin = AppState.profile?.tier === 'enterprise_admin';
+    document.getElementById('createEnterpriseSection').style.display = isIndividual ? 'block' : 'none';
+    document.getElementById('inviteTeammateSection').style.display = isAdmin ? 'block' : 'none';
+
+    if (isAdmin) await loadPendingInvitesList();
+
+    document.getElementById('accountModal').classList.add('active');
+}
+
+function closeAccountModal() {
+    document.getElementById('accountModal').classList.remove('active');
+}
+
+async function createEnterprise() {
+    const name = document.getElementById('enterpriseNameInput').value.trim();
+    if (!name) return;
+    const { error } = await supabaseClient.rpc('create_enterprise', { enterprise_name: name });
+    if (error) {
+        alert(error.message);
+        return;
+    }
+    await loadUserProfile();
+    updateHeaderUser();
+    document.getElementById('enterpriseNameInput').value = '';
+    await openAccountModal();
+}
+
+async function sendInvite() {
+    const email = document.getElementById('inviteEmailInput').value.trim();
+    if (!email) return;
+    const { error } = await supabaseClient.from('enterprise_invites').insert({
+        enterprise_id: AppState.profile.enterprise_id,
+        invited_email: email,
+        invited_by: AppState.user.id
+    });
+    if (error) {
+        alert(error.message);
+        return;
+    }
+    document.getElementById('inviteEmailInput').value = '';
+    await loadPendingInvitesList();
+}
+
+async function loadPendingInvitesList() {
+    const listEl = document.getElementById('pendingInvitesList');
+    const { data, error } = await supabaseClient
+        .from('enterprise_invites')
+        .select('invited_email, status')
+        .eq('enterprise_id', AppState.profile.enterprise_id)
+        .order('created_at', { ascending: false });
+    if (error) {
+        listEl.textContent = '';
+        return;
+    }
+    listEl.innerHTML = data.map(inv =>
+        `<div style="font-size: 13px; padding: 4px 0;">${inv.invited_email} — ${inv.status}</div>`
+    ).join('') || '<div style="font-size: 13px; color: var(--ak-text-light);">No invites yet</div>';
+}
+
+async function checkForMyPendingInvite() {
+    if (AppState.profile?.tier !== 'individual') return;
+    const { data, error } = await supabaseClient
+        .from('enterprise_invites')
+        .select('token')
+        .eq('status', 'pending')
+        .ilike('invited_email', AppState.user.email)
+        .limit(1)
+        .maybeSingle();
+    if (error || !data) return;
+    AppState.pendingInviteToken = data.token;
+    document.getElementById('inviteBanner').style.display = 'flex';
+}
+
+async function acceptMyInvite() {
+    if (!AppState.pendingInviteToken) return;
+    const { error } = await supabaseClient.rpc('accept_enterprise_invite', { invite_token: AppState.pendingInviteToken });
+    if (error) {
+        alert(error.message);
+        return;
+    }
+    AppState.pendingInviteToken = null;
+    document.getElementById('inviteBanner').style.display = 'none';
+    await loadUserProfile();
+    updateHeaderUser();
 }
 
 // ============================================
@@ -205,6 +310,11 @@ function setupEventListeners() {
     document.getElementById('signOutBtn').addEventListener('click', signOut);
     document.getElementById('appBackBtn').addEventListener('click', goToHome);
     document.getElementById('goToSessionBtn').addEventListener('click', () => { if (AppState.activeSessionApp) openApp(AppState.activeSessionApp); });
+    document.getElementById('accountBtn').addEventListener('click', openAccountModal);
+    document.getElementById('closeAccountBtn').addEventListener('click', closeAccountModal);
+    document.getElementById('createEnterpriseBtn').addEventListener('click', createEnterprise);
+    document.getElementById('sendInviteBtn').addEventListener('click', sendInvite);
+    document.getElementById('acceptInviteBtn').addEventListener('click', acceptMyInvite);
 }
 
 // ============================================
