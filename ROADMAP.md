@@ -170,4 +170,4 @@ All three tools are off Google Sheets / Apps Script and on Supabase. **Built and
 
 Independent of the phases above: item 41 (Privacy Policy/Terms on the main domain) can be done any time — it isn't blocking any phase.
 
-73. Trust pages — ✅ **done (v38)**: login page now describes the tools, Arwa Enterprises (India & GCC), data & security summary and links to public About & Contact, Privacy, Terms and Security pages (drafts, not legal advice — have a lawyer review Privacy/Terms). Data statement: "stays until you delete it". Still to do: Google OAuth consent-screen verification (use these page URLs), GitHub Dependabot/secret scanning.
+73. Trust pages — ✅ **done (v38-39)**: login page now describes the tools, Arwa Enterprises (India & GCC), data & security summary and links to public About & Contact, Privacy, Terms and Security pages (drafts, not legal advice — have a lawyer review Privacy/Terms). Data statement: "stays until you delete it". Still to do: Google OAuth consent-screen verification (use these page URLs), GitHub Dependabot/secret scanning.

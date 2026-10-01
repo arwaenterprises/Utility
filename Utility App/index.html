@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=38"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=38"></script>
-    <script src="vendor/qrcode.min.js?v=38"></script>
-    <script src="vendor/html5-qrcode.min.js?v=38"></script>
-    <script src="vendor/supabase.js?v=38"></script>
+    <script src="vendor/xlsx.full.min.js?v=39"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=39"></script>
+    <script src="vendor/qrcode.min.js?v=39"></script>
+    <script src="vendor/html5-qrcode.min.js?v=39"></script>
+    <script src="vendor/supabase.js?v=39"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -125,8 +125,14 @@
 
         <!-- SCREEN: Login -->
         <div id="loginScreen" class="screen active">
+            <div class="login-hero">
+                <img src="icons/icon-192.png" alt="Utility logo" width="72" height="72">
+                <h1>Utility</h1>
+                <p>Warehouse &amp; store tools for any phone, tablet or computer &mdash; even offline.</p>
+            </div>
+
             <div class="card">
-                <h2 class="card-title">👋 Welcome</h2>
+                <h2 class="card-title">Welcome</h2>
                 <p class="card-subtitle">Sign in to access your tools</p>
 
                 <div class="error-msg" id="loginError"></div>
@@ -136,25 +142,39 @@
                 </button>
             </div>
 
+            <div class="trust-row">
+                <div class="trust-badge"><span class="tb-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg></span><span class="tb-t">Google sign-in</span><span class="tb-s">We never see your password</span></div>
+                <a class="trust-badge" href="https://www.ssllabs.com/ssltest/analyze.html?d=utility.arwaenterprises.com" target="_blank" rel="noopener"><span class="tb-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><span class="tb-t">HTTPS: grade A+</span><span class="tb-s">SSL Labs, 1 Oct 2026 &#8599;</span></a>
+                <a class="trust-badge" href="https://transparencyreport.google.com/safe-browsing/search?url=https%3A%2F%2Futility.arwaenterprises.com" target="_blank" rel="noopener"><span class="tb-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></span><span class="tb-t">Safe Browsing: clean</span><span class="tb-s">Google, 1 Oct 2026 &#8599;</span></a>
+                <div class="trust-badge"><span class="tb-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/></svg></span><span class="tb-t">No ads, no tracking</span><span class="tb-s">Your data stays until you delete it</span></div>
+            </div>
+
             <div class="card login-info">
-                <h3>What is Utility?</h3>
-                <p>Simple warehouse and store tools that work on phones, tablets and computers &mdash; even when the internet drops. Built and run by <strong>Arwa Enterprises</strong> (India &amp; GCC).</p>
-                <ul>
-                    <li>&#128230; <strong>Box Scanner</strong> &ndash; scan items into boxes</li>
-                    <li>&#128269; <strong>Box Segregate</strong> &ndash; look up boxes, check pallets</li>
-                    <li>&#128176; <strong>Price Check</strong> &ndash; scan an item, see its price</li>
-                    <li>&#128450;&#65039; <strong>Year/Season Sort</strong> &ndash; sort items into boxes</li>
-                    <li>&#127991;&#65039; <strong>Item Barcode</strong> &amp; &#128424;&#65039; <strong>Box Labels</strong> &ndash; print labels</li>
-                </ul>
-                <h3>Your data and security</h3>
-                <ul>
-                    <li>You sign in on Google's own page &mdash; we never see your password.</li>
-                    <li>Connection is HTTPS only; you see only your own data (and your team's, if you join one).</li>
-                    <li>No ads or tracking in the app. Your data stays until you delete it.</li>
-                </ul>
-                <p class="login-links">
-                    <a href="about.html">About &amp; Contact</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="terms.html">Terms</a> &middot; <a href="security.html">Security</a>
-                </p>
+                <h3>Six tools, one login</h3>
+                <div class="tool-grid">
+                    <div class="tool-chip"><span class="tool-ico">&#128230;</span><b>Box Scanner</b><small>Scan items into boxes</small></div>
+                    <div class="tool-chip"><span class="tool-ico">&#128269;</span><b>Box Segregate</b><small>Look up boxes, check pallets</small></div>
+                    <div class="tool-chip"><span class="tool-ico">&#128176;</span><b>Price Check</b><small>Scan an item, see its price</small></div>
+                    <div class="tool-chip"><span class="tool-ico">&#128450;&#65039;</span><b>Year/Season Sort</b><small>Sort items into boxes</small></div>
+                    <div class="tool-chip"><span class="tool-ico">&#127991;&#65039;</span><b>Item Barcode</b><small>Print item labels</small></div>
+                    <div class="tool-chip"><span class="tool-ico">&#128424;&#65039;</span><b>Box Labels</b><small>Print box labels</small></div>
+                </div>
+            </div>
+
+            <div class="card login-info">
+                <h3>How it works</h3>
+                <div class="steps">
+                    <div class="step"><span class="step-n">1</span><b>Sign in</b><small>with your Google account</small></div>
+                    <div class="step"><span class="step-n">2</span><b>Pick a tool</b><small>scan, look up or print</small></div>
+                    <div class="step"><span class="step-n">3</span><b>Works offline</b><small>syncs when you are back online</small></div>
+                </div>
+            </div>
+
+            <div class="login-foot">
+                <p>Built and run by <strong>Arwa Enterprises</strong> &middot; India &amp; GCC</p>
+                <p><a href="mailto:connect.arwaenterprises@gmail.com">connect.arwaenterprises@gmail.com</a></p>
+                <p class="login-links"><a href="about.html">About &amp; Contact</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="terms.html">Terms</a> &middot; <a href="security.html">Security</a></p>
+                <p class="login-checked">Badges with &#8599; open the public check, so you can verify them yourself.</p>
             </div>
         </div>
 
@@ -1014,17 +1034,17 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=38"></script>
-    <script src="js/supabaseClient.js?v=38"></script>
-    <script src="js/lists.js?v=38"></script>
-    <script src="js/usage.js?v=38"></script>
-    <script src="js/syncstatus.js?v=38"></script>
-    <script src="js/app.js?v=38"></script>
-    <script src="js/boxScanner.js?v=38"></script>
-    <script src="js/itemBarcode.js?v=38"></script>
-    <script src="js/boxCode.js?v=38"></script>
-    <script src="js/boxSegregate.js?v=38"></script>
-    <script src="js/priceCheck.js?v=38"></script>
-    <script src="js/yearSegregate.js?v=38"></script>
+    <script src="js/config.js?v=39"></script>
+    <script src="js/supabaseClient.js?v=39"></script>
+    <script src="js/lists.js?v=39"></script>
+    <script src="js/usage.js?v=39"></script>
+    <script src="js/syncstatus.js?v=39"></script>
+    <script src="js/app.js?v=39"></script>
+    <script src="js/boxScanner.js?v=39"></script>
+    <script src="js/itemBarcode.js?v=39"></script>
+    <script src="js/boxCode.js?v=39"></script>
+    <script src="js/boxSegregate.js?v=39"></script>
+    <script src="js/priceCheck.js?v=39"></script>
+    <script src="js/yearSegregate.js?v=39"></script>
 </body>
 </html>
