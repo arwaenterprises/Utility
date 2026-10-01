@@ -25,8 +25,9 @@ function newScanUid() {
 const REF_LISTS = {
     box_list: {
         label: 'box list',
+        unique: 'box_number',        // a box number may appear only once
         columns: [
-            { key: 'box_number', required: true },
+            { key: 'box_number', required: true, aliases: ['box_code', 'box_id', 'box_no'] },
             { key: 'trn' }, { key: 'increff_order_id' }, { key: 'store_name' },
             { key: 'region' }, { key: 'store_code' }, { key: 'brand' }
         ]
@@ -50,10 +51,13 @@ const REF_LISTS = {
         ]
     },
     doc_boxes: {
-        label: 'document / box list',
+        label: 'TRN / box list',
+        unique: 'box_number',        // a box can only go on one pallet, so each number may appear once
+        strict: true,                // all three columns are mandatory: an incomplete row stops the upload
         columns: [
-            { key: 'document_number', required: true },
-            { key: 'box_number', required: true },
+            // stored as document_number (older uploads use that name); shown to users as TRN#
+            { key: 'document_number', label: 'TRN#', required: true, aliases: ['trn', 'trn_number', 'transfer_number', 'document', 'doc_number'] },
+            { key: 'box_number', required: true, aliases: ['box_code', 'box_id', 'box_no'] },
             { key: 'store_name', required: true }
         ]
     }
@@ -141,8 +145,9 @@ async function refParseFile(file, listType) {
     const colIndex = {};
     const missing = [];
     def.columns.forEach(c => {
-        const idx = headerIdx[refNormalizeHeader(c.key)];
-        if (idx === undefined) { if (c.required) missing.push(c.key); }
+        const names = [c.key, c.label].concat(c.aliases || []).filter(Boolean).map(refNormalizeHeader);
+        const idx = names.map(n => headerIdx[n]).find(i => i !== undefined);
+        if (idx === undefined) { if (c.required) missing.push(refHeaderLabel(c)); }
         else colIndex[c.key] = idx;
     });
     if (missing.length) {
@@ -150,6 +155,8 @@ async function refParseFile(file, listType) {
     }
 
     const rows = [];
+    const rowNumbers = [];      // spreadsheet row number of each kept record (row 1 = headers)
+    const incomplete = [];      // strict lists: rows with a missing mandatory value
     let skipped = 0;
     for (let i = 1; i < sheetRows.length; i++) {
         const rec = {};
@@ -157,27 +164,51 @@ async function refParseFile(file, listType) {
             const idx = colIndex[c.key];
             rec[c.key] = idx === undefined ? '' : String(sheetRows[i][idx] == null ? '' : sheetRows[i][idx]).trim();
         });
-        if (def.columns.some(c => c.required && !rec[c.key])) { skipped++; continue; }
+        const missingCols = def.columns.filter(c => c.required && !rec[c.key]);
+        if (missingCols.length) {
+            if (def.strict) incomplete.push('row ' + (i + 1) + ' (missing ' + missingCols.map(refHeaderLabel).join(', ') + ')');
+            else skipped++;
+            continue;
+        }
         rows.push(rec);
+        rowNumbers.push(i + 1);
+    }
+    if (incomplete.length) {
+        return { rows: [], error: 'Upload stopped: every row needs ' + def.columns.map(refHeaderLabel).join(', ') + '.\n' +
+            incomplete.length + ' row(s) are incomplete: ' + incomplete.slice(0, 10).join('; ') + (incomplete.length > 10 ? '; ...' : '') };
     }
     if (rows.length === 0) return { rows: [], error: 'No usable rows found in the file.' };
-    return { rows, skipped };
+
+    // Duplicate check (before anything is uploaded): the same value twice in the key column.
+    const duplicates = [];
+    if (def.unique) {
+        const seen = new Map();
+        rows.forEach((r, n) => {
+            const k = r[def.unique].toLowerCase();
+            if (!seen.has(k)) seen.set(k, { value: r[def.unique], rows: [] });
+            seen.get(k).rows.push(rowNumbers[n]);
+        });
+        seen.forEach(v => { if (v.rows.length > 1) duplicates.push(v); });
+    }
+    return { rows, skipped, duplicates };
 }
 
 // ------------------------------------------------
 // Template download: an Excel file with the right column headers
 // ------------------------------------------------
 const REF_HEADER_WORDS = { id: 'ID', trn: 'TRN', ptl: 'PTL' };
-function refHeaderLabel(key) {
+function refHeaderLabel(colOrKey) {
+    if (colOrKey && colOrKey.label) return colOrKey.label;
+    const key = typeof colOrKey === 'string' ? colOrKey : colOrKey.key;
     return key.split('_').map(w => REF_HEADER_WORDS[w] || (w.charAt(0).toUpperCase() + w.slice(1))).join(' ');
 }
 
 const REF_TEMPLATE_NOTES = {
-    box_list: ['Box Number is required. Everything else is optional.'],
+    box_list: ['Box Number is required (a column called Box Code also works). Everything else is optional.', 'A box number may appear only once - duplicates stop the upload.'],
     price_list: ['Barcode is required. Everything else is optional.'],
     ys_item_master: ['Barcode is required.', 'Season: SS or FW.'],
     ys_ptl_config: ['PTL Number is required (1 becomes 01).', 'Season: SS or FW.', 'Year Logic: lte (that year and earlier) or exact (that year only).'],
-    doc_boxes: ['Document Number, Box Number and Store Name are all required.', 'One row per box.']
+    doc_boxes: ['TRN#, Box Number and Store Name are all required on every row.', 'One row per box. A box number may appear only once - duplicates stop the upload.']
 };
 
 // Sheet 1 ("Data") holds only the header row - that is the sheet the upload reads.
@@ -185,12 +216,12 @@ const REF_TEMPLATE_NOTES = {
 function refDownloadTemplate(listType) {
     const def = REF_LISTS[listType];
     const wb = XLSX.utils.book_new();
-    const headers = def.columns.map(c => refHeaderLabel(c.key));
+    const headers = def.columns.map(c => refHeaderLabel(c));
     const ws = XLSX.utils.aoa_to_sheet([headers]);
     ws['!cols'] = headers.map(h => ({ wch: Math.max(14, h.length + 4) }));
     XLSX.utils.book_append_sheet(wb, ws, 'Data');
     const info = [['Column', 'Required?']]
-        .concat(def.columns.map(c => [refHeaderLabel(c.key), c.required ? 'Required' : 'Optional']))
+        .concat(def.columns.map(c => [refHeaderLabel(c), c.required ? 'Required' : 'Optional']))
         .concat([[''], ['Notes']])
         .concat((REF_TEMPLATE_NOTES[listType] || []).map(n => [n]))
         .concat([['Fill the Data sheet from row 2 down, save, then upload. An upload replaces the whole list.']]);
@@ -239,6 +270,14 @@ function refStartUpload(listType, anchorBtn, onDone) {
         if (!file) return;
         const parsed = await refParseFile(file, listType);
         if (parsed.error) { alert(parsed.error); return; }
+        if (parsed.duplicates && parsed.duplicates.length) {
+            const uniqueLabel = refHeaderLabel(def.columns.find(c => c.key === def.unique));
+            alert('Upload stopped: ' + parsed.duplicates.length + ' ' + uniqueLabel + '(s) appear more than once.\n' +
+                parsed.duplicates.slice(0, 10).map(d => d.value + ' (rows ' + d.rows.join(', ') + ')').join('\n') +
+                (parsed.duplicates.length > 10 ? '\n...' : '') +
+                '\n\nRemove the duplicates and upload again. Nothing was changed.');
+            return;
+        }
         const note = parsed.skipped ? '\n(' + parsed.skipped + ' row(s) with missing required values were skipped.)' : '';
         if (!confirm('Replace the whole ' + def.label + ' with this file (' + parsed.rows.length + ' rows)?\nThe old list will be deleted.' + note)) return;
         const progress = refProgress(anchorBtn, 'Uploading');

@@ -17,6 +17,8 @@ let bsHtml5Qr = null;
 let bsCameraActive = false;
 let bsIsLooking = false;
 let bsPalletMode = false;
+let bsSummaryOpen = false;           // the box list under the scan result is collapsed until the user expands it
+const bsOpenGroups = new Set();      // TRN#/store rows whose box numbers are expanded
 
 function bsActiveList() { return bsPalletMode ? 'doc_boxes' : 'box_list'; }
 function bsDocScansKey() { return 'bs_doc_scans_' + AppState.user.id; }
@@ -38,6 +40,17 @@ async function initBoxSegregate() {
         });
         input.addEventListener('blur', resetBsKeyboard);
         document.getElementById('bsPalletToggle').addEventListener('change', function(e) { bsSetPalletMode(e.target.checked); });
+        document.getElementById('bsDocSummary').addEventListener('click', function(e) {
+            if (e.target.closest('[data-bs-toggle-summary]')) {
+                bsSummaryOpen = !bsSummaryOpen; bsRenderDocSummary(); return;
+            }
+            const row = e.target.closest('[data-bs-group]');
+            if (row) {
+                const k = row.dataset.bsGroup;
+                if (bsOpenGroups.has(k)) bsOpenGroups.delete(k); else bsOpenGroups.add(k);
+                bsRenderDocSummary();
+            }
+        });
         bsListenerAdded = true;
     }
 
@@ -237,7 +250,7 @@ function lookupPalletBox(barcode) {
     card.innerHTML =
         `<div class="bs-doc-flag">${duplicate ? '⚠️ ALREADY SCANNED' : '✅ PUT ON PALLET'}</div>` +
         `<div class="bs-doc-store">${escapeHtml(rec.store_name)}</div>` +
-        `<div class="bs-doc-meta">Document <strong>${escapeHtml(rec.document_number)}</strong> &nbsp;·&nbsp; Box <strong>${escapeHtml(rec.box_number)}</strong></div>` +
+        `<div class="bs-doc-meta">TRN# <strong>${escapeHtml(rec.document_number)}</strong> &nbsp;·&nbsp; Box <strong>${escapeHtml(rec.box_number)}</strong></div>` +
         (g ? `<div class="bs-doc-meta">${g.scanned} of ${g.total} boxes for this store</div>` : '');
     card.style.display = 'block';
     document.getElementById('bsNotFound').style.display = 'none';
@@ -254,12 +267,27 @@ function bsRenderDocSummary() {
     }
     const scannedAll = bsDocScans.length;
     const boxesAll = totals.reduce((n, g) => n + g.total, 0);
-    el.innerHTML =
-        `<div class="bs-doc-total">${scannedAll} of ${boxesAll} boxes scanned</div>` +
-        '<table class="scans-table"><thead><tr><th>Document</th><th>Store</th><th>Boxes</th></tr></thead><tbody>' +
-        totals.map(g =>
-            `<tr${g.scanned === g.total ? ' class="bs-doc-done"' : ''}><td>${escapeHtml(g.document_number)}</td><td>${escapeHtml(g.store_name)}</td><td>${g.scanned}/${g.total}</td></tr>`
-        ).join('') + '</tbody></table>';
+    // Collapsed by default: just the running total. Tap it to see the list; tap a TRN# row to see its boxes.
+    let html = `<button type="button" class="bs-doc-total bs-doc-toggle" data-bs-toggle-summary="1">` +
+        `${bsSummaryOpen ? '▾' : '▸'} ${scannedAll} of ${boxesAll} boxes scanned</button>`;
+    if (bsSummaryOpen) {
+        const scannedSet = new Set(bsDocScans.map(s => s.box_number.toLowerCase()));
+        html += '<table class="scans-table"><thead><tr><th>TRN#</th><th>Store Name</th><th>Boxes</th></tr></thead><tbody>' +
+            totals.map(g => {
+                const key = bsGroupKey(g);
+                const open = bsOpenGroups.has(key);
+                let rowHtml = `<tr class="bs-doc-row${g.scanned === g.total ? ' bs-doc-done' : ''}" data-bs-group="${escapeHtml(key)}">` +
+                    `<td>${open ? '▾' : '▸'} ${escapeHtml(g.document_number)}</td><td>${escapeHtml(g.store_name)}</td><td>${g.scanned}/${g.total}</td></tr>`;
+                if (open) {
+                    const boxes = Array.from(bsDocMap.values()).filter(r => bsGroupKey(r) === key);
+                    rowHtml += `<tr class="bs-doc-boxes"><td colspan="3">` +
+                        boxes.map(r => `<span class="bs-doc-box${scannedSet.has(String(r.box_number).toLowerCase()) ? ' scanned' : ''}">${escapeHtml(r.box_number)}${scannedSet.has(String(r.box_number).toLowerCase()) ? ' ✓' : ''}</span>`).join('') +
+                        `</td></tr>`;
+                }
+                return rowHtml;
+            }).join('') + '</tbody></table>';
+    }
+    el.innerHTML = html;
 }
 
 // One row per scanned box, grouped by document number then store - the layout used for AWB generation.
@@ -270,7 +298,7 @@ function downloadPalletExcel() {
         String(a.store_name).localeCompare(String(b.store_name)) ||
         (a.scanned_at < b.scanned_at ? -1 : 1)
     ).map(s => ({
-        'Document Number': s.document_number,
+        'TRN#': s.document_number,
         'Store Name': s.store_name,
         'Box Number': s.box_number,
         'Scanned At': new Date(s.scanned_at).toLocaleString()

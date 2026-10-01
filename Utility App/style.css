@@ -2191,6 +2191,30 @@ body.rtl .form-select {
 .bs-doc-store { font-size: 26px; font-weight: 800; color: var(--ak-maroon); line-height: 1.15; margin-bottom: 6px; word-break: break-word; }
 .bs-doc-meta { font-size: 13px; color: var(--ak-text-light); margin-top: 2px; }
 .bs-doc-total { font-weight: 700; font-size: 14px; margin: 4px 0 8px; }
+.bs-doc-toggle {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 4px 0;
+    color: var(--ak-text);
+    font-family: inherit;
+    cursor: pointer;
+}
+.bs-doc-row { cursor: pointer; }
+.bs-doc-boxes td { padding: 6px 8px; background: var(--ak-gray-100, #f5f5f5); }
+.bs-doc-box {
+    display: inline-block;
+    margin: 2px 4px 2px 0;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--ak-white);
+    border: 1px solid var(--ak-gray-200, #ddd);
+    font-size: 12px;
+    font-family: monospace;
+}
+.bs-doc-box.scanned { background: #e8f5e9; border-color: var(--ak-success, #2e7d32); }
 .bs-doc-done td { background: #e8f5e9; }
 .bs-doc-empty { color: var(--ak-text-light); font-size: 13px; text-align: center; padding: 12px; }
 .bs-doc-actions { display: flex; gap: 8px; margin-top: 12px; }

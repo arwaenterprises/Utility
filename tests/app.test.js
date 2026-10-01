@@ -64,7 +64,7 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     scan('p3'); scan('ZZ'); ok('unknown box flagged', document.getElementById('bsNotFound').style.display === 'block' && bsDocScans.length === 2);
     ok('doc scans persisted per user', Storage.getJSON('bs_doc_scans_u1').length === 2);
     downloadPalletExcel(); const dl = written.pop();
-    ok('AWB download grouped by doc/store', dl.rows.length === 2 && dl.rows[0]['Document Number'] === 'D1' && dl.rows[0]['Store Name'] === 'Riyadh Park' && dl.rows[1]['Document Number'] === 'D2' && Object.keys(dl.rows[0]).join() === 'Document Number,Store Name,Box Number,Scanned At', JSON.stringify(dl.rows));
+    ok('AWB download grouped by doc/store', dl.rows.length === 2 && dl.rows[0]['TRN#'] === 'D1' && dl.rows[0]['Store Name'] === 'Riyadh Park' && dl.rows[1]['TRN#'] === 'D2' && Object.keys(dl.rows[0]).join() === 'TRN#,Store Name,Box Number,Scanned At', JSON.stringify(dl.rows));
     resetPalletScans(); ok('pallet reset downloads then clears', written.length === 1 && bsDocScans.length === 0);
     bsSetPalletMode(false); ok('toggle back to normal hides pallet panel', document.getElementById('bsPalletWrap').style.display === 'none');
 
@@ -72,15 +72,55 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     const tplHeaders = (lt) => { const n = written.length; refDownloadTemplate(lt); const w = written[written.length - 1]; return w; };
     const grab = (lt) => { let cap; const old = XLSX.writeFile; XLSX.writeFile = (wb, name) => { cap = { name, headers: XLSX.utils.sheet_to_json(wb.Sheets['Data'], { header: 1 })[0], sheets: wb.SheetNames }; }; refDownloadTemplate(lt); XLSX.writeFile = old; return cap; };
     let t = grab('box_list'); ok('box list template headers', t.headers.join() === 'Box Number,TRN,Increff Order ID,Store Name,Region,Store Code,Brand' && t.sheets.join() === 'Data,Instructions', t.headers.join());
-    t = grab('doc_boxes'); ok('doc template headers', t.headers.join() === 'Document Number,Box Number,Store Name', t.name);
+    t = grab('doc_boxes'); ok('doc template headers', t.headers.join() === 'TRN#,Box Number,Store Name', t.name);
     t = grab('ys_ptl_config'); ok('ptl template headers', t.headers.join() === 'PTL Number,Season,Year,Year Logic');
     t = grab('price_list'); ok('price template headers', t.headers.join() === 'Barcode,Current Price,Original Price,Style,Color,Size,Year,Season');
     t = grab('ys_item_master'); ok('item master template headers', t.headers.join() === 'Barcode,Year,Season,Brand');
     // a template filled in by the user round-trips through the parser
-    const filled = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(filled, XLSX.utils.aoa_to_sheet([['Document Number','Box Number','Store Name'],['D9','Z1','Mall']]), 'Data');
+    const filled = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(filled, XLSX.utils.aoa_to_sheet([['TRN#','Box Number','Store Name'],['D9','Z1','Mall']]), 'Data');
     const fp = await refParseFile(new File([XLSX.write(filled, { type: 'array', bookType: 'xlsx' })], 't.xlsx'), 'doc_boxes'); ok('filled template parses', fp.rows.length === 1 && fp.rows[0].document_number === 'D9');
     ok('template buttons exist', ['bsTemplateBtn','pcTemplateBtn'].every(id => document.getElementById(id)));
     ok('ad slot exists and takes no space', getComputedStyle(document.getElementById('adSlotBottom')).display === 'none');
+
+
+    // ---------- Pallet list: hidden until expanded ----------
+    bsSetPalletMode(true); await bsSyncList('doc_boxes', true);
+    // (the pallet scans above were reset, so start from a known state)
+    bsDocScans = []; Storage.setJSON('bs_doc_scans_u1', []); bsSummaryOpen = false; bsOpenGroups.clear(); bsRenderDocSummary();
+    const sum = document.getElementById('bsDocSummary');
+    ok('box list is hidden by default (only the total shows)', !sum.querySelector('table') && /0 of 3 boxes scanned/.test(sum.textContent), sum.textContent.trim());
+    sum.querySelector('[data-bs-toggle-summary]').click();
+    ok('tapping the total expands the list with TRN# / Store Name / Boxes', !!sum.querySelector('table') && [...sum.querySelectorAll('th')].map(t => t.textContent).join() === 'TRN#,Store Name,Boxes', [...sum.querySelectorAll('th')].map(t => t.textContent).join());
+    scan('p1');
+    sum.querySelector('[data-bs-group]').click();
+    ok('tapping a TRN# row shows its box numbers, scanned ones ticked', /P1 ✓/.test(sum.textContent) && /P2/.test(sum.textContent) && !/P2 ✓/.test(sum.textContent), sum.textContent.replace(/\s+/g, ' '));
+    sum.querySelector('[data-bs-toggle-summary]').click();
+    ok('tapping the total again hides the list', !sum.querySelector('table'));
+    scan('NOPE-32'); ok('box not found message sits right under the scan field', document.getElementById('bsNotFound').style.display === 'block' && document.getElementById('bsNotFound').previousElementSibling.id === 'bsCamOverlay');
+    bsSetPalletMode(false);
+
+    // ---------- upload checks: duplicates, mandatory fields, header aliases ----------
+    let d = await refParseFile(mkFile('TRN#,Box Number,Store Name\nT1,B1,Riyadh\nT2,b1,Jeddah\nT3,B2,Dammam\nT4,B2,Dammam\n'), 'doc_boxes');
+    ok('duplicate box numbers are detected (case-insensitive) with their row numbers', d.duplicates.length === 2 && d.duplicates[0].rows.join() === '2,3' && d.duplicates[1].rows.join() === '4,5', JSON.stringify(d.duplicates));
+    d = await refParseFile(mkFile('TRN#,Box Number,Store Name\nT1,B1,Riyadh\nT2,B2,\n,B3,Jeddah\n'), 'doc_boxes');
+    ok('pallet list: all 3 fields mandatory - incomplete rows stop the upload', /Upload stopped/.test(d.error) && /row 3 \(missing Store Name\)/.test(d.error) && /row 4 \(missing TRN#\)/.test(d.error), d.error);
+    d = await refParseFile(mkFile('trn,box code,Store Name\nT1,B1,Riyadh\n'), 'doc_boxes');
+    ok('headers: "TRN" and "Box Code" are accepted', d.rows.length === 1 && d.rows[0].document_number === 'T1' && d.rows[0].box_number === 'B1', JSON.stringify(d.rows));
+    d = await refParseFile(mkFile('Document Number,Box Number,Store Name\nT1,B1,Riyadh\n'), 'doc_boxes');
+    ok('headers: old name "Document Number" still accepted', d.rows.length === 1);
+    d = await refParseFile(mkFile('Box Code\nB1\nB2\nB2\n'), 'box_list');
+    ok('box list: only Box Code is needed (everything else optional) and duplicates are flagged', d.rows.length === 3 && d.duplicates.length === 1 && d.duplicates[0].value === 'B2', JSON.stringify(d.duplicates));
+    d = await refParseFile(mkFile('Box Number,TRN\nB1,\nB2,T9\n'), 'box_list');
+    ok('box list: empty optional cells are fine', d.rows.length === 2 && !d.error && !d.skipped);
+    // the upload flow refuses a file with duplicates and changes nothing
+    const before = JSON.stringify(__db.reference_chunks.filter(c => c.list_type === 'doc_boxes').map(c => c.rows));
+    __alerts.length = 0;
+    refStartUpload('doc_boxes', document.getElementById('bsUploadBtn'), null);   // creates the hidden file input and opens the chooser
+    const input = document.getElementById('refFileInput');
+    const dt = new DataTransfer(); dt.items.add(mkFile('TRN#,Box Number,Store Name\nT1,B1,X\nT2,B1,Y\n', 'dup.csv')); input.files = dt.files;
+    await input.onchange();
+    await sleep(50);
+    ok('upload with duplicate box numbers is refused with an explanation, nothing changed', __alerts.some(a => /Upload stopped: 1 Box Number\(s\) appear more than once/.test(a) && /B1 \(rows 2, 3\)/.test(a)) && JSON.stringify(__db.reference_chunks.filter(c => c.list_type === 'doc_boxes').map(c => c.rows)) === before, __alerts.slice(-1).join());
 
     // ---------- member cannot upload ----------
     AppState.profile = { display_name: 'M', enterprise_id: 'E1', tier: 'enterprise_member' }; __me.id = 'u1'; __me.enterprise_id = 'E1';

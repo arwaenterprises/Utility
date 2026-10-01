@@ -103,18 +103,20 @@ All three tools are off Google Sheets / Apps Script and on Supabase. **Built and
 | List (where uploaded) | Required columns | Optional columns |
 |---|---|---|
 | Box list (Box Segregate, Pallet mode off) | `Box Number` | `TRN`, `Increff Order ID`, `Store Name`, `Region`, `Store Code`, `Brand` |
-| Document / box list (Box Segregate, Pallet mode on) | `Document Number`, `Box Number`, `Store Name` | — |
+| TRN# / box list (Box Segregate, Pallet mode on) | `TRN#`, `Box Number`, `Store Name` — **all three mandatory on every row** (an incomplete row stops the upload) | — |
 | Price list (Price Check) | `Barcode` | `Current Price`, `Original Price`, `Style`, `Color`, `Size`, `Year`, `Season` |
 | Item master (Year/Season Sort) | `Barcode` | `Year`, `Season`, `Brand` |
 | PTL config (Year/Season Sort) | `PTL Number` | `Season`, `Year`, `Year Logic` |
 
-    Notes: Year/Season `Season` is `SS` or `FW` (Spring/Summer/Fall/Winter spellings are understood); PTL `Year Logic` is **`lte`** (items up to and including that year) or **`exact`** (that year only); `PTL Number` is padded to two digits (`1` → `01`). A new upload **replaces the whole list** and deletes the old rows.
+    Notes: Year/Season `Season` is `SS` or `FW` (Spring/Summer/Fall/Winter spellings are understood); PTL `Year Logic` is **`lte`** (items up to and including that year) or **`exact`** (that year only); `PTL Number` is padded to two digits (`1` → `01`). A new upload **replaces the whole list** and deletes the old rows. **Duplicate check before upload:** in both box lists (normal and TRN#) a box number may appear only once (compared ignoring capitals); if any repeat, the upload is stopped, nothing is changed, and the message lists the repeated box numbers with their spreadsheet row numbers. Header aliases: `TRN#` = `TRN` = `Transfer Number` = `Document Number`; `Box Number` = `Box Code` = `Box ID`.
 61. **Compact top bar (AdSense space)** — Box Segregate and Price Check use small round ↻ Sync and ⬆ Upload icon buttons (the percentage shows inside the button while syncing/uploading) and a small "Pallet" checkbox toggle like Nu/AlNu, so the screen uses as little vertical space as possible for future ads. Year/Season upload buttons shortened to "⬆ Items" / "⬆ PTL". Cache version `v23`.
 
 62. **Compact layout everywhere** — one `COMPACT LAYOUT` block at the end of `style.css` tightens padding / margins / font sizes on every screen (header, home, all tools, modals): main padding 16→8px, cards 24→12px, form fields, buttons, stat boxes, tables, tool header (subtitle line hidden). Cache version `v24`.
 63. **Template download icon next to every Upload** — a round 📄 button beside ⬆ Upload on Box Segregate (both modes), Price Check and Year/Season (⬆ Items / ⬆ PTL each). It downloads an Excel file: sheet "Data" with only the column headers (the sheet the upload reads) and sheet "Instructions" listing required/optional columns and notes. Shown only to people who can upload. Item Barcode already had its own Template / Upload buttons.
 
 64. **Files moved out of the published folder** — `index.html.bak`, `Duplicate Data.xlsx` and the two Apps Script `.txt` files were being served publicly by Netlify (the publish folder is `Utility App/`). They were moved with `git mv` to `legacy/` (repo root, not published) on `saas-pilot`; nothing was deleted, and `main` (the old site) is untouched. The Apps Script files can be deleted for good once the old site is switched off.
+
+65. **Pallet mode refinements (user review of a real screenshot)** — "Document Number" renamed **TRN#** everywhere (column, scan result, summary, download: *TRN#, Store Name, Box Number, Scanned At*); the per-TRN# box list under the scan result is **collapsed by default** (only "x of y boxes scanned" shows) — tap it to expand, tap a TRN# row to see its box numbers (scanned ones ticked, useful for checking why a box says "not found": the number must exactly match one in the uploaded list, capitals ignored); the "Box not found" message now sits directly under the scan field instead of below the buttons. Cache `v26`.
 
 ## J. What is pending (summary — keep this section current)
 
