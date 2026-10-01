@@ -1,12 +1,12 @@
 // ============================================
-// AK UTILITY - SERVICE WORKER
+// UTILITY - SERVICE WORKER
 // ============================================
 // Goal: every tablet/browser gets the latest deployed files as soon as
 // possible, while still working offline off the last-known-good copy.
 //
 // BUMP CACHE_VERSION every time you deploy a change to index.html/js/css,
 // same as the ?v= numbers in index.html's script tags.
-const CACHE_VERSION = 'ak-utility-v11';
+const CACHE_VERSION = 'ak-utility-v12';
 
 const APP_SHELL = [
     './',
