@@ -65,7 +65,7 @@ A running, numbered backlog of everything discussed for this app, so it isn't ju
 37. App needs ad placements designed in; exact placement/timing strategy TBD beyond the two specifics below
 38. Box Scanner: show an ad after a box is closed, during the natural ~5–10 second gap while the user tapes/places the box before scanning the next one — **not** a gate blocking the close-box action itself
 39. Desktop layout: the app renders as a centered mobile-width card with empty space on both sides on wide screens — use that space for display ads
-40. AdSense is not a near-term priority — explicitly deferred until after the Supabase migration is stable. The core migration (section D) and offline support (item 32) are now built; AdSense stays deferred until the user decides to start it and the migration has had a real-world soak.
+40. **AdSense — ON HOLD (user decision):** not pursuing it now; the priority is a solid, well-tested app that operators use daily. The groundwork stays in place and costs nothing: compact layout, the hidden `.ad-slot` placeholder (item 55), and the analysis of what an approval needs (public content pages — Privacy, Terms, Contact/About, Help; ads only on public content pages, never beside scanning controls; ads.txt + AdSense snippet; CSP update; consent banner for EU/UK). Items 36–39 and the ad-after-box-close idea (38) are parked. If revisited later, put ads on public content pages only.
 
 ## G. Domain compliance (outside this repo)
 
@@ -124,12 +124,12 @@ All three tools are off Google Sheets / Apps Script and on Supabase. **Built and
 - **Reach the site without a VPN** — item 15 (looks like a network / DNS block on the user's side).
 - After a day of normal use, check the browser console (F12) for "Content Security Policy" warnings; if none, switch the CSP header to enforcing (item 11).
 - Decide whether the Pallet download should also list never-scanned / unknown boxes — item 57.
-- Google OAuth consent-screen status (user believes ~100 users is fine) and Privacy Policy / Terms pages on `arwaenterprises.com` — items 41, 46.
+- Google OAuth consent-screen status (user believes ~100 users is fine). The Privacy Policy / Terms pages (item 41) are no longer tied to AdSense; they are only needed if Google asks for them for sign-in verification (item 46).
 - Switch off the old Netlify site when the last operator has moved (item 16).
 
 **Open engineering work (not started):**
 - Item 13 — automated tests / CI (the headless + Postgres tests used so far exist only locally) and automatic database migrations.
-- Items 36–40 — Google AdSense itself (account, real placements, ad after box close, desktop side ads); the hidden placeholder exists (item 55).
+- AdSense (items 36–40) — **on hold by the user's decision**; nothing to do now.
 - Seat limits / billing (item 33) — only when pricing is decided.
 
 **Done recently:** offline Box Scanner (32), role-based Reset (22/43), Phase 3 migration + Pallet mode (section I), compact UI + template icons (61–63), security headers (11), delete-rule fix (45), invite expiry / rename / member count (33), Photo Capture removed (20), publish folder cleaned (64).
