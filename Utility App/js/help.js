@@ -194,12 +194,9 @@ function helpSeenKey(appId) {
     return 'help_seen_' + appId + '_' + ((AppState.user && AppState.user.id) || 'anon');
 }
 
-// Language: the person's last choice in the guide, else the Box Scanner language, else English.
+// Language: the app-wide choice (welcome screen / Account window), see js/lang.js.
 function helpPickLang() {
-    let l = null;
-    try { l = Storage.get('help_lang'); } catch (e) { /* storage blocked */ }
-    if (!l && typeof ScannerState !== 'undefined' && ScannerState.language === 'ar') l = 'ar';
-    return l === 'ar' ? 'ar' : 'en';
+    return (typeof AppLang !== 'undefined' && AppLang.get() === 'ar') ? 'ar' : 'en';
 }
 
 function helpRender() {
@@ -222,7 +219,6 @@ function helpRender() {
         '<p class="help-hold">' + t.hold + '</p>';
     body.scrollTop = 0;
     document.getElementById('helpCloseBtn').textContent = t.ok;
-    document.querySelectorAll('#helpLang .lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === helpLang));
 }
 
 function helpShow(appId) {
@@ -246,9 +242,4 @@ document.addEventListener('DOMContentLoaded', () => {
     const close = document.getElementById('helpCloseBtn');
     if (open) open.addEventListener('click', () => { if (AppState.currentApp) helpShow(AppState.currentApp); });
     if (close) close.addEventListener('click', () => document.getElementById('helpModal').classList.remove('active'));
-    document.querySelectorAll('#helpLang .lang-btn').forEach(b => b.addEventListener('click', () => {
-        helpLang = b.dataset.lang === 'ar' ? 'ar' : 'en';
-        try { Storage.set('help_lang', helpLang); } catch (e) { /* storage blocked: fine */ }
-        helpRender();
-    }));
 });

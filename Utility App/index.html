@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=45"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=45"></script>
-    <script src="vendor/qrcode.min.js?v=45"></script>
-    <script src="vendor/html5-qrcode.min.js?v=45"></script>
-    <script src="vendor/supabase.js?v=45"></script>
+    <script src="vendor/xlsx.full.min.js?v=46"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=46"></script>
+    <script src="vendor/qrcode.min.js?v=46"></script>
+    <script src="vendor/html5-qrcode.min.js?v=46"></script>
+    <script src="vendor/supabase.js?v=46"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -47,6 +47,14 @@
                 <div class="settings-section">
                     <p><strong id="accountEmailDisp"></strong></p>
                     <p id="accountTierDisp" style="color: var(--ak-text-light); font-size: 13px;"></p>
+                </div>
+
+                <div class="settings-section">
+                    <h4 data-i18n="lang_label">Language</h4>
+                    <div class="applang-toggle lang-toggle" role="group" aria-label="Language">
+                        <button class="lang-btn active" type="button" data-applang="en">EN</button>
+                        <button class="lang-btn" type="button" data-applang="ar">عربي</button>
+                    </div>
                 </div>
 
                 <div class="settings-section">
@@ -124,10 +132,6 @@
     <div class="modal-overlay" id="helpModal">
         <div class="modal help-modal">
             <h3 class="modal-title" id="helpTitle">How to use</h3>
-            <div class="lang-toggle" id="helpLang">
-                <button class="lang-btn active" type="button" data-lang="en">EN</button>
-                <button class="lang-btn" type="button" data-lang="ar">عربي</button>
-            </div>
             <div class="modal-body help-body" id="helpBody" style="text-align: left;"></div>
             <div class="modal-buttons">
                 <button class="btn btn-primary btn-block" id="helpCloseBtn" type="button">Got it</button>
@@ -141,77 +145,85 @@
         <!-- SCREEN: Login -->
         <div id="loginScreen" class="screen active">
             <div class="login-hero">
+                <div class="applang-toggle lang-toggle" role="group" aria-label="Language">
+                    <button class="lang-btn active" type="button" data-applang="en">EN</button>
+                    <button class="lang-btn" type="button" data-applang="ar">عربي</button>
+                </div>
                 <img src="icons/icon-192.png" alt="Utility logo" width="72" height="72">
                 <h1>Utility</h1>
-                <p>Simple, secure warehouse &amp; store tools for any phone, tablet or computer.</p>
+                <p data-i18n="hero_tag">Simple, secure warehouse &amp; store tools for any phone, tablet or computer.</p>
             </div>
 
             <div class="card">
-                <h2 class="card-title">Welcome</h2>
-                <p class="card-subtitle">Sign in to access your tools</p>
+                <h2 class="card-title" data-i18n="welcome">Welcome</h2>
+                <p class="card-subtitle" data-i18n="signin_sub">Sign in to access your tools</p>
 
                 <div class="error-msg" id="loginError"></div>
 
                 <button class="btn btn-primary btn-block" id="googleSignInBtn">
-                    <span id="googleSignInBtnText">Sign in with Google</span>
+                    <span id="googleSignInBtnText" data-i18n="signin_btn">Sign in with Google</span>
                 </button>
             </div>
 
             <div class="trust-row">
-                <div class="trust-badge b-google"><span class="tb-ico tb-google"><span></span></span><span class="tb-t">Google sign-in</span><span class="tb-s">We never see your password</span></div>
-                <a class="trust-badge b-ssl" href="https://www.ssllabs.com/ssltest/analyze.html?d=utility.arwaenterprises.com" target="_blank" rel="noopener"><span class="tb-ico tb-grade">A+</span><span class="tb-t">HTTPS: grade A+</span><span class="tb-s">SSL Labs, 1 Oct 2026 &#8599;</span></a>
-                <a class="trust-badge b-safe" href="https://transparencyreport.google.com/safe-browsing/search?url=https%3A%2F%2Futility.arwaenterprises.com" target="_blank" rel="noopener"><span class="tb-ico tb-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><span class="tb-t">Safe Browsing: clean</span><span class="tb-s">Google, 1 Oct 2026 &#8599;</span></a>
-                <div class="trust-badge b-noads"><span class="tb-ico tb-noads"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M6.7 6.7l10.6 10.6"/></svg></span><span class="tb-t">No ads, no tracking</span><span class="tb-s">Your data stays until you delete it</span></div>
+                <div class="trust-badge b-google"><span class="tb-ico tb-google"><span></span></span><span class="tb-t" data-i18n="b_google_t">Google sign-in</span><span class="tb-s" data-i18n="b_google_s">We never see your password</span></div>
+                <a class="trust-badge b-ssl" href="https://www.ssllabs.com/ssltest/analyze.html?d=utility.arwaenterprises.com" target="_blank" rel="noopener"><span class="tb-ico tb-grade">A+</span><span class="tb-t" data-i18n="b_ssl_t">HTTPS: grade A+</span><span class="tb-s" data-i18n="b_ssl_s">SSL Labs, 1 Oct 2026 &#8599;</span></a>
+                <a class="trust-badge b-safe" href="https://transparencyreport.google.com/safe-browsing/search?url=https%3A%2F%2Futility.arwaenterprises.com" target="_blank" rel="noopener"><span class="tb-ico tb-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><span class="tb-t" data-i18n="b_safe_t">Safe Browsing: clean</span><span class="tb-s" data-i18n="b_safe_s">Google, 1 Oct 2026 &#8599;</span></a>
+                <div class="trust-badge b-noads"><span class="tb-ico tb-noads"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M6.7 6.7l10.6 10.6"/></svg></span><span class="tb-t" data-i18n="b_noads_t">No ads, no tracking</span><span class="tb-s" data-i18n="b_noads_s">Your data stays until you delete it</span></div>
             </div>
 
             <div class="card login-info data-promise">
-                <h3>Your data, your control</h3>
+                <h3 data-i18n="dp_h">Your data, your control</h3>
                 <ul class="dp-list">
-                    <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b>Only you see your data</b><small>Your scans and lists are private to you. In a company team, only the team admin can also see the team&rsquo;s data.</small></div></li>
-                    <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b>Your data stays until you delete it</b><small>Delete it yourself in the app when the work is done, or email us and we will remove it.</small></div></li>
-                    <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b>Never sold, no ads, no tracking</b><small>We do not sell data or show ads. Usage statistics are plain counts, never your barcodes.</small></div></li>
-                    <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b>Camera stays on your device</b><small>Barcode scanning happens in your browser. Nothing is recorded or uploaded.</small></div></li>
+                    <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b data-i18n="dp1_b">Only you see your data</b><small data-i18n="dp1_s">Your scans and lists are private to you. In a company team, only the team admin can also see the team&rsquo;s data.</small></div></li>
+                    <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b data-i18n="dp2_b">Your data stays until you delete it</b><small data-i18n="dp2_s">Delete it yourself in the app when the work is done, or email us and we will remove it.</small></div></li>
+                    <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b data-i18n="dp3_b">Never sold, no ads, no tracking</b><small data-i18n="dp3_s">We do not sell data or show ads. Usage statistics are plain counts, never your barcodes.</small></div></li>
+                    <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b data-i18n="dp4_b">Camera stays on your device</b><small data-i18n="dp4_s">Barcode scanning happens in your browser. Nothing is recorded or uploaded.</small></div></li>
                 </ul>
                 <div class="dp-links">
-                    <a href="privacy.html">Privacy Policy</a>
-                    <a href="terms.html">Terms</a>
-                    <a href="security.html">Security details</a>
+                    <a href="privacy.html" data-i18n="l_privacy">Privacy Policy</a>
+                    <a href="terms.html" data-i18n="l_terms">Terms</a>
+                    <a href="security.html" data-i18n="l_security">Security details</a>
                 </div>
             </div>
 
-            <p class="login-teaser">Sign in to explore our warehouse tools &mdash; more are added over time.</p>
+            <p class="login-teaser" data-i18n="teaser">Sign in to explore our warehouse tools &mdash; more are added over time.</p>
 
             <div class="card login-info">
-                <h3>How it works</h3>
+                <h3 data-i18n="how_h">How it works</h3>
                 <div class="steps">
-                    <div class="step"><span class="step-n">1</span><b>Sign in</b><small>with your Google account</small></div>
-                    <div class="step"><span class="step-n">2</span><b>Explore the tools</b><small>scan, look up or print</small></div>
-                    <div class="step"><span class="step-n">3</span><b>Works offline</b><small>syncs when you are back online</small></div>
+                    <div class="step"><span class="step-n">1</span><b data-i18n="st1_b">Sign in</b><small data-i18n="st1_s">with your Google account</small></div>
+                    <div class="step"><span class="step-n">2</span><b data-i18n="st2_b">Explore the tools</b><small data-i18n="st2_s">scan, look up or print</small></div>
+                    <div class="step"><span class="step-n">3</span><b data-i18n="st3_b">Works offline</b><small data-i18n="st3_s">syncs when you are back online</small></div>
                 </div>
             </div>
 
             <div class="login-foot">
-                <p>Built and run by <strong>Arwa Enterprises</strong> &middot; India &amp; GCC</p>
+                <p data-i18n="foot_by">Built and run by <strong>Arwa Enterprises</strong> &middot; India &amp; GCC</p>
                 <p><a href="mailto:connect.arwaenterprises@gmail.com">connect.arwaenterprises@gmail.com</a></p>
-                <p class="login-links"><a href="about.html">About &amp; Contact</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="terms.html">Terms</a> &middot; <a href="security.html">Security</a></p>
-                <p class="login-checked">Badges with &#8599; open the public check, so you can verify them yourself.</p>
+                <p class="login-links"><a href="about.html" data-i18n="f_about">About &amp; Contact</a> &middot; <a href="privacy.html" data-i18n="f_privacy">Privacy</a> &middot; <a href="terms.html" data-i18n="f_terms">Terms</a> &middot; <a href="security.html" data-i18n="f_security">Security</a></p>
+                <p class="login-checked" data-i18n="foot_note">Badges with &#8599; open the public check, so you can verify them yourself.</p>
             </div>
         </div>
 
         <!-- SCREEN: Home -->
         <div id="homeScreen" class="screen">
             <div class="home-header">
-                <h2>Welcome!</h2>
-                <p>Select a utility to get started</p>
+                <h2 data-i18n="home_h">Welcome!</h2>
+                <p data-i18n="home_p">Select a utility to get started</p>
+                <div class="applang-toggle lang-toggle" role="group" aria-label="Language">
+                    <button class="lang-btn active" type="button" data-applang="en">EN</button>
+                    <button class="lang-btn" type="button" data-applang="ar">عربي</button>
+                </div>
             </div>
             
             <div class="session-banner" id="sessionBanner">
                 <span class="session-banner-icon">📦</span>
                 <div class="session-banner-text">
-                    <strong>Box Scanner Session Active</strong>
-                    <span id="sessionBannerInfo">Complete or reset to switch apps</span>
+                    <strong data-i18n="sess_t">Box Scanner Session Active</strong>
+                    <span id="sessionBannerInfo" data-i18n="sess_i">Complete or reset to switch apps</span>
                 </div>
-                <button class="session-banner-btn" id="goToSessionBtn">Go to Scanner</button>
+                <button class="session-banner-btn" id="goToSessionBtn" data-i18n="sess_btn">Go to Scanner</button>
             </div>
 
             <div class="session-banner" id="inviteBanner" style="display:none;">
@@ -1055,19 +1067,20 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=45"></script>
-    <script src="js/supabaseClient.js?v=45"></script>
-    <script src="js/lists.js?v=45"></script>
-    <script src="js/usage.js?v=45"></script>
-    <script src="js/syncstatus.js?v=45"></script>
-    <script src="js/help.js?v=45"></script>
-    <script src="js/tooltip.js?v=45"></script>
-    <script src="js/app.js?v=45"></script>
-    <script src="js/boxScanner.js?v=45"></script>
-    <script src="js/itemBarcode.js?v=45"></script>
-    <script src="js/boxCode.js?v=45"></script>
-    <script src="js/boxSegregate.js?v=45"></script>
-    <script src="js/priceCheck.js?v=45"></script>
-    <script src="js/yearSegregate.js?v=45"></script>
+    <script src="js/config.js?v=46"></script>
+    <script src="js/lang.js?v=46"></script>
+    <script src="js/supabaseClient.js?v=46"></script>
+    <script src="js/lists.js?v=46"></script>
+    <script src="js/usage.js?v=46"></script>
+    <script src="js/syncstatus.js?v=46"></script>
+    <script src="js/help.js?v=46"></script>
+    <script src="js/tooltip.js?v=46"></script>
+    <script src="js/app.js?v=46"></script>
+    <script src="js/boxScanner.js?v=46"></script>
+    <script src="js/itemBarcode.js?v=46"></script>
+    <script src="js/boxCode.js?v=46"></script>
+    <script src="js/boxSegregate.js?v=46"></script>
+    <script src="js/priceCheck.js?v=46"></script>
+    <script src="js/yearSegregate.js?v=46"></script>
 </body>
 </html>

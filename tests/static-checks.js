@@ -105,6 +105,19 @@ check('public pages show the contact email', ['about.html', 'privacy.html', 'sec
   const missing = [...titles].filter(t => !arKeys.includes(t.replace(/&amp;/g, '&')));
   check('every title="..." hint has an Arabic version in tooltip.js', missing.length === 0, 'missing: ' + missing.join(' | '));
 }
+{ // every translatable text on the welcome / home screens has an Arabic version, and vice versa
+  const html = fs.readFileSync(path.join(APP, 'index.html'), 'utf8');
+  const lang = fs.readFileSync(path.join(APP, 'js', 'lang.js'), 'utf8');
+  const used = [...new Set([...html.matchAll(/data-i18n="([^"]+)"/g)].map(m => m[1]))];
+  const arBlock = lang.slice(lang.indexOf('const AR_UI'), lang.indexOf('const AppLang'));
+  const defined = [...arBlock.matchAll(/\b([a-z0-9_]+):\s*'/g)].map(m => m[1]);
+  check('every data-i18n text has an Arabic entry in lang.js', used.filter(k => !defined.includes(k)).length === 0, 'missing: ' + used.filter(k => !defined.includes(k)).join(', '));
+  check('lang.js has no Arabic entry that no text uses', defined.filter(k => k !== 'lang_label' && !used.includes(k)).length === 0, 'unused: ' + defined.filter(k => !used.includes(k)).join(', '));
+}
+{ // guard: a bad edit once emptied the stylesheet
+  const css = fs.readFileSync(path.join(APP, 'style.css'), 'utf8');
+  check('style.css is complete (not truncated)', css.length > 60000 && css.includes(':root') && css.includes('.login-hero') && css.includes('.longpress-tip') && css.includes('.applang-toggle'), 'length ' + css.length);
+}
 check('security.txt present', fs.existsSync(path.join(APP, '.well-known', 'security.txt')));
 check('CSP script-src allows only this site', !/script-src[^;]*https?:/.test(toml));
 

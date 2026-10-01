@@ -5,7 +5,7 @@ const ScannerState = {
     remark: '',
     currentBox: null,
     boxScanning: false,
-    language: 'en',
+    language: (typeof AppLang !== 'undefined') ? AppLang.get() : 'en',
     inputMode: 'Nu',
     uniqueMode: false,
     scans: [],
@@ -256,7 +256,7 @@ function loadScannerSession() {
         ScannerState.remark = session.remark || '';
         ScannerState.currentBox = session.currentBox || null;
         ScannerState.boxScanning = session.boxScanning || false;
-        ScannerState.language = session.language || 'en';
+        ScannerState.language = AppLang.get();      // the app-wide language, not the saved session's
         ScannerState.inputMode = session.inputMode || 'Nu';
         ScannerState.uniqueMode = session.uniqueMode || false;
         ScannerState.completedBoxes = new Set(session.completedBoxes || []);
@@ -312,12 +312,16 @@ function applyScannerTranslations() {
     document.getElementById('settingsLangArBtn').classList.toggle('active', ScannerState.language === 'ar');
 }
 
+// The language is chosen once for the whole app (see js/lang.js); the toggles in this tool just set it.
 function setScannerLanguage(lang) {
+    AppLang.set(lang);
+}
+AppLang.onChange((lang) => {
     ScannerState.language = lang;
     applyScannerTranslations();
-    saveScannerSession();
-    updateScansTable();
-}
+    if (typeof saveScannerSession === 'function' && AppState.user) saveScannerSession();
+    if (AppState.user && scannerDB) updateScansTable();
+});
 
 function setScannerInputMode(mode) {
     ScannerState.inputMode = mode;

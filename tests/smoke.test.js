@@ -31,16 +31,19 @@ const { start, openApp, report, stop } = require('./helpers/harness');
       ok('guide does not open by itself the second time: ' + id, !modal());
       document.getElementById('helpBtn').click();
       ok('"?" button opens the guide again: ' + id, modal());
-      document.querySelector('#helpLang [data-lang="ar"]').click();
-      ok('Arabic toggle shows the guide right-to-left: ' + id, document.getElementById('helpBody').dir === 'rtl' && /[\u0600-\u06FF]/.test(document.getElementById('helpBody').textContent));
-      document.querySelector('#helpLang [data-lang="en"]').click();
-      ok('English toggle brings it back: ' + id, document.getElementById('helpBody').dir === 'ltr' && !/[\u0600-\u06FF]/.test(document.getElementById('helpBody').textContent));
+      document.getElementById('helpCloseBtn').click();
+      AppLang.set('ar'); document.getElementById('helpBtn').click();
+      ok('Arabic app language shows the guide right-to-left: ' + id, document.getElementById('helpBody').dir === 'rtl' && /[\u0600-\u06FF]/.test(document.getElementById('helpBody').textContent));
+      document.getElementById('helpCloseBtn').click();
+      AppLang.set('en'); document.getElementById('helpBtn').click();
+      ok('English app language brings it back: ' + id, document.getElementById('helpBody').dir === 'ltr' && !/[\u0600-\u06FF]/.test(document.getElementById('helpBody').textContent));
       document.getElementById('helpCloseBtn').click();
     }
     // Long-press hints for icon buttons (phones have no hover).
     const touch = (el, type) => el.dispatchEvent(new PointerEvent(type, { pointerType: 'touch', bubbles: true, cancelable: true, clientX: 50, clientY: 50 }));
     const wait = ms => new Promise(r => setTimeout(r, ms));
     localStorage.clear(); openApp('boxSegregate'); document.getElementById('helpCloseBtn').click();
+    await wait(300);                                    // let the screen change finish scrolling
     const hb = document.getElementById('helpBtn');
     touch(hb, 'pointerdown'); await wait(650);
     const bubble = document.querySelector('.longpress-tip');
@@ -50,15 +53,32 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     await wait(100); touch(hb, 'pointerdown'); touch(hb, 'pointerup'); hb.click();
     ok('a normal quick tap still works', document.getElementById('helpModal').classList.contains('active') && !document.querySelector('.longpress-tip'));
     document.getElementById('helpCloseBtn').click();
-    localStorage.setItem('aku_help_lang', 'ar');
+    AppLang.set('ar'); await wait(300);
     touch(hb, 'pointerdown'); await wait(650); touch(hb, 'pointerup'); hb.click();
     const ab = document.querySelector('.longpress-tip');
     ok('long-press hint appears in Arabic when Arabic is chosen', !!ab && /[\u0600-\u06FF]/.test(ab.textContent) && ab.dir === 'rtl', ab && ab.textContent);
-    localStorage.clear();
+    AppLang.set('en'); localStorage.clear();
     const dyn = document.createElement('button'); dyn.className = 'delete-scan-btn'; dyn.textContent = '✕'; document.body.appendChild(dyn);
     touch(dyn, 'pointerdown'); await wait(650); touch(dyn, 'pointerup');
     ok('buttons created later (no title) still get a hint', document.querySelector('.longpress-tip') && document.querySelector('.longpress-tip').textContent === 'Delete this scan');
     dyn.remove();
+    // a quick tap right after a long press must still work (only the release of the long press itself is ignored)
+    touch(hb, 'pointerdown'); await wait(650); touch(hb, 'pointerup'); hb.click();
+    touch(hb, 'pointerdown'); touch(hb, 'pointerup'); let quick = 0; hb.addEventListener('click', () => quick++, { once: true }); hb.click();
+    ok('a quick tap right after a long press is not swallowed', quick === 1);
+    document.getElementById('helpCloseBtn').click();
+    // App-wide language chosen on the welcome screen.
+    localStorage.clear(); AppLang.apply();
+    const hero = document.querySelector('[data-i18n="hero_tag"]'), enHero = hero.innerHTML;
+    document.querySelector('#loginScreen .applang-toggle [data-applang="ar"]').click();
+    ok('Arabic button on the welcome screen turns the page right-to-left and translates it', document.body.classList.contains('rtl') && /[\u0600-\u06FF]/.test(hero.textContent) && /[\u0600-\u06FF]/.test(document.getElementById('googleSignInBtnText').textContent));
+    ok('the choice is remembered on this device', localStorage.getItem('aku_lang') === 'ar' && AppLang.get() === 'ar');
+    ok('Box Scanner follows the app language', ScannerState.language === 'ar' && document.body.classList.contains('rtl'));
+    document.querySelector('#loginScreen .applang-toggle [data-applang="en"]').click();
+    ok('English button restores the exact English text and layout', hero.innerHTML === enHero && !document.body.classList.contains('rtl') && ScannerState.language === 'en');
+    document.querySelector('#accountModal .applang-toggle [data-applang="ar"]').click();
+    ok('the Account window can change the language too', AppLang.get() === 'ar' && document.querySelector('#homeScreen .applang-toggle [data-applang="ar"]').classList.contains('active'));
+    AppLang.set('en'); localStorage.clear();
     ok('Year/Season store id comes from the Google account', AppState.storeId === 'a@b.c' && AppState.storeName === 'Ann');
     ok('no Google Apps Script / hard-coded admin code left in the app', typeof CONFIG.GOOGLE_SCRIPT_URL === 'undefined' && typeof CONFIG.ADMIN_CODE === 'undefined' && typeof CONFIG.YS_SCRIPT_URL === 'undefined' && typeof CONFIG.PC_SCRIPT_URL === 'undefined');
     return log;

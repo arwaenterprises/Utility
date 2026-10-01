@@ -94,6 +94,7 @@ const TIP_FALLBACK = {
 
     document.addEventListener('pointerdown', (e) => {
         hide();
+        swallowUntil = 0;                                      // a new touch starts a new gesture: never swallow its click
         if (e.pointerType === 'mouse') return;                 // a mouse already has hover
         const el = holder(e.target);
         if (!el) return;
