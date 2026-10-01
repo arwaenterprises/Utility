@@ -48,6 +48,7 @@ const ScannerT = {
         errDuplicateBarcode: "This barcode was already scanned in this box",
         errUniqueLockedDuringBox: "Close the current box before changing the No Dup setting",
         errResetNeedsConnection: "Reset needs an internet connection so your server data is cleared too",
+        errResetPendingSync: "Some closed boxes haven't uploaded to your admin yet. Connect to the internet and wait for the sync badge to show ✓, then reset",
         errSaveFailed: "Could not save scan, please try again",
         errLoadFailed: "Could not load your scans, please try again",
         lblUniqueToggle: "No Dup",
@@ -73,6 +74,7 @@ const ScannerT = {
         errDuplicateBarcode: "تم مسح هذا الباركود مسبقًا في هذا الصندوق",
         errUniqueLockedDuringBox: "أغلق الصندوق الحالي قبل تغيير إعداد منع التكرار",
         errResetNeedsConnection: "إعادة التعيين تحتاج إلى اتصال بالإنترنت لمسح بيانات الخادم أيضًا",
+        errResetPendingSync: "بعض الصناديق المغلقة لم تُرفع إلى المسؤول بعد. اتصل بالإنترنت وانتظر حتى تظهر علامة ✓ ثم أعد التعيين",
         errSaveFailed: "تعذر حفظ المسح، حاول مرة أخرى",
         errLoadFailed: "تعذر تحميل المسح، حاول مرة أخرى",
         lblUniqueToggle: "بدون تكرار",
@@ -201,7 +203,17 @@ async function fetchOwnServerScans() {
     return rows;
 }
 
+// Enterprise members only ever clear their own device on Reset; their rows stay in
+// Supabase until the enterprise admin resets them from the Team console. Individual
+// accounts own their data, so their Reset also clears the server copy.
+function isEnterpriseMember() {
+    return !!AppState.profile?.enterprise_id;
+}
+
 async function hydrateFromServer() {
+    // An enterprise member's device is the working copy; pulling server rows back in
+    // would undo their local Reset (the server keeps the data for the admin).
+    if (isEnterpriseMember()) return;
     const serverRows = await fetchOwnServerScans();
     const local = new Set((await getAllScans()).map(s => s.scan_uid));
     for (const row of serverRows) {
@@ -660,28 +672,47 @@ function showResetModal() {
 async function executeResetSession(confirmed) {
     document.getElementById('resetModal').classList.remove('active');
     if (confirmed) {
-        if (!AppState.isOnline) {
-            alert(scannerT('errResetNeedsConnection'));
-            return;
-        }
-        try {
-            // Bring in anything on the server this device lacks, so the export holds
-            // every row that the reset is about to delete.
-            await hydrateFromServer();
-            await loadAndDisplayScans();
-        } catch (err) {
-            console.error('Pre-reset refresh failed:', err);
-            alert(scannerT('errLoadFailed'));
-            return;
-        }
-        await downloadScannerExcel();
-        try {
-            await clearServerScans();
-            await clearLocalScans();
-        } catch (err) {
-            console.error('Clear scans failed:', err);
-            alert(scannerT('errSaveFailed'));
-            return;
+        if (isEnterpriseMember()) {
+            // Admin's copy lives on the server: nothing closed may be lost before we clear the device.
+            if (AppState.isOnline) await autoSyncScans();
+            const pending = (await getAllScans()).filter(s => !s.synced && s.box_status === 'Closed');
+            if (pending.length > 0) {
+                await loadAndDisplayScans();
+                alert(scannerT('errResetPendingSync'));
+                return;
+            }
+            await downloadScannerExcel();
+            try {
+                await clearLocalScans();
+            } catch (err) {
+                console.error('Clear local scans failed:', err);
+                alert(scannerT('errSaveFailed'));
+                return;
+            }
+        } else {
+            if (!AppState.isOnline) {
+                alert(scannerT('errResetNeedsConnection'));
+                return;
+            }
+            try {
+                // Bring in anything on the server this device lacks, so the export holds
+                // every row that the reset is about to delete.
+                await hydrateFromServer();
+                await loadAndDisplayScans();
+            } catch (err) {
+                console.error('Pre-reset refresh failed:', err);
+                alert(scannerT('errLoadFailed'));
+                return;
+            }
+            await downloadScannerExcel();
+            try {
+                await clearServerScans();
+                await clearLocalScans();
+            } catch (err) {
+                console.error('Clear scans failed:', err);
+                alert(scannerT('errSaveFailed'));
+                return;
+            }
         }
         clearScannerSession();
         document.getElementById('scannerRemarkInput').value = '';
@@ -756,7 +787,7 @@ async function initBoxScanner() {
     }
     setupScannerEventListeners();
     const hasSession = loadScannerSession();
-    if (AppState.isOnline) {
+    if (AppState.isOnline && !isEnterpriseMember()) {
         try { await hydrateFromServer(); } catch (err) { console.log('Server refresh failed:', err); }
         saveScannerSession();
     }
