@@ -34,11 +34,19 @@ A running, numbered backlog of everything discussed for this app, so it isn't ju
 19. Two account tiers:
     - **Single/individual user** — scans and sees only their own data
     - **Enterprise** — an enterprise admin oversees ~10–15 sub-users under their org, can view all their data, and can reset it
+    - **Decided:** self-serve at signup (user picks Individual or Enterprise, no approval needed); enterprise admin adds sub-users via email invite (sub-user clicks link, signs in with Google, auto-joins the enterprise); an Individual user can later upgrade/join an Enterprise (not locked in forever)
 20. All logged-in users (either tier) eventually see the same set of tools on the home screen (4–6 tools: Box Scanner, Item Barcode, Box Code, etc. — exact list TBD) — **but during the pilot phase, only Box Scanner is shown; other tiles stay hidden until each is migrated in turn**
 21. Fix the current data-isolation gap: today anyone with Google Sheet access can see all users' scanned data mixed together with no separation — Supabase migration must enforce per-user/per-enterprise data scoping (Row-Level Security)
 22. When a user or enterprise admin resets their data, it must be **actually deleted** from Supabase (not just hidden/flagged) to keep storage within free-tier limits while scaling toward 500 users
 23. Everything must stay on free tiers across all tools/services used
 24. App must keep functioning exactly as it does now through the migration
+25. **Decided schema (final, ready to implement):**
+    - `profiles` — one row per signed-in user: `id`, `email`, `display_name`, `tier` (`individual`/`enterprise_admin`/`enterprise_member`), `enterprise_id` (nullable)
+    - `enterprises` — one row per org: `id`, `name`, `admin_user_id`
+    - `enterprise_invites` — pending email invites: `id`, `enterprise_id`, `invited_email`, `status`, `token`, `expires_at`
+    - `scans` — replaces both IndexedDB and the Google Sheet, same fields the app already uses (`store_id`, `store_name`, `staff_name`, `remark`, `box_number`, `barcode`, `qty`, `box_status`, `timestamp`, `scan_uid`), plus `user_id` and `enterprise_id` for ownership
+    - RLS: individuals and enterprise members only see their own `scans`; enterprise admins see every `scans` row tagged with their `enterprise_id`; Reset performs a real `DELETE`, not a soft-delete flag
+    - Net effect: replaces the current IndexedDB-then-sync-to-Sheets dual-write complexity with a single direct write to Supabase — simpler than what exists today, not more complex
 
 ## E. Auth
 
@@ -59,8 +67,8 @@ A running, numbered backlog of everything discussed for this app, so it isn't ju
 
 ## Phasing (agreed approach)
 
-1. **Phase 1 (next up):** Clone the app on a new branch (`saas-pilot`), hide every tool tile except Box Scanner, deploy that branch to `utility.arwaenterprises.com` as a second Netlify site. No backend changes yet — still talks to the same Google Apps Script.
-2. **Phase 2:** Design and build the Supabase migration for Box Scanner only — accounts, Google OAuth, Row-Level Security multi-tenancy, data-reset-deletes-data behavior (items 17–26). This needs its own dedicated design session before implementation starts.
+1. **Phase 1 — done:** Cloned the app on branch `saas-pilot`, hid every tool tile except Box Scanner, deployed that branch to a second Netlify site, pointed `utility.arwaenterprises.com` at it. Live over HTTP; HTTPS cert issuance deferred (DNS now correct, just needs a retry in Netlify when convenient — not blocking). Still talks to the same Google Apps Script — no backend changes yet.
+2. **Phase 2 (next up):** Design and build the Supabase migration for Box Scanner only — accounts, Google OAuth, Row-Level Security multi-tenancy, data-reset-deletes-data behavior (items 17–26). This needs its own dedicated design session before implementation starts.
 3. **Phase 3:** Once Box Scanner on Supabase is proven stable, decide on rolling the same pattern out to the remaining tools, revealing each tile as it's migrated.
 4. **Phase 4:** Add Google AdSense once the Supabase migration is stable (items 27–31).
 5. **Phase 5:** Retire the old Netlify + Google Apps Script version once the new one is fully proven.
