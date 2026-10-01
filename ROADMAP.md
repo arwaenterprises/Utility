@@ -15,10 +15,8 @@ A running, numbered backlog of everything discussed for this app, so it isn't ju
 
 ## B. Known pending (security & cleanup)
 
-9. Google Apps Script backend (`doPost`) has no authentication — anyone with the script URL can write arbitrary data to the Google Sheet. **Note:** Box Scanner no longer uses this path at all (see section D) — it only still applies to the tools not yet migrated off the old backend.
 10. Year/Season Sort's admin reset still uses the same hardcoded-password pattern Box Scanner used to have (not fixed — wasn't in scope when Box Scanner's was removed)
 11. No security headers (CSP, X-Frame-Options, etc.) configured on Netlify
-12. Store login has no password — **superseded for Box Scanner**: it no longer has Store ID login at all, replaced by Google OAuth (item 32). Still applies to tools not yet migrated.
 13. No automated tests exist for this app
 14. No roadmap/backlog tracking file existed in the repo — **this file is the fix**
 
@@ -51,9 +49,9 @@ A running, numbered backlog of everything discussed for this app, so it isn't ju
 30. Single-overlay modal behavior: Account and Team modals no longer stack — opening Team closes Account, closing Team doesn't pop Account back up
 31. Verified against a local Postgres instance (6,000 synthetic rows across 5 users: correct aggregates, correct search matches, non-admin callers rejected) and a headless-browser pass over the frontend with mocked data (expand/collapse, selection, per-row and bulk downloads, search grouping)
 
-## D3. Still pending from the SaaS migration
+## D3. SaaS migration leftovers
 
-32. **Real offline support with IndexedDB** — explicitly requested after scanning felt less responsive than the old IndexedDB-backed version ("the crispness fix"). Box Scanner is currently online-only against Supabase. Flagged repeatedly as the single biggest remaining piece of this migration; not yet designed or built.
+32. **Real offline support with IndexedDB** — ✅ **built**, same offline-first model as the `main` branch ("the crispness fix"). Every scan is written to a per-user IndexedDB database first (instant, works with no connection); closing a box marks its scans pending and a background sync pushes them to Supabase every 10s (and immediately on reconnect or box close). Sync is an `upsert` on `scans.scan_uid` (a UUID generated once at scan time), so a retried batch never duplicates rows; a Web Lock keeps a second tab/PWA from syncing at the same time. The "Last 5 Scans" header shows a sync badge (✓ or the number of closed-box scans still pending). On open, the user's own server rows missing on the device are pulled in (new device / pre-offline data). Reset still downloads then deletes, but needs a connection so the server copy is cleared too. **Not yet verified on a real device against live Supabase** — needs a real-world pass (scan offline, reconnect, confirm rows land once).
 33. Five admin-management gaps, explicitly deferred by the user for a later round: multiple admins per enterprise, an audit trail, invite expiration handling, enterprise settings/rename, billing/seat-count hooks.
 
 ## E. Auth — ✅ done
@@ -67,18 +65,18 @@ A running, numbered backlog of everything discussed for this app, so it isn't ju
 37. App needs ad placements designed in; exact placement/timing strategy TBD beyond the two specifics below
 38. Box Scanner: show an ad after a box is closed, during the natural ~5–10 second gap while the user tapes/places the box before scanning the next one — **not** a gate blocking the close-box action itself
 39. Desktop layout: the app renders as a centered mobile-width card with empty space on both sides on wide screens — use that space for display ads
-40. AdSense is not a near-term priority — explicitly deferred until after the Supabase migration is stable. The core migration (section D) is done, but item 32 (offline support) was called out as part of that same effort and is still open, so AdSense stays deferred until that's resolved too, unless the user says otherwise.
+40. AdSense is not a near-term priority — explicitly deferred until after the Supabase migration is stable. The core migration (section D) and offline support (item 32) are now built; AdSense stays deferred until the user decides to start it and the migration has had a real-world soak.
 
 ## G. Domain compliance (outside this repo)
 
-41. `arwaenterprises.com` is missing a Privacy Policy and Terms of Service page — needed for both AdSense approval and Google OAuth consent screen verification (blocks items 34 and 36). No About page either (minor). This is work on the main marketing site, not in the `Utility` repo, but flagged here so it isn't lost.
+41. `arwaenterprises.com` is missing a Privacy Policy and Terms of Service page — needed for both AdSense approval and Google OAuth consent screen verification (blocks item 36 and Google OAuth consent screen verification). No About page either (minor). This is work on the main marketing site, not in the `Utility` repo, but flagged here so it isn't lost.
 
 ## Phasing (agreed approach)
 
 1. **Phase 1 — done:** Cloned the app on branch `saas-pilot`, hid every tool tile except Box Scanner, deployed that branch to a second Netlify site, pointed `utility.arwaenterprises.com` at it.
-2. **Phase 2 — done:** Supabase migration for Box Scanner — accounts, Google OAuth, Row-Level Security multi-tenancy, data-reset-deletes-data behavior, enterprise invite/accept/remove, and the unified Team Management console (items 17–31). Verified live in production by the user. What's left from this phase: real offline support (item 32) and the deferred admin-management gaps (item 33).
+2. **Phase 2 — done:** Supabase migration for Box Scanner — accounts, Google OAuth, Row-Level Security multi-tenancy, data-reset-deletes-data behavior, enterprise invite/accept/remove, and the unified Team Management console (items 17–31). Verified live in production by the user. Offline support (item 32) is now built too. What's left from this phase: the deferred admin-management gaps (item 33).
 3. **Phase 3 (next up):** Roll the same Supabase pattern out to the remaining tools (Item Barcode, Box Code, Photo Capture, Box Segregate, Price Check, Year/Season Sort), revealing each tile as it's migrated. Not started.
-4. **Phase 4:** Add Google AdSense once the migration is fully stable, including offline support (items 36–40).
+4. **Phase 4:** Add Google AdSense once the migration is fully stable (items 36–40).
 5. **Phase 5:** Retire the old Netlify + Google Apps Script version once the new one is fully proven.
 
 Independent of the phases above: item 41 (Privacy Policy/Terms on the main domain) can be done any time — it isn't blocking any phase.

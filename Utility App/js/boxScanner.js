@@ -12,8 +12,21 @@ const ScannerState = {
     pendingDeleteId: null,
     completedBoxes: new Set(),
     isProcessingClose: false,
-    isSubmittingScan: false
+    isSyncing: false,
+    syncIntervalId: null
 };
+
+// Unique ID for every scan. Generated once at scan time and never regenerated, so a
+// resent batch carries the same IDs and Supabase upserts it onto the row it already
+// wrote instead of creating a duplicate. Must be a valid UUID (scans.scan_uid is uuid).
+function newScanUid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    // Fallback for non-secure contexts where crypto.randomUUID is unavailable
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+}
 
 const ScannerT = {
     en: {
@@ -34,7 +47,7 @@ const ScannerT = {
         errModeLockedDuringBox: "Close the current box before changing Nu/AlNu mode",
         errDuplicateBarcode: "This barcode was already scanned in this box",
         errUniqueLockedDuringBox: "Close the current box before changing the No Dup setting",
-        errOffline: "You're offline — scanning needs a connection",
+        errResetNeedsConnection: "Reset needs an internet connection so your server data is cleared too",
         errSaveFailed: "Could not save scan, please try again",
         errLoadFailed: "Could not load your scans, please try again",
         lblUniqueToggle: "No Dup",
@@ -59,7 +72,7 @@ const ScannerT = {
         errModeLockedDuringBox: "أغلق الصندوق الحالي قبل تغيير وضع Nu/AlNu",
         errDuplicateBarcode: "تم مسح هذا الباركود مسبقًا في هذا الصندوق",
         errUniqueLockedDuringBox: "أغلق الصندوق الحالي قبل تغيير إعداد منع التكرار",
-        errOffline: "أنت غير متصل — المسح يحتاج إلى اتصال",
+        errResetNeedsConnection: "إعادة التعيين تحتاج إلى اتصال بالإنترنت لمسح بيانات الخادم أيضًا",
         errSaveFailed: "تعذر حفظ المسح، حاول مرة أخرى",
         errLoadFailed: "تعذر تحميل المسح، حاول مرة أخرى",
         lblUniqueToggle: "بدون تكرار",
@@ -71,39 +84,138 @@ const ScannerT = {
 function scannerT(key) { return ScannerT[ScannerState.language][key] || key; }
 
 // ============================================
-// BOX SCANNER - SUPABASE DATA LAYER
+// BOX SCANNER - LOCAL DATABASE (IndexedDB)
 // ============================================
-// Online-only by design for this pilot: every scan writes straight to Supabase,
-// no local queue. If the write fails (e.g. offline), the scan is not recorded
-// and the user sees an error rather than a silently lost/queued item.
+// Offline-first, same model as the main branch: every scan is written to
+// IndexedDB first (instant, works with no connection), and closed boxes are
+// pushed to Supabase in the background (see "SUPABASE SYNC" below). Local rows
+// use the same snake_case fields as the Supabase `scans` table, plus a local-only
+// `synced` flag. The database is per signed-in user so two accounts sharing a
+// device never see each other's scans.
+let scannerDB = null;
+let scannerDBName = null;
+const SCANNER_STORE = 'scans';
 
-async function addScan(scan) {
-    const { data, error } = await supabaseClient.from('scans').insert(scan).select().single();
-    if (error) throw error;
-    return data;
+function initScannerDB() {
+    const name = 'AKBoxScannerDB_' + AppState.user.id;
+    if (scannerDB && scannerDBName === name) return Promise.resolve(scannerDB);
+    if (scannerDB) { scannerDB.close(); scannerDB = null; }
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(name, 1);
+        req.onerror = () => reject(req.error);
+        req.onsuccess = () => { scannerDB = req.result; scannerDBName = name; resolve(scannerDB); };
+        req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(SCANNER_STORE)) {
+                db.createObjectStore(SCANNER_STORE, { keyPath: 'scan_uid' });
+            }
+        };
+    });
 }
+
+function scannerStoreOp(mode, fn) {
+    return new Promise((resolve, reject) => {
+        const tx = scannerDB.transaction([SCANNER_STORE], mode);
+        const req = fn(tx.objectStore(SCANNER_STORE));
+        tx.oncomplete = () => resolve(req ? req.result : undefined);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+    });
+}
+
+function addScan(scan) { return scannerStoreOp('readwrite', (store) => store.add(scan)); }
+function updateScan(scan) { return scannerStoreOp('readwrite', (store) => store.put(scan)); }
+function deleteScanById(scanUid) { return scannerStoreOp('readwrite', (store) => store.delete(scanUid)); }
+function clearLocalScans() { return scannerStoreOp('readwrite', (store) => store.clear()); }
 
 async function getAllScans() {
-    const { data, error } = await supabaseClient.from('scans').select('*').order('scanned_at', { ascending: true });
-    if (error) throw error;
-    return data;
+    const scans = await scannerStoreOp('readonly', (store) => store.getAll());
+    return scans.sort((a, b) => (a.scanned_at < b.scanned_at ? -1 : a.scanned_at > b.scanned_at ? 1 : 0));
 }
 
-async function closeBoxScansInDb(boxNumber) {
-    const { error } = await supabaseClient
-        .from('scans')
-        .update({ box_status: 'Closed' })
-        .eq('box_number', boxNumber)
-        .eq('box_status', 'Open');
-    if (error) throw error;
+// ============================================
+// BOX SCANNER - SUPABASE SYNC
+// ============================================
+const SCANNER_SYNC_BATCH = 500;
+const SCANNER_SYNC_INTERVAL_MS = 10000;
+
+// Upserting on scan_uid makes a retry safe: a batch that reached Supabase but whose
+// response was lost is simply written onto the same rows again.
+async function pushScansToServer(scans) {
+    for (let i = 0; i < scans.length; i += SCANNER_SYNC_BATCH) {
+        const rows = scans.slice(i, i + SCANNER_SYNC_BATCH).map(({ synced, ...row }) => row);
+        const { error } = await supabaseClient.from('scans').upsert(rows, { onConflict: 'scan_uid' });
+        if (error) throw error;
+    }
 }
 
-async function deleteScanById(id) {
-    const { error } = await supabaseClient.from('scans').delete().eq('id', id);
-    if (error) throw error;
+// The in-page isSyncing flag cannot see a second tab or the installed PWA, which share
+// the same IndexedDB. The Web Lock is held across the whole origin, so only one
+// instance on the device can be syncing at a time.
+async function autoSyncScans() {
+    if (!navigator.locks) return runAutoSync();
+    return navigator.locks.request('ak-box-scanner-sync', { ifAvailable: true }, async (lock) => {
+        if (!lock) return; // another tab holds it
+        return runAutoSync();
+    });
 }
 
-async function clearAllScans() {
+async function runAutoSync() {
+    if (ScannerState.isSyncing || !AppState.isOnline || !AppState.user || !scannerDB) return;
+    ScannerState.isSyncing = true;
+    try {
+        // Read from the local DB (not ScannerState.scans) so a second tab's changes are seen.
+        const all = await getAllScans();
+        const unsynced = all.filter(s => !s.synced && s.box_status === 'Closed');
+        if (unsynced.length === 0) return;
+        await pushScansToServer(unsynced);
+        for (const scan of unsynced) {
+            scan.synced = true;
+            await updateScan(scan);
+        }
+        await loadAndDisplayScans();
+    } catch (err) {
+        // Scans stay synced=false and are retried on the next tick.
+        console.log('Auto-sync failed:', err);
+    } finally {
+        ScannerState.isSyncing = false;
+    }
+}
+
+// Pull the signed-in user's own rows that this device does not have yet (a new device,
+// cleared browser data, or scans from before offline support existed). Pulled rows are
+// marked synced. Own rows only: an enterprise admin's RLS also exposes team rows.
+async function fetchOwnServerScans() {
+    const rows = [];
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabaseClient
+            .from('scans').select('*')
+            .eq('user_id', AppState.user.id)
+            .order('scanned_at', { ascending: true })
+            .range(from, from + pageSize - 1);
+        if (error) throw error;
+        rows.push(...data);
+        if (data.length < pageSize) break;
+    }
+    return rows;
+}
+
+async function hydrateFromServer() {
+    const serverRows = await fetchOwnServerScans();
+    const local = new Set((await getAllScans()).map(s => s.scan_uid));
+    for (const row of serverRows) {
+        if (local.has(row.scan_uid)) continue;
+        await addScan({
+            scan_uid: row.scan_uid, user_id: row.user_id, enterprise_id: row.enterprise_id,
+            remark: row.remark, box_number: row.box_number, barcode: row.barcode, qty: row.qty,
+            box_status: row.box_status, scanned_at: row.scanned_at, synced: true
+        });
+        if (row.box_status === 'Closed') ScannerState.completedBoxes.add(row.box_number);
+    }
+}
+
+async function clearServerScans() {
     const { error } = await supabaseClient.from('scans').delete().eq('user_id', AppState.user.id);
     if (error) throw error;
 }
@@ -310,39 +422,31 @@ async function handleBarcodeScan(e) {
         }
     }
 
-    if (!AppState.isOnline) {
-        alert(scannerT('errOffline'));
-        return;
-    }
-
-    if (ScannerState.isSubmittingScan) return;
-    ScannerState.isSubmittingScan = true;
-    document.getElementById('scannerKbdBtn')?.classList.add('processing');
-
     const scan = {
+        scan_uid: newScanUid(),
         user_id: AppState.user.id,
         enterprise_id: AppState.profile?.enterprise_id || null,
         remark: ScannerState.remark,
         box_number: String(ScannerState.currentBox),
         barcode: String(barcode),
         qty: 1,
-        box_status: 'Open'
+        box_status: 'Open',
+        scanned_at: new Date().toISOString(),
+        synced: false
     };
 
     try {
         await addScan(scan);
-        document.getElementById('barcodeInput').value = '';
-        document.getElementById('barcodeInput').classList.add('input-highlight');
-        setTimeout(() => document.getElementById('barcodeInput').classList.remove('input-highlight'), 500);
-        resetScannerKeyboard();
-        await loadAndDisplayScans();
     } catch (err) {
         console.error('Save scan failed:', err);
         alert(scannerT('errSaveFailed'));
-    } finally {
-        ScannerState.isSubmittingScan = false;
-        document.getElementById('scannerKbdBtn')?.classList.remove('processing');
+        return;
     }
+    document.getElementById('barcodeInput').value = '';
+    document.getElementById('barcodeInput').classList.add('input-highlight');
+    setTimeout(() => document.getElementById('barcodeInput').classList.remove('input-highlight'), 500);
+    resetScannerKeyboard();
+    await loadAndDisplayScans();
 }
 
 // ============================================
@@ -394,7 +498,13 @@ async function executeCloseBox() {
 
     try {
         const closedBox = ScannerState.currentBox;
-        await closeBoxScansInDb(closedBox);
+        for (const scan of ScannerState.scans) {
+            if (scan.box_number === closedBox && scan.box_status === 'Open') {
+                scan.box_status = 'Closed';
+                scan.synced = false;
+                await updateScan(scan);
+            }
+        }
         if (closedBox) ScannerState.completedBoxes.add(closedBox);
         ScannerState.currentBox = null;
         ScannerState.boxScanning = false;
@@ -409,6 +519,7 @@ async function executeCloseBox() {
         updateScannerStats();
         syncScannerModeLock();
         syncScannerUniqueLock();
+        if (AppState.isOnline) autoSyncScans();
     } catch (err) {
         console.error('Close box failed:', err);
         alert(scannerT('errSaveFailed'));
@@ -430,6 +541,20 @@ async function loadAndDisplayScans() {
     }
     updateScannerStats();
     updateScansTable();
+    updateSyncBadge();
+}
+
+function updateSyncBadge() {
+    const badge = document.getElementById('syncBadge');
+    if (!badge) return;
+    const pending = ScannerState.scans.filter(s => !s.synced && s.box_status === 'Closed').length;
+    if (pending === 0) {
+        badge.textContent = '✓';
+        badge.className = 'sync-badge synced';
+    } else {
+        badge.textContent = pending;
+        badge.className = 'sync-badge pending';
+    }
 }
 
 function updateScannerStats() {
@@ -456,7 +581,7 @@ function updateScansTable() {
     recent.forEach(scan => {
         const tr = document.createElement('tr');
         const time = new Date(scan.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        tr.innerHTML = `<td>${scan.barcode}</td><td>${time}</td><td><button class="delete-scan-btn" data-id="${scan.id}" data-barcode="${scan.barcode}">✕</button></td>`;
+        tr.innerHTML = `<td>${scan.barcode}</td><td>${time}</td><td><button class="delete-scan-btn" data-id="${scan.scan_uid}" data-barcode="${scan.barcode}">✕</button></td>`;
         tbody.appendChild(tr);
     });
 }
@@ -535,9 +660,24 @@ function showResetModal() {
 async function executeResetSession(confirmed) {
     document.getElementById('resetModal').classList.remove('active');
     if (confirmed) {
+        if (!AppState.isOnline) {
+            alert(scannerT('errResetNeedsConnection'));
+            return;
+        }
+        try {
+            // Bring in anything on the server this device lacks, so the export holds
+            // every row that the reset is about to delete.
+            await hydrateFromServer();
+            await loadAndDisplayScans();
+        } catch (err) {
+            console.error('Pre-reset refresh failed:', err);
+            alert(scannerT('errLoadFailed'));
+            return;
+        }
         await downloadScannerExcel();
         try {
-            await clearAllScans();
+            await clearServerScans();
+            await clearLocalScans();
         } catch (err) {
             console.error('Clear scans failed:', err);
             alert(scannerT('errSaveFailed'));
@@ -607,8 +747,19 @@ function setupScannerEventListeners() {
 // BOX SCANNER - INITIALIZATION
 // ============================================
 async function initBoxScanner() {
+    try {
+        await initScannerDB();
+    } catch (err) {
+        console.error('Open local scan database failed:', err);
+        alert(scannerT('errLoadFailed'));
+        return;
+    }
     setupScannerEventListeners();
     const hasSession = loadScannerSession();
+    if (AppState.isOnline) {
+        try { await hydrateFromServer(); } catch (err) { console.log('Server refresh failed:', err); }
+        saveScannerSession();
+    }
     applyScannerTranslations();
 
     if (hasSession && ScannerState.remark) {
@@ -629,7 +780,20 @@ async function initBoxScanner() {
     } else {
         showScannerScreen('scannerSessionScreen');
     }
+
+    // initBoxScanner runs every time the app tile is opened (js/app.js), so clear any
+    // interval from a previous open instead of stacking up a new one each time.
+    if (ScannerState.syncIntervalId) clearInterval(ScannerState.syncIntervalId);
+    ScannerState.syncIntervalId = setInterval(() => {
+        if (AppState.isOnline && AppState.user) autoSyncScans();
+    }, SCANNER_SYNC_INTERVAL_MS);
+    autoSyncScans();
 }
+
+// Push pending scans the moment the connection comes back instead of waiting for the next tick.
+window.addEventListener('online', () => {
+    if (ScannerState.syncIntervalId && AppState.user) autoSyncScans();
+});
 
 // ============================================
 // BOX SCANNER - KEYBOARD TOGGLE
