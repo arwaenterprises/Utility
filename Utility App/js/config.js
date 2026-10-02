@@ -32,7 +32,7 @@ function appIconHtml(app, cls) {
 const AppState = {
     user: null,
     profile: null,
-    pendingInviteToken: null,
+    pendingInvites: [],          // invitations waiting for this person (see checkForMyPendingInvite)
     currentApp: null,
     currentScreen: 'loginScreen',
     hasActiveSession: false,

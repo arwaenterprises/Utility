@@ -2372,3 +2372,7 @@ body.rtl .app-back-btn { transform: scaleX(-1); }
 .bs-sync-btn.bs-upload-btn .btn-img { filter: none; }
 
 .help-ico { width: 18px; height: 18px; vertical-align: -4px; }
+
+.invite-choice { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--ak-gray-200); }
+.invite-choice:last-child { border-bottom: none; }
+.invite-choice small { color: var(--ak-text-light); font-size: 11px; }

@@ -166,3 +166,28 @@ select _t_eq('owner view shows names and enterprise', (select count(*) from usag
 select _t_eq('delete_my_account() does not exist (feature rolled back)', (select count(*) from pg_proc where proname = 'delete_my_account'), 0);
 
 \echo All access-rule tests passed
+
+-- ============ invitations ============
+insert into auth.users(id,email) values ('00000000-0000-0000-0000-0000000000d1','invitee@x.com');
+select _t_eq('admin can send an invitation', _t_val('00000000-0000-0000-0000-0000000000e1', $$select case when send_enterprise_invite('Invitee@X.com')='sent' then 1 else 0 end$$), 1);
+select _t_eq('a second invitation to the same email is ignored while one is waiting', _t_val('00000000-0000-0000-0000-0000000000e1', $$select case when send_enterprise_invite('invitee@x.com')='already_pending' then 1 else 0 end$$), 1);
+select _t_eq('...so only one invitation row exists', (select count(*) from enterprise_invites where lower(invited_email)='invitee@x.com' and enterprise_id='11111111-1111-1111-1111-111111111111'), 1);
+select _t_do('00000000-0000-0000-0000-0000000000e2', $$select send_enterprise_invite('invitee@x.com')$$);
+select _t_eq('another company can invite the same person (both invitations wait)', (select count(*) from enterprise_invites where lower(invited_email)='invitee@x.com' and status='pending'), 2);
+select _t_eq('the invited person sees both, with the company names', _t_val('00000000-0000-0000-0000-0000000000d1', $$select count(*) from my_pending_invites() where enterprise_name in ('New Name','E2')$$), 2);
+select _t_eq('someone else sees none of them', _t_val('00000000-0000-0000-0000-00000000000a', $$select count(*) from my_pending_invites()$$), 0);
+select _t_err('inviting a member of another company is refused at once', '00000000-0000-0000-0000-0000000000e2', $$select send_enterprise_invite('member1@x.com')$$, 'another company');
+select _t_err('inviting the admin of another company is refused at once', '00000000-0000-0000-0000-0000000000e1', $$select send_enterprise_invite('admin2@x.com')$$, 'another company');
+select _t_err('inviting your own team member is refused', '00000000-0000-0000-0000-0000000000e1', $$select send_enterprise_invite('member1@x.com')$$, 'already in your team');
+select _t_err('a bad email is refused', '00000000-0000-0000-0000-0000000000e1', $$select send_enterprise_invite('not-an-email')$$, 'valid email');
+select _t_err('a member cannot send invitations', '00000000-0000-0000-0000-0000000000b1', $$select send_enterprise_invite('x@y.com')$$, 'Only the enterprise admin');
+select _t_err('an individual cannot send invitations', '00000000-0000-0000-0000-00000000000a', $$select send_enterprise_invite('x@y.com')$$, 'Only the enterprise admin');
+select _t_do('00000000-0000-0000-0000-0000000000d1', $$select accept_enterprise_invite((select token from my_pending_invites() where enterprise_name='New Name'))$$);
+select _t_eq('accepting one closes the other waiting invitation (expired, not pending)', (select count(*) from enterprise_invites where lower(invited_email)='invitee@x.com' and status='expired'), 1);
+select _t_eq('the person no longer sees any waiting invitation', _t_val('00000000-0000-0000-0000-0000000000d1', $$select count(*) from my_pending_invites()$$), 0);
+select _t_err('the closed invitation can no longer be accepted', '00000000-0000-0000-0000-0000000000d1', $$select accept_enterprise_invite((select token from enterprise_invites where enterprise_id='22222222-2222-2222-2222-222222222222' and lower(invited_email)='invitee@x.com'))$$, 'already belong');
+
+
+-- tidy up the person created for the invitation checks, so later checks see the same people as before
+delete from enterprise_invites where lower(invited_email) = 'invitee@x.com';
+delete from auth.users where id = '00000000-0000-0000-0000-0000000000d1';

@@ -54,6 +54,27 @@ window.__rpcCalls = [];
   }
   const rpcs = {
     remove_enterprise_member: ({ member_user_id }) => { window.__removedMember = member_user_id; return true; },
+    my_pending_invites: () => window.__me.enterprise_id ? [] : db.enterprise_invites
+      .filter(i => i.status === 'pending' && new Date(i.expires_at) > new Date() && String(i.invited_email).toLowerCase() === String(window.__me.email).toLowerCase())
+      .map(i => ({ id: i.id, token: i.token || ('tok-' + i.id), enterprise_name: i.enterprise_name || 'Company ' + i.enterprise_id, expires_at: i.expires_at })),
+    accept_enterprise_invite: ({ invite_token }) => {
+      const inv = db.enterprise_invites.find(i => (i.token || ('tok-' + i.id)) === invite_token && i.status === 'pending');
+      if (window.__me.enterprise_id) throw { message: 'You already belong to an enterprise.' };
+      if (!inv) throw { message: 'Invite not found, already used, or expired.' };
+      inv.status = 'accepted';
+      db.enterprise_invites.forEach(i => { if (i !== inv && i.status === 'pending' && String(i.invited_email).toLowerCase() === String(inv.invited_email).toLowerCase()) i.status = 'expired'; });
+      window.__me = { ...window.__me, enterprise_id: inv.enterprise_id, tier: 'enterprise_member' };
+      return true;
+    },
+    send_enterprise_invite: ({ p_email }) => {
+      const email = String(p_email || '').trim().toLowerCase();
+      if (window.__me.tier !== 'enterprise_admin') throw { message: 'Only the enterprise admin can invite people.' };
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw { message: 'Please enter a valid email address.' };
+      if ((window.__alreadyInCompany || []).includes(email)) throw { message: 'This person already belongs to another company, so they cannot be invited.' };
+      if (db.enterprise_invites.some(i => i.enterprise_id === window.__me.enterprise_id && String(i.invited_email).toLowerCase() === email && i.status === 'pending' && new Date(i.expires_at) > new Date())) return 'already_pending';
+      db.enterprise_invites.push({ id: 'i' + Math.random(), enterprise_id: window.__me.enterprise_id, invited_email: email, status: 'pending', expires_at: new Date(Date.now() + 7 * 864e5).toISOString() });
+      return 'sent';
+    },
     begin_list_upload: ({ p_list_type }) => { db.reference_chunks = db.reference_chunks.filter(r => !(r.list_type === p_list_type && !r.is_active && owned(r))); },
     append_list_chunk: ({ p_list_type, p_seq, p_rows }) => {
       if (window.__failSeq === p_seq) throw { message: 'chunk failed (test)' };

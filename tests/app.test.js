@@ -347,6 +347,55 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     // ---------- account deletion was rolled back ----------
     ok('no Delete-account button, modal or code in the app', !document.getElementById('openDeleteAccountBtn') && !document.getElementById('deleteAccountModal') && typeof openDeleteAccount === 'undefined' && typeof confirmDeleteAccount === 'undefined');
 
+    // ---------- invitations: safer sending, clearer receiving ----------
+    window.alert = m => { window.__lastAlert = String(m); };
+    const inviteRows = e => __db.enterprise_invites.filter(i => i.invited_email === e).length;
+    __db.enterprise_invites = [];
+    AppState.user = { id: 'u1', email: 'a@b.c' }; AppState.profile = { display_name: 'Admin', enterprise_id: 'E1', tier: 'enterprise_admin' };
+    window.__me = { id: 'u1', email: 'a@b.c', tier: 'enterprise_admin', enterprise_id: 'E1' };
+    const sendTo = async (email) => { window.__lastAlert = ''; document.getElementById('inviteEmailInput').value = email; await sendInvite(); };
+    await sendTo('Pat@X.com');
+    ok('an invitation is sent', inviteRows('pat@x.com') === 1 && window.__lastAlert === '');
+    await sendTo('pat@x.com');
+    ok('a second invitation to the same email is ignored, with a friendly note', inviteRows('pat@x.com') === 1 && /already waiting/.test(window.__lastAlert), window.__lastAlert);
+    window.__alreadyInCompany = ['busy@x.com']; await sendTo('busy@x.com');
+    ok('inviting someone who already belongs to a company is refused at once', inviteRows('busy@x.com') === 0 && /already belongs to another company/.test(window.__lastAlert), window.__lastAlert);
+    await sendTo('not-an-email');
+    ok('a bad email is refused with a clear message', /valid email/.test(window.__lastAlert));
+    // the person who received two invitations
+    __db.enterprise_invites = [
+      { id: 'iA', enterprise_id: 'EA', enterprise_name: 'Alpha Trading', invited_email: 'pat@x.com', status: 'pending', expires_at: new Date(Date.now() + 5 * 864e5).toISOString() },
+      { id: 'iB', enterprise_id: 'EB', enterprise_name: 'Beta Stores', invited_email: 'pat@x.com', status: 'pending', expires_at: new Date(Date.now() + 5 * 864e5).toISOString() }];
+    window.__me = { id: 'u9', email: 'Pat@X.com', tier: 'individual', enterprise_id: null };
+    AppState.user = { id: 'u9', email: 'pat@x.com' }; AppState.profile = { display_name: 'Pat', enterprise_id: null, tier: 'individual' };
+    await checkForMyPendingInvite();
+    const banner = document.getElementById('inviteBanner');
+    ok('two invitations: the banner says how many and offers Choose', banner.style.display === 'flex' && /You have 2 invitations/.test(document.getElementById('inviteBannerInfo').textContent) && document.getElementById('acceptInviteBtn').textContent === 'Choose');
+    AppLang.set('ar');
+    ok('... and the banner follows the Arabic language choice', /[\u0600-\u06FF]/.test(document.getElementById('inviteBannerInfo').textContent) && /2/.test(document.getElementById('inviteBannerInfo').textContent));
+    AppLang.set('en');
+    document.getElementById('acceptInviteBtn').click();
+    ok('Choose opens a list with BOTH company names', document.getElementById('inviteModal').classList.contains('active') && /Alpha Trading/.test(document.getElementById('inviteModalList').textContent) && /Beta Stores/.test(document.getElementById('inviteModalList').textContent) && document.querySelectorAll('#inviteModalList [data-accept-invite]').length === 2);
+    document.querySelector('#inviteModalList [data-accept-invite]').click(); await new Promise(r => setTimeout(r, 80));
+    const stat = n => __db.enterprise_invites.find(i => i.id === n).status;
+    ok('accepting one joins that company and closes the other invitation', [stat('iA'), stat('iB')].sort().join() === 'accepted,expired' && AppState.profile.tier === 'enterprise_member', [stat('iA'), stat('iB')].join());
+    ok('the banner and the list close afterwards', !document.getElementById('inviteModal').classList.contains('active') && banner.style.display === 'none');
+    // one invitation: the banner names the company and accepts directly
+    __db.enterprise_invites = [{ id: 'iC', enterprise_id: 'EC', enterprise_name: 'Gamma Ltd', invited_email: 'lee@x.com', status: 'pending', expires_at: new Date(Date.now() + 5 * 864e5).toISOString() }];
+    window.__me = { id: 'u8', email: 'lee@x.com', tier: 'individual', enterprise_id: null };
+    AppState.user = { id: 'u8', email: 'lee@x.com' }; AppState.profile = { display_name: 'Lee', enterprise_id: null, tier: 'individual' };
+    await checkForMyPendingInvite();
+    ok('one invitation: the banner names the company and says Accept', /Gamma Ltd invited you to join/.test(document.getElementById('inviteBannerInfo').textContent) && document.getElementById('acceptInviteBtn').textContent === 'Accept');
+    document.getElementById('acceptInviteBtn').click(); await new Promise(r => setTimeout(r, 80));
+    ok('Accept joins the company directly', stat('iC') === 'accepted' && AppState.profile.tier === 'enterprise_member');
+    // an enterprise member / admin never sees a banner
+    __db.enterprise_invites = [{ id: 'iD', enterprise_id: 'ED', enterprise_name: 'Delta', invited_email: 'lee@x.com', status: 'pending', expires_at: new Date(Date.now() + 5 * 864e5).toISOString() }];
+    await checkForMyPendingInvite();
+    ok('someone who already belongs to a company sees no invitation banner', document.getElementById('inviteBanner').style.display === 'none');
+    __db.enterprise_invites = []; window.__alreadyInCompany = [];
+    window.__me = { id: 'u1', email: 'a@b.c', tier: 'individual', enterprise_id: null };
+    AppState.user = { id: 'u1', email: 'a@b.c' }; AppState.profile = { display_name: 'Ann', enterprise_id: null, tier: 'individual' };
+
     // ---------- sync / upload / template buttons are pictures; the % display still works and the picture returns ----------
     const syncBtn = document.getElementById('bsRefreshBtn');
     ok('sync, upload and template buttons use the picture icons', !!syncBtn.querySelector('img[src="icons/ui-sync.png"]') && !!document.querySelector('#bsUploadBtn img[src="icons/ui-upload.png"]') && !!document.querySelector('#bsTemplateBtn img[src="icons/ui-download.png"]') && !!document.querySelector('#pcRefreshBtn img[src="icons/ui-sync.png"]') && !!document.querySelector('#ysImSyncBtn img[src="icons/ui-sync.png"]') && !!document.querySelector('#uploadCsvBtn img[src="icons/ui-upload.png"]') && !!document.querySelector('#downloadTemplateBtn img[src="icons/ui-download.png"]'));

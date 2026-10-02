@@ -206,7 +206,76 @@ begin
     set status = 'accepted'
     where id = matched_invite.id;
 
+    -- The person now belongs to a company: their other waiting invitations (from other admins, or
+    -- duplicates) can never be accepted, so close them instead of leaving them "pending".
+    update public.enterprise_invites
+    set status = 'expired'
+    where lower(invited_email) = lower(caller_email)
+      and status = 'pending'
+      and id <> matched_invite.id;
+
     return true;
+end;
+$$;
+
+-- The invitations waiting for the signed-in person, with the company name (an invited person cannot read
+-- the enterprises table, so this runs with the function's rights). Nothing is returned to someone who
+-- already belongs to a company.
+create or replace function public.my_pending_invites()
+returns table (id uuid, token uuid, enterprise_name text, expires_at timestamptz)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select i.id, i.token, e.name, i.expires_at
+    from public.enterprise_invites i
+    join public.enterprises e on e.id = i.enterprise_id
+    where i.status = 'pending'
+      and i.expires_at > now()
+      and lower(i.invited_email) = lower(public.current_user_email())
+      and public.current_user_enterprise_id() is null
+    order by i.created_at desc;
+$$;
+
+-- Sending an invitation, with the checks the admin needs: only the admin, a sensible email, nobody who already
+-- belongs to a company (this one or another - such a person could never accept), and no duplicate while an
+-- earlier invitation to the same email is still waiting. Returns 'sent' or 'already_pending'.
+create or replace function public.send_enterprise_invite(p_email text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_email text := lower(trim(coalesce(p_email, '')));
+    v_eid uuid := public.current_user_enterprise_id();
+    v_theirs uuid;
+begin
+    if not public.current_user_is_enterprise_admin() then
+        raise exception 'Only the enterprise admin can invite people.';
+    end if;
+    if v_email !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' then
+        raise exception 'Please enter a valid email address.';
+    end if;
+
+    select p.enterprise_id into v_theirs from public.profiles p where lower(p.email) = v_email limit 1;
+    if v_theirs is not null then
+        if v_theirs = v_eid then
+            raise exception 'This person is already in your team.';
+        end if;
+        raise exception 'This person already belongs to another company, so they cannot be invited.';
+    end if;
+
+    if exists (select 1 from public.enterprise_invites
+               where enterprise_id = v_eid and lower(invited_email) = v_email
+                 and status = 'pending' and expires_at > now()) then
+        return 'already_pending';
+    end if;
+
+    insert into public.enterprise_invites (enterprise_id, invited_email, invited_by)
+    values (v_eid, v_email, auth.uid());
+    return 'sent';
 end;
 $$;
 
@@ -241,6 +310,8 @@ $$;
 
 grant execute on function public.create_enterprise(text) to authenticated;
 grant execute on function public.accept_enterprise_invite(uuid) to authenticated;
+grant execute on function public.my_pending_invites() to authenticated;
+grant execute on function public.send_enterprise_invite(text) to authenticated;
 grant execute on function public.remove_enterprise_member(uuid) to authenticated;
 
 -- ============================================

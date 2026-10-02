@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=52"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=52"></script>
-    <script src="vendor/qrcode.min.js?v=52"></script>
-    <script src="vendor/html5-qrcode.min.js?v=52"></script>
-    <script src="vendor/supabase.js?v=52"></script>
+    <script src="vendor/xlsx.full.min.js?v=53"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=53"></script>
+    <script src="vendor/qrcode.min.js?v=53"></script>
+    <script src="vendor/html5-qrcode.min.js?v=53"></script>
+    <script src="vendor/supabase.js?v=53"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -138,6 +138,20 @@
         </div>
     </div>
 
+    <!-- INVITATIONS: shown when the person has more than one waiting invitation, so they choose which company to join -->
+    <div class="modal-overlay" id="inviteModal">
+        <div class="modal" style="max-width: 420px;">
+            <h3 class="modal-title" id="inviteModalTitle">Your invitations</h3>
+            <div class="modal-body" style="text-align: left;">
+                <p id="inviteModalHint" style="font-size: 13px; color: var(--ak-text-light); margin-bottom: 10px;">Choose the company you want to join. You can join only one.</p>
+                <div id="inviteModalList"></div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary btn-block" id="inviteModalCloseBtn" type="button">Later</button>
+            </div>
+        </div>
+    </div>
+
     <!-- HELP MODAL: step-by-step guide for the open tool (content in js/help.js) -->
     <div class="modal-overlay" id="helpModal">
         <div class="modal help-modal">
@@ -235,7 +249,7 @@
             <div class="session-banner" id="inviteBanner" style="display:none;">
                 <span class="session-banner-icon">✉️</span>
                 <div class="session-banner-text">
-                    <strong>You've been invited</strong>
+                    <strong id="inviteBannerTitle">You've been invited</strong>
                     <span id="inviteBannerInfo">Join an enterprise</span>
                 </div>
                 <button class="session-banner-btn" id="acceptInviteBtn">Accept</button>
@@ -1048,20 +1062,20 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=52"></script>
-    <script src="js/lang.js?v=52"></script>
-    <script src="js/supabaseClient.js?v=52"></script>
-    <script src="js/lists.js?v=52"></script>
-    <script src="js/usage.js?v=52"></script>
-    <script src="js/syncstatus.js?v=52"></script>
-    <script src="js/help.js?v=52"></script>
-    <script src="js/tooltip.js?v=52"></script>
-    <script src="js/app.js?v=52"></script>
-    <script src="js/boxScanner.js?v=52"></script>
-    <script src="js/itemBarcode.js?v=52"></script>
-    <script src="js/boxCode.js?v=52"></script>
-    <script src="js/boxSegregate.js?v=52"></script>
-    <script src="js/priceCheck.js?v=52"></script>
-    <script src="js/yearSegregate.js?v=52"></script>
+    <script src="js/config.js?v=53"></script>
+    <script src="js/lang.js?v=53"></script>
+    <script src="js/supabaseClient.js?v=53"></script>
+    <script src="js/lists.js?v=53"></script>
+    <script src="js/usage.js?v=53"></script>
+    <script src="js/syncstatus.js?v=53"></script>
+    <script src="js/help.js?v=53"></script>
+    <script src="js/tooltip.js?v=53"></script>
+    <script src="js/app.js?v=53"></script>
+    <script src="js/boxScanner.js?v=53"></script>
+    <script src="js/itemBarcode.js?v=53"></script>
+    <script src="js/boxCode.js?v=53"></script>
+    <script src="js/boxSegregate.js?v=53"></script>
+    <script src="js/priceCheck.js?v=53"></script>
+    <script src="js/yearSegregate.js?v=53"></script>
 </body>
 </html>

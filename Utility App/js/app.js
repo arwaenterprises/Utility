@@ -147,15 +147,13 @@ async function createEnterprise() {
 async function sendInvite() {
     const email = document.getElementById('inviteEmailInput').value.trim();
     if (!email) return;
-    const { error } = await supabaseClient.from('enterprise_invites').insert({
-        enterprise_id: AppState.profile.enterprise_id,
-        invited_email: email,
-        invited_by: AppState.user.id
-    });
+    // The database checks that the person can really be invited (not already in a company, not a duplicate).
+    const { data, error } = await supabaseClient.rpc('send_enterprise_invite', { p_email: email });
     if (error) {
         alert(error.message);
         return;
     }
+    if (data === 'already_pending') alert('An invitation to this email is already waiting. It stays valid for 7 days.');
     document.getElementById('inviteEmailInput').value = '';
     await loadPendingInvitesList();
 }
@@ -773,31 +771,71 @@ async function removeMember(memberId) {
     await loadPendingInvitesList();
 }
 
-async function checkForMyPendingInvite() {
-    if (AppState.profile?.tier !== 'individual') return;
-    const { data, error } = await supabaseClient
-        .from('enterprise_invites')
-        .select('token')
-        .eq('status', 'pending')
-        .ilike('invited_email', AppState.user.email)
-        .limit(1)
-        .maybeSingle();
-    if (error || !data) return;
-    AppState.pendingInviteToken = data.token;
-    document.getElementById('inviteBanner').style.display = 'flex';
+// ---- Invitations waiting for the signed-in person ----
+// The database returns them with the company name. One invitation: the banner says who invited you and has an
+// Accept button. Several: the banner says how many and opens a window to choose - you can join only one company,
+// and accepting one closes the others.
+function inviteText() {
+    const ar = (typeof AppLang !== 'undefined' && AppLang.get() === 'ar');
+    return ar
+        ? { title: 'تمت دعوتك', one: n => `دعتك ${n} للانضمام إليها`, many: k => `لديك ${k} دعوات`, accept: 'قبول', choose: 'اختيار', heading: 'دعواتك', hint: 'اختر الشركة التي تريد الانضمام إليها. يمكنك الانضمام إلى شركة واحدة فقط.', later: 'لاحقًا' }
+        : { title: "You've been invited", one: n => `${n} invited you to join`, many: k => `You have ${k} invitations`, accept: 'Accept', choose: 'Choose', heading: 'Your invitations', hint: 'Choose the company you want to join. You can join only one.', later: 'Later' };
 }
 
-async function acceptMyInvite() {
-    if (!AppState.pendingInviteToken) return;
-    const { error } = await supabaseClient.rpc('accept_enterprise_invite', { invite_token: AppState.pendingInviteToken });
+function renderInviteBanner() {
+    const banner = document.getElementById('inviteBanner');
+    const list = AppState.pendingInvites || [];
+    if (!list.length) { banner.style.display = 'none'; return; }
+    const t = inviteText();
+    document.getElementById('inviteBannerTitle').textContent = t.title;
+    document.getElementById('inviteBannerInfo').textContent = list.length === 1 ? t.one(list[0].enterprise_name || '') : t.many(list.length);
+    document.getElementById('acceptInviteBtn').textContent = list.length === 1 ? t.accept : t.choose;
+    banner.style.display = 'flex';
+}
+
+async function checkForMyPendingInvite() {
+    AppState.pendingInvites = [];
+    if (AppState.profile?.tier !== 'individual') { renderInviteBanner(); return; }
+    const { data, error } = await supabaseClient.rpc('my_pending_invites');
+    if (!error && data) AppState.pendingInvites = data;
+    renderInviteBanner();
+}
+
+function openInviteChooser() {
+    const t = inviteText();
+    document.getElementById('inviteModalTitle').textContent = t.heading;
+    document.getElementById('inviteModalHint').textContent = t.hint;
+    document.getElementById('inviteModalCloseBtn').textContent = t.later;
+    const el = document.getElementById('inviteModalList');
+    el.setAttribute('dir', (typeof AppLang !== 'undefined' && AppLang.get() === 'ar') ? 'rtl' : 'ltr');
+    el.innerHTML = (AppState.pendingInvites || []).map(i => `
+        <div class="invite-choice">
+            <span><strong>${escapeHtml(i.enterprise_name || '')}</strong><br><small>${new Date(i.expires_at).toLocaleDateString()}</small></span>
+            <button class="btn btn-primary" type="button" data-accept-invite="${i.token}">${t.accept}</button>
+        </div>`).join('');
+    document.getElementById('inviteModal').classList.add('active');
+}
+
+async function acceptInviteToken(token) {
+    const { error } = await supabaseClient.rpc('accept_enterprise_invite', { invite_token: token });
     if (error) {
         alert(error.message);
+        await checkForMyPendingInvite();      // the list may have changed (expired or already closed)
         return;
     }
-    AppState.pendingInviteToken = null;
+    AppState.pendingInvites = [];
+    document.getElementById('inviteModal').classList.remove('active');
     document.getElementById('inviteBanner').style.display = 'none';
     await loadUserProfile();
     updateHeaderUser();
+    renderAppGrid();
+}
+
+async function acceptMyInvite() {
+    const list = AppState.pendingInvites || [];
+    if (list.length === 0) return;
+    if (list.length === 1) return acceptInviteToken(list[0].token);
+    openInviteChooser();
 }
 
 // ============================================
@@ -926,6 +964,9 @@ function setupEventListeners() {
     document.getElementById('createEnterpriseBtn').addEventListener('click', createEnterprise);
     document.getElementById('sendInviteBtn').addEventListener('click', sendInvite);
     document.getElementById('acceptInviteBtn').addEventListener('click', acceptMyInvite);
+    document.getElementById('inviteModalCloseBtn').addEventListener('click', () => document.getElementById('inviteModal').classList.remove('active'));
+    document.getElementById('inviteModalList').addEventListener('click', (e) => { const t = e.target.dataset.acceptInvite; if (t) acceptInviteToken(t); });
+    if (typeof AppLang !== 'undefined') AppLang.onChange(() => { renderInviteBanner(); });
     document.getElementById('dataHelpBtn').addEventListener('click', () => helpShow('dataManagement'));
     document.getElementById('umMemberList').addEventListener('click', (e) => {
         const removeId = e.target.dataset.removeMember;
