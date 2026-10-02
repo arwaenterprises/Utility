@@ -116,7 +116,7 @@ check('public pages show the contact email', ['about.html', 'privacy.html', 'sec
 }
 { // guard: a bad edit once emptied the stylesheet
   const css = fs.readFileSync(path.join(APP, 'style.css'), 'utf8');
-  check('style.css is complete (not truncated)', css.length > 60000 && css.includes(':root') && css.includes('.login-hero') && css.includes('.longpress-tip') && css.includes('.applang-toggle'), 'length ' + css.length);
+  check('style.css is complete (not truncated)', css.length > 60000 && css.includes(':root') && css.includes('.login-hero') && css.includes('.longpress-tip') && css.includes('.hdr-circle'), 'length ' + css.length);
 }
 check('security.txt present', fs.existsSync(path.join(APP, '.well-known', 'security.txt')));
 check('CSP script-src allows only this site', !/script-src[^;]*https?:/.test(toml));

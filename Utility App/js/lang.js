@@ -61,7 +61,6 @@ const AppLang = (function () {
         document.body.classList.toggle('rtl', lang === 'ar');
         document.documentElement.setAttribute('lang', lang);
         translatePage(lang);
-        document.querySelectorAll('.applang-toggle .lang-btn').forEach(b => b.classList.toggle('active', b.dataset.applang === lang));
         const circle = document.getElementById('langBtn');                 // the round EN / AR button in the top bar
         if (circle) circle.textContent = lang === 'ar' ? 'AR' : 'EN';
         listeners.forEach(fn => { try { fn(lang); } catch (e) { console.error(e); } });
@@ -73,7 +72,6 @@ const AppLang = (function () {
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('.applang-toggle .lang-btn').forEach(b => b.addEventListener('click', () => set(b.dataset.applang)));
         const circle = document.getElementById('langBtn');
         if (circle) circle.addEventListener('click', () => set(get() === 'ar' ? 'en' : 'ar'));
         apply();

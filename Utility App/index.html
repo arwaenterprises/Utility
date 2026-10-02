@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=54"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=54"></script>
-    <script src="vendor/qrcode.min.js?v=54"></script>
-    <script src="vendor/html5-qrcode.min.js?v=54"></script>
-    <script src="vendor/supabase.js?v=54"></script>
+    <script src="vendor/xlsx.full.min.js?v=55"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=55"></script>
+    <script src="vendor/qrcode.min.js?v=55"></script>
+    <script src="vendor/html5-qrcode.min.js?v=55"></script>
+    <script src="vendor/supabase.js?v=55"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -169,10 +169,6 @@
         <!-- SCREEN: Login -->
         <div id="loginScreen" class="screen active">
             <div class="login-hero">
-                <div class="applang-toggle lang-toggle" role="group" aria-label="Language">
-                    <button class="lang-btn active" type="button" data-applang="en">EN</button>
-                    <button class="lang-btn" type="button" data-applang="ar">عربي</button>
-                </div>
                 <img src="icons/icon-192.png" alt="Utility logo" width="72" height="72">
                 <h1>Utility</h1>
                 <p data-i18n="hero_tag">Simple, secure warehouse &amp; store tools for any phone, tablet or computer.</p>
@@ -276,7 +272,7 @@
                 <div id="scannerScanScreen" class="scanner-screen">
                     <!-- The Remark is the only thing asked to begin a session. It is mandatory (it tells scanning types
                          apart) and is locked after the first box is scanned, until Reset. -->
-                    <div class="remark-card">
+                    <div class="remark-card" id="scannerRemarkCard">
                         <label id="lblRemark" for="scannerRemarkInput">Remark</label>
                         <input type="text" id="scannerRemarkInput" class="form-input" placeholder="e.g., Fall Winter 2023 stocks" autocomplete="off">
                     </div>
@@ -687,7 +683,7 @@
                 <div id="ysScanScreen" class="scanner-screen">
                     <!-- Pre-session area: the Remark (mandatory, locked after the first scan until Reset), the upload
                          buttons for admins / individuals, and the progress of loading the item master + PTL config. -->
-                    <div class="remark-card">
+                    <div class="remark-card" id="ysRemarkCard">
                         <label for="ysRemarkInput">Remark</label>
                         <input type="text" id="ysRemarkInput" class="form-input" placeholder="e.g., FW2025 returns sorting" autocomplete="off">
                         <div id="ysUploadRow" class="ys-upload-row" style="display:none;">
@@ -1039,20 +1035,20 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=54"></script>
-    <script src="js/lang.js?v=54"></script>
-    <script src="js/supabaseClient.js?v=54"></script>
-    <script src="js/lists.js?v=54"></script>
-    <script src="js/usage.js?v=54"></script>
-    <script src="js/syncstatus.js?v=54"></script>
-    <script src="js/help.js?v=54"></script>
-    <script src="js/tooltip.js?v=54"></script>
-    <script src="js/app.js?v=54"></script>
-    <script src="js/boxScanner.js?v=54"></script>
-    <script src="js/itemBarcode.js?v=54"></script>
-    <script src="js/boxCode.js?v=54"></script>
-    <script src="js/boxSegregate.js?v=54"></script>
-    <script src="js/priceCheck.js?v=54"></script>
-    <script src="js/yearSegregate.js?v=54"></script>
+    <script src="js/config.js?v=55"></script>
+    <script src="js/lang.js?v=55"></script>
+    <script src="js/supabaseClient.js?v=55"></script>
+    <script src="js/lists.js?v=55"></script>
+    <script src="js/usage.js?v=55"></script>
+    <script src="js/syncstatus.js?v=55"></script>
+    <script src="js/help.js?v=55"></script>
+    <script src="js/tooltip.js?v=55"></script>
+    <script src="js/app.js?v=55"></script>
+    <script src="js/boxScanner.js?v=55"></script>
+    <script src="js/itemBarcode.js?v=55"></script>
+    <script src="js/boxCode.js?v=55"></script>
+    <script src="js/boxSegregate.js?v=55"></script>
+    <script src="js/priceCheck.js?v=55"></script>
+    <script src="js/yearSegregate.js?v=55"></script>
 </body>
 </html>

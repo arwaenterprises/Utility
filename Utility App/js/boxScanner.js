@@ -382,11 +382,20 @@ function startScannerSession() {
     return true;
 }
 
+// Once the job has started the Remark goes away completely; before that it is the only thing asked, and the
+// scanning fields stay switched off until a Remark has been typed.
 function setScannerRemarkLocked(locked) {
     const input = document.getElementById('scannerRemarkInput');
     input.readOnly = locked;
     input.classList.toggle('locked', locked);
     if (locked) input.value = ScannerState.remark;
+    document.getElementById('scannerRemarkCard').style.display = locked ? 'none' : '';
+    updateScannerScanFieldsEnabled();
+}
+
+function updateScannerScanFieldsEnabled() {
+    const ready = !!(ScannerState.remark || document.getElementById('scannerRemarkInput').value.trim());
+    ['boxIdInput', 'barcodeInput', 'scannerKbdBtn'].forEach(id => { document.getElementById(id).disabled = !ready; });
 }
 
 // ============================================
@@ -835,8 +844,8 @@ async function executeResetSession(confirmed) {
 // The last step of every Reset: forget the session and go back to the start screen.
 function finishScannerReset() {
     clearScannerSession();
-    setScannerRemarkLocked(false);
     document.getElementById('scannerRemarkInput').value = '';
+    setScannerRemarkLocked(false);
     document.getElementById('boxIdInput').value = '';
     document.getElementById('barcodeInput').value = '';
     document.getElementById('barcodeGroup').classList.add('hidden');
@@ -856,6 +865,10 @@ let scannerListenersAdded = false;
 function setupScannerEventListeners() {
     if (scannerListenersAdded) return;
     scannerListenersAdded = true;
+    document.getElementById('scannerRemarkInput').addEventListener('input', updateScannerScanFieldsEnabled);
+    document.getElementById('scannerRemarkInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.target.value.trim()) { updateScannerScanFieldsEnabled(); document.getElementById('boxIdInput').focus(); }
+    });
     document.getElementById('modeToggleBtn').addEventListener('click', guardScannerModeToggle);
     document.getElementById('modeToggleBtn').addEventListener('change', (e) => setScannerInputMode(e.target.checked ? 'AlNu' : 'Nu'));
     document.getElementById('uniqueToggleBtn').addEventListener('click', guardScannerUniqueToggle);

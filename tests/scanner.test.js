@@ -82,8 +82,19 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     await scan('ZB', 'boxIdInput');
     ok('with a Remark the first box scan begins the session and opens the box', ScannerState.boxScanning && ScannerState.currentBox === 'ZB' && ScannerState.remark === 'Pallet job 7' && AppState.hasActiveSession === true);
     ok('the Remark is locked while the session runs', document.getElementById('scannerRemarkInput').readOnly && document.getElementById('scannerRemarkInput').value === 'Pallet job 7');
+    ok('once the job started the Remark box is gone from the screen', document.getElementById('scannerRemarkCard').style.display === 'none');
     await showResetModal();              // no item scanned yet: closes at once
     ok('Reset unlocks the Remark again for the next job', !document.getElementById('scannerRemarkInput').readOnly && document.getElementById('scannerRemarkInput').value === '' && !AppState.hasActiveSession);
+    ok('after Reset the Remark box is back and the scan fields are switched off', document.getElementById('scannerRemarkCard').style.display === '' && document.getElementById('boxIdInput').disabled && document.getElementById('scannerKbdBtn').disabled);
+    document.getElementById('scannerRemarkInput').value = 'Job 8'; document.getElementById('scannerRemarkInput').dispatchEvent(new Event('input'));
+    ok('typing a Remark switches the scan fields on', !document.getElementById('boxIdInput').disabled && !document.getElementById('scannerKbdBtn').disabled);
+    document.getElementById('scannerRemarkInput').value = '  '; document.getElementById('scannerRemarkInput').dispatchEvent(new Event('input'));
+    ok('clearing the Remark switches them off again', document.getElementById('boxIdInput').disabled);
+    document.getElementById('scannerRemarkInput').value = 'Job 8'; document.getElementById('scannerRemarkInput').dispatchEvent(new Event('input'));
+    { let focused = false; const bi = document.getElementById('boxIdInput'); const origFocus = bi.focus.bind(bi); bi.focus = () => { focused = true; origFocus(); };
+      document.getElementById('scannerRemarkInput').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+      ok('Enter in the Remark box moves to the Box ID field', focused); delete bi.focus; }
+    await showResetModal(); document.getElementById('scannerRemarkInput').value = '';
 
     // ---------- enterprise member ----------
     AppState.profile = { display_name: 'Mia', enterprise_id: 'E1', tier: 'enterprise_member' };

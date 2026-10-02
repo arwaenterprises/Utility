@@ -1354,11 +1354,20 @@ async function ysPrepareData() {
     return true;
 }
 
+// Once the job has started the Remark goes away completely; before that it is the only thing asked, and the
+// scan field stays switched off until a Remark has been typed.
 function ysSetRemarkLocked(locked) {
     const input = document.getElementById('ysRemarkInput');
     input.readOnly = locked;
     input.classList.toggle('locked', locked);
     if (locked) input.value = YSState.remark;
+    document.getElementById('ysRemarkCard').style.display = locked ? 'none' : '';
+    ysUpdateScanFieldsEnabled();
+}
+
+function ysUpdateScanFieldsEnabled() {
+    const ready = !!(YSState.staffName || document.getElementById('ysRemarkInput').value.trim());
+    ['ysBarcodeInput', 'ysKbdBtn'].forEach(id => { document.getElementById(id).disabled = !ready; });
 }
 
 // Called by the first scan. Needs the Remark and loaded data; the operator's name comes from the signed-in account.
@@ -1383,8 +1392,8 @@ async function ysBeginSession() {
 // The scan screen for a job that has not started: empty Remark, data loaded.
 async function ysOpenFresh() {
     ysShowScreen('ysScanScreen');
-    ysSetRemarkLocked(false);
     document.getElementById('ysRemarkInput').value = '';
+    ysSetRemarkLocked(false);
     document.getElementById('ysDispStore').textContent = `${AppState.storeId} - ${AppState.storeName}`;
     const ok = await ysPrepareData();
     if (ok) {
@@ -1402,6 +1411,10 @@ async function ysOpenFresh() {
 // ============================================
 function setupYsEventListeners() {
     document.getElementById('ysBarcodeInput').addEventListener('keypress', handleYsScan);
+    document.getElementById('ysRemarkInput').addEventListener('input', ysUpdateScanFieldsEnabled);
+    document.getElementById('ysRemarkInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.target.value.trim()) { ysUpdateScanFieldsEnabled(); document.getElementById('ysBarcodeInput').focus(); }
+    });
 
     document.getElementById('ysNuBtn').addEventListener('click', ysGuardModeToggle);
     document.getElementById('ysAlNuBtn').addEventListener('click', ysGuardModeToggle);

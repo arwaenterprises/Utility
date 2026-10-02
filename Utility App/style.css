@@ -2323,9 +2323,6 @@ button, [title], .sync-badge { -webkit-touch-callout: none; -webkit-user-select:
 .help-hold { margin-top: 14px; padding-top: 8px; border-top: 1px dashed var(--ak-gray-300); font-size: 12px; color: var(--ak-text-light); }
 
 /* app-wide language switch (welcome screen, home screen, Account window) */
-.applang-toggle { justify-content: center; margin: 0 auto 8px; }
-.login-hero .applang-toggle, .home-header .applang-toggle { max-width: 160px; }
-.home-header .applang-toggle { margin-top: 8px; }
 body.rtl .app-back-btn { transform: scaleX(-1); }
 
 /* Team window: tabs, folded invite, close ✕ */

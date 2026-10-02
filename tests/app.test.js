@@ -185,9 +185,14 @@ const { start, openApp, report, stop } = require('./helpers/harness');
       ok('YS: a Remark of only spaces does not count', alerts2.length === 2 && !YSState.staffName);
       window.alert = oa;
     }
+    ok('YS: the scan field is switched off until a Remark is typed', document.getElementById('ysBarcodeInput').disabled && document.getElementById('ysKbdBtn').disabled);
+    document.getElementById('ysRemarkInput').value = 'R'; document.getElementById('ysRemarkInput').dispatchEvent(new Event('input'));
+    ok('YS: typing a Remark switches it on', !document.getElementById('ysBarcodeInput').disabled && !document.getElementById('ysKbdBtn').disabled);
+    ok('YS: the Remark box is still visible before the first scan', document.getElementById('ysRemarkCard').style.display === '');
     document.getElementById('ysRemarkInput').value = 'R';
     document.getElementById('ysBarcodeInput').value = 'I1'; await handleYsScan({ key: 'Enter' });
     ok('YS: with a Remark the first scan begins the session (operator = the signed-in account) and locks the Remark', YSState.staffName === 'Ann' && YSState.remark === 'R' && AppState.hasActiveSession === true && document.getElementById('ysRemarkInput').readOnly, YSState.staffName);
+    ok('YS: once the job started the Remark box is gone from the screen', document.getElementById('ysRemarkCard').style.display === 'none');
     YSState.scanStep = 'item'; YSState.pendingItem = null; YSState.pendingHuIdx = null;
     ok('YS storeId from google account', AppState.storeId === 'a@b.c');
     // scans
