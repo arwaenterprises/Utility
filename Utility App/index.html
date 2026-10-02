@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=51"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=51"></script>
-    <script src="vendor/qrcode.min.js?v=51"></script>
-    <script src="vendor/html5-qrcode.min.js?v=51"></script>
-    <script src="vendor/supabase.js?v=51"></script>
+    <script src="vendor/xlsx.full.min.js?v=52"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=52"></script>
+    <script src="vendor/qrcode.min.js?v=52"></script>
+    <script src="vendor/html5-qrcode.min.js?v=52"></script>
+    <script src="vendor/supabase.js?v=52"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -101,11 +101,11 @@
                 <button class="team-close-x" id="closeTeamBtn" type="button" title="Close" aria-label="Close">✕</button></h3>
             <div class="modal-body" style="text-align: left; max-height: 78vh; overflow-y: auto;">
                 <div class="team-tabs" role="tablist">
-                    <button class="team-tab active" id="teamTabBs" type="button" role="tab" data-team-tab="bs">📦 Box Scanner</button>
+                    <button class="team-tab active" id="teamTabBs" type="button" role="tab" data-team-tab="bs">📦 Box-Item Scan</button>
                     <button class="team-tab" id="teamTabYs" type="button" role="tab" data-team-tab="ys">🗂️ Year/Season</button>
                 </div>
 
-                <!-- Tab 1: Box Scanner scans -->
+                <!-- Tab 1: Box-Item Scan scans -->
                 <div id="teamPanelBs" class="team-panel">
                     <div class="settings-section">
                         <input type="text" id="teamSearchInput" class="form-input" placeholder="🔍 Search box number, user, or item...">
@@ -226,7 +226,7 @@
             <div class="session-banner" id="sessionBanner">
                 <span class="session-banner-icon">📦</span>
                 <div class="session-banner-text">
-                    <strong data-i18n="sess_t">Box Scanner Session Active</strong>
+                    <strong data-i18n="sess_t">Box-Item Scan Session Active</strong>
                     <span id="sessionBannerInfo" data-i18n="sess_i">Complete or reset to switch apps</span>
                 </div>
                 <button class="session-banner-btn" id="goToSessionBtn" data-i18n="sess_btn">Go to Scanner</button>
@@ -587,7 +587,7 @@
                 <!-- Print Box Label Settings Modal -->
                 <div class="modal-overlay" id="boxSettingsModal">
                     <div class="modal">
-                        <h3 class="modal-title">⚙️ Print Box Label Settings</h3>
+                        <h3 class="modal-title">⚙️ Box Code Print Settings</h3>
                         <div class="modal-body" style="text-align: left;">
                             <div class="print-settings-section">
                                 <h4>Output Format</h4>
@@ -1048,20 +1048,20 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=51"></script>
-    <script src="js/lang.js?v=51"></script>
-    <script src="js/supabaseClient.js?v=51"></script>
-    <script src="js/lists.js?v=51"></script>
-    <script src="js/usage.js?v=51"></script>
-    <script src="js/syncstatus.js?v=51"></script>
-    <script src="js/help.js?v=51"></script>
-    <script src="js/tooltip.js?v=51"></script>
-    <script src="js/app.js?v=51"></script>
-    <script src="js/boxScanner.js?v=51"></script>
-    <script src="js/itemBarcode.js?v=51"></script>
-    <script src="js/boxCode.js?v=51"></script>
-    <script src="js/boxSegregate.js?v=51"></script>
-    <script src="js/priceCheck.js?v=51"></script>
-    <script src="js/yearSegregate.js?v=51"></script>
+    <script src="js/config.js?v=52"></script>
+    <script src="js/lang.js?v=52"></script>
+    <script src="js/supabaseClient.js?v=52"></script>
+    <script src="js/lists.js?v=52"></script>
+    <script src="js/usage.js?v=52"></script>
+    <script src="js/syncstatus.js?v=52"></script>
+    <script src="js/help.js?v=52"></script>
+    <script src="js/tooltip.js?v=52"></script>
+    <script src="js/app.js?v=52"></script>
+    <script src="js/boxScanner.js?v=52"></script>
+    <script src="js/itemBarcode.js?v=52"></script>
+    <script src="js/boxCode.js?v=52"></script>
+    <script src="js/boxSegregate.js?v=52"></script>
+    <script src="js/priceCheck.js?v=52"></script>
+    <script src="js/yearSegregate.js?v=52"></script>
 </body>
 </html>

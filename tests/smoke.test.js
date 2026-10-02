@@ -11,6 +11,8 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     renderAppGrid();
     const tiles = [...document.querySelectorAll('.app-tile')].map(t => t.dataset.appId);
     ok('home shows all 6 tools + the 7th tile Data Management', tiles.join() === 'boxScanner,itemBarcode,boxCode,boxSegregate,priceCheck,yearSegregate,dataManagement', tiles.join());
+    ok('tool names: Box-Item Scan, Item Barcode Print, Box Code Print', [...document.querySelectorAll('.app-tile .app-tile-name')].map(e => e.textContent).slice(0, 3).join('|') === 'Box-Item Scan|Item Barcode Print|Box Code Print', [...document.querySelectorAll('.app-tile .app-tile-name')].map(e => e.textContent).join('|'));
+    ok('Data Management tab is called Box-Item Scan', /Box-Item Scan/.test(document.getElementById('teamTabBs').textContent));
     ok('the 7th tile uses its picture icon', !!document.querySelector('.app-tile[data-app-id="dataManagement"] img.app-tile-img[src="icons/ui-data.png"]'));
     for (const id of APPS.filter(a => !a.modal).map(a => a.id)) {
       let err = '';

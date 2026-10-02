@@ -1,7 +1,7 @@
 # Utility
 
-Warehouse utility app for scanning and sorting boxes (Box Scanner, Box Segregate, Price Check,
-Year/Season Sort, Item Barcode, Print Box Label). Hosted on Netlify (publishes the `Utility App/`
+Warehouse utility app for scanning and sorting boxes (Box-Item Scan, Box Segregate, Price Check,
+Year/Season Sort, Item Barcode Print, Box Code Print, Data Management). Hosted on Netlify (publishes the `Utility App/`
 folder), backed by Supabase (`supabase/schema.sql`). See `ROADMAP.md` for decisions, status and
 what is pending.
 
