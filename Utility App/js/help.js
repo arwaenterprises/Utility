@@ -13,8 +13,8 @@ const HELP = {
         en: {
             intro: 'Scan items into boxes, close each box, then download the list.',
             steps: [
-                'Type a <b>Remark</b> (for example "Fall Winter 2023 stocks") and tap <b>Start Session</b>.',
-                'Scan the <b>Box ID</b> (the label on the box).',
+                'Type a <b>Remark</b> (required - it tells your scanning jobs apart, for example "Fall Winter 2023 stocks").',
+                'Scan the <b>Box ID</b> (the label on the box). This first scan starts the session and locks the Remark.',
                 'Scan each <b>item barcode</b> that goes into that box. The last 5 scans show below; tap <b>Del</b> to remove a mistake.',
                 'When the box is full, tap <b>Close Box</b>, tap <b>Yes</b>, then scan the Box ID again to confirm.',
                 'Repeat for the next box. Tap <b>View Box</b> and scan any box ID to see what is inside it.',
@@ -24,14 +24,15 @@ const HELP = {
                 '<b>Nu</b> accepts numbers only; <b>AlNu</b> accepts letters and numbers. You can change it only when no box is open.',
                 '<b>No Dup</b> stops the same barcode being scanned twice.',
                 'Works offline. The &#10003; badge shows your scans are saved to the server.',
-                'The &#9000;&#65039; button shows or hides the on-screen keyboard (handy with a handheld scanner).'
+                'The &#9000;&#65039; button shows or hides the on-screen keyboard (handy with a handheld scanner).',
+                'To change the Remark, tap <b>Reset</b>. If nothing was scanned yet it closes at once, with no question and no download.'
             ]
         },
         ar: {
             intro: 'امسح القطع داخل الصناديق، أغلق كل صندوق، ثم حمّل القائمة.',
             steps: [
-                'اكتب <b>ملاحظة</b> (مثال: "مخزون خريف وشتاء 2023") ثم اضغط <b>بدء الجلسة</b>.',
-                'امسح <b>رقم الصندوق</b> (الملصق الموجود على الصندوق).',
+                'اكتب <b>ملاحظة</b> (إلزامية - تميّز بين أعمال المسح، مثال: "مخزون خريف وشتاء 2023").',
+                'امسح <b>رقم الصندوق</b> (الملصق الموجود على الصندوق). هذا المسح الأول يبدأ الجلسة ويقفل الملاحظة.',
                 'امسح <b>باركود</b> كل قطعة توضع في هذا الصندوق. تظهر آخر 5 عمليات مسح في الأسفل؛ اضغط <b>حذف</b> لإزالة أي خطأ.',
                 'عندما يمتلئ الصندوق اضغط <b>إغلاق الصندوق</b>، ثم <b>Yes</b>، ثم امسح رقم الصندوق مرة أخرى للتأكيد.',
                 'كرر العملية للصندوق التالي. اضغط <b>عرض الصندوق</b> وامسح أي رقم صندوق لترى محتوياته.',
@@ -41,7 +42,8 @@ const HELP = {
                 '<b>Nu</b> للأرقام فقط، و<b>AlNu</b> للأحرف والأرقام. لا يمكن تغييره إلا عندما لا يكون هناك صندوق مفتوح.',
                 '<b>بدون تكرار</b> يمنع مسح الباركود نفسه مرتين.',
                 'يعمل بدون إنترنت. علامة &#10003; تعني أن عمليات المسح حُفظت على الخادم.',
-                'زر &#9000;&#65039; يُظهر أو يُخفي لوحة المفاتيح على الشاشة (مفيد مع الماسح اليدوي).'
+                'زر &#9000;&#65039; يُظهر أو يُخفي لوحة المفاتيح على الشاشة (مفيد مع الماسح اليدوي).',
+                'لتغيير الملاحظة اضغط <b>إعادة</b>. إذا لم يتم مسح شيء بعد فيُغلق فورًا بدون سؤال وبدون تحميل.'
             ]
         }
     },
@@ -174,7 +176,7 @@ const HELP = {
             intro: 'Sort items by year and season into PTL boxes.',
             before: 'The <b>Item Master</b> and <b>PTL config</b> lists must be uploaded first (use the <img class="help-ico" src="icons/ui-upload.png" alt=""> Items and <img class="help-ico" src="icons/ui-upload.png" alt=""> PTL buttons; the <img class="help-ico" src="icons/ui-download.png" alt=""> icons give the templates). Team members: your admin uploads them.',
             steps: [
-                'Enter <b>Your Name</b> and a <b>Remark</b>, wait for the items to finish syncing, then tap <b>Start Session</b>.',
+                'Wait for the items to finish loading, then type a <b>Remark</b> (required). Your first scan starts the session and locks the Remark.',
                 'Choose <b>Nu</b> (numbers only) or <b>AlNu</b> (letters and numbers) at the top.',
                 'Scan an <b>item barcode</b>. The app shows which PTL the item belongs to.',
                 'Go to that PTL and scan its <b>ST</b> code (for example ST05) to open the box. For a new box, scan the physical box label when asked.',
@@ -192,7 +194,7 @@ const HELP = {
             intro: 'افرز القطع حسب السنة والموسم داخل صناديق PTL.',
             before: 'يجب رفع قائمتي <b>Item Master</b> و<b>PTL config</b> أولًا (أزرار <img class="help-ico" src="icons/ui-upload.png" alt=""> Items و<img class="help-ico" src="icons/ui-upload.png" alt=""> PTL؛ وأيقونات <img class="help-ico" src="icons/ui-download.png" alt=""> تعطيك النماذج). أعضاء الفريق: المسؤول يرفعهما.',
             steps: [
-                'أدخل <b>Your Name</b> و<b>Remark</b>، وانتظر حتى تكتمل مزامنة القطع، ثم اضغط <b>Start Session</b>.',
+                'انتظر حتى يكتمل تحميل القطع، ثم اكتب <b>Remark</b> (إلزامي). المسح الأول يبدأ الجلسة ويقفل الملاحظة.',
                 'اختر <b>Nu</b> (أرقام فقط) أو <b>AlNu</b> (أحرف وأرقام) في الأعلى.',
                 'امسح <b>باركود القطعة</b>. يعرض التطبيق رقم PTL الذي تنتمي إليه.',
                 'اذهب إلى ذلك الـ PTL وامسح رمز <b>ST</b> الخاص به (مثل ST05) لفتح الصندوق. للصندوق الجديد امسح ملصق الصندوق الفعلي عند الطلب.',

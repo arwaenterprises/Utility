@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=53"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=53"></script>
-    <script src="vendor/qrcode.min.js?v=53"></script>
-    <script src="vendor/html5-qrcode.min.js?v=53"></script>
-    <script src="vendor/supabase.js?v=53"></script>
+    <script src="vendor/xlsx.full.min.js?v=54"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=54"></script>
+    <script src="vendor/qrcode.min.js?v=54"></script>
+    <script src="vendor/html5-qrcode.min.js?v=54"></script>
+    <script src="vendor/supabase.js?v=54"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -272,26 +272,14 @@
             <!-- BOX SCANNER APP -->
             <div id="boxScannerApp" class="app-module">
                 
-                <!-- Session Setup Screen -->
-                <div id="scannerSessionScreen" class="scanner-screen active">
-                    <div class="card">
-                        <h2 class="card-title">📋 Session Setup</h2>
-                        <p class="card-subtitle">Enter session details to start scanning</p>
-                        
-                        
-                        <div class="form-group">
-                            <label id="lblRemark">Remark</label>
-                            <input type="text" id="scannerRemarkInput" class="form-input" placeholder="e.g., Fall Winter 2023 stocks">
-                        </div>
-
-                        <button class="btn btn-primary btn-block" id="startSessionBtn">
-                            <span id="lblStartSession">Start Session</span>
-                        </button>
-                    </div>
-                </div>
-                
                 <!-- Scanning Screen -->
                 <div id="scannerScanScreen" class="scanner-screen">
+                    <!-- The Remark is the only thing asked to begin a session. It is mandatory (it tells scanning types
+                         apart) and is locked after the first box is scanned, until Reset. -->
+                    <div class="remark-card">
+                        <label id="lblRemark" for="scannerRemarkInput">Remark</label>
+                        <input type="text" id="scannerRemarkInput" class="form-input" placeholder="e.g., Fall Winter 2023 stocks" autocomplete="off">
+                    </div>
                     <div class="info-bar">
                         <div class="info-bar-toggles">
                             <div class="unique-toggle" id="modeToggleWrap">
@@ -695,19 +683,13 @@
             <!-- YEAR/SEASON SEGREGATION APP -->
             <div id="yearSegregateApp" class="app-module">
 
-                <!-- Session Setup Screen -->
-                <div id="ysSessionScreen" class="scanner-screen active">
-                    <div class="card">
-                        <h2 class="card-title">📋 Session Setup</h2>
-                        <p class="card-subtitle">Enter session details to start sorting</p>
-                        <div class="form-group">
-                            <label>Your Name</label>
-                            <input type="text" id="ysStaffInput" class="form-input" placeholder="Enter your name..." autocomplete="off">
-                        </div>
-                        <div class="form-group">
-                            <label>Remark</label>
-                            <input type="text" id="ysRemarkInput" class="form-input" placeholder="e.g., FW2025 returns sorting" autocomplete="off">
-                        </div>
+                <!-- Main Scan Screen -->
+                <div id="ysScanScreen" class="scanner-screen">
+                    <!-- Pre-session area: the Remark (mandatory, locked after the first scan until Reset), the upload
+                         buttons for admins / individuals, and the progress of loading the item master + PTL config. -->
+                    <div class="remark-card">
+                        <label for="ysRemarkInput">Remark</label>
+                        <input type="text" id="ysRemarkInput" class="form-input" placeholder="e.g., FW2025 returns sorting" autocomplete="off">
                         <div id="ysUploadRow" class="ys-upload-row" style="display:none;">
                             <button class="bs-sync-btn bs-upload-btn bs-small-btn" id="ysUploadItemsBtn" type="button" title="Upload item master"><img class="btn-img" src="icons/ui-upload.png" alt=""> Items</button>
                             <button class="bs-round-btn bs-upload-btn bs-tpl-btn has-img" type="button" onclick="refDownloadTemplate('ys_item_master')" title="Download item master template" aria-label="Download item master template"><img class="btn-img" src="icons/ui-download.png" alt=""></button>
@@ -719,12 +701,7 @@
                         </div>
                         <div class="ref-progress" id="ysSyncBar" style="display:none;"><div class="ref-progress-fill"></div></div>
                         <div id="ysSyncError" class="error-msg" style="display:none;"></div>
-                        <button class="btn btn-primary btn-block" id="ysStartSessionBtn">Start Session</button>
                     </div>
-                </div>
-
-                <!-- Main Scan Screen -->
-                <div id="ysScanScreen" class="scanner-screen">
                     <!-- Compact top bar: Nu/AlNu | items count | sync | badge -->
                     <div class="ys-compact-bar">
                         <div class="mode-radio-toggle" id="ysModeLock">
@@ -1062,20 +1039,20 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=53"></script>
-    <script src="js/lang.js?v=53"></script>
-    <script src="js/supabaseClient.js?v=53"></script>
-    <script src="js/lists.js?v=53"></script>
-    <script src="js/usage.js?v=53"></script>
-    <script src="js/syncstatus.js?v=53"></script>
-    <script src="js/help.js?v=53"></script>
-    <script src="js/tooltip.js?v=53"></script>
-    <script src="js/app.js?v=53"></script>
-    <script src="js/boxScanner.js?v=53"></script>
-    <script src="js/itemBarcode.js?v=53"></script>
-    <script src="js/boxCode.js?v=53"></script>
-    <script src="js/boxSegregate.js?v=53"></script>
-    <script src="js/priceCheck.js?v=53"></script>
-    <script src="js/yearSegregate.js?v=53"></script>
+    <script src="js/config.js?v=54"></script>
+    <script src="js/lang.js?v=54"></script>
+    <script src="js/supabaseClient.js?v=54"></script>
+    <script src="js/lists.js?v=54"></script>
+    <script src="js/usage.js?v=54"></script>
+    <script src="js/syncstatus.js?v=54"></script>
+    <script src="js/help.js?v=54"></script>
+    <script src="js/tooltip.js?v=54"></script>
+    <script src="js/app.js?v=54"></script>
+    <script src="js/boxScanner.js?v=54"></script>
+    <script src="js/itemBarcode.js?v=54"></script>
+    <script src="js/boxCode.js?v=54"></script>
+    <script src="js/boxSegregate.js?v=54"></script>
+    <script src="js/priceCheck.js?v=54"></script>
+    <script src="js/yearSegregate.js?v=54"></script>
 </body>
 </html>

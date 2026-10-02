@@ -350,6 +350,9 @@ async function handleYsScan(e) {
     document.getElementById('ysBarcodeInput').value = '';
     if (!raw) return;
 
+    // The first scan begins the session - which needs the Remark.
+    if (!YSState.staffName && !(await ysBeginSession())) return;
+
     const upper = raw.toUpperCase();
 
     // ST/CL codes always pass through regardless of Nu/AlNu mode
@@ -892,8 +895,8 @@ async function ysExecuteReset() {
 function ysFinishReset() {
     clearYsSession();
     setActiveSession('yearSegregate', false);
-    ysShowScreen('ysSessionScreen');
     updateBackButton();
+    return ysOpenFresh();
 }
 
 function ysCancelReset() {
@@ -1292,23 +1295,17 @@ function ysToggleKeyboard() {
 // ============================================
 // SESSION START
 // ============================================
-async function ysStartSession() {
-    const staff = document.getElementById('ysStaffInput').value.trim();
-    const remark = document.getElementById('ysRemarkInput').value.trim();
+// There is no "Start Session" screen. Opening the tool loads the item master + PTL config (from the device when
+// it already has them) and shows the scan screen with an empty Remark. The Remark is mandatory (it tells the
+// different jobs apart); the session begins with the first scan and the Remark is then locked until Reset.
 
-    if (!staff) { alert('Please enter your name.'); document.getElementById('ysStaffInput').focus(); return; }
-    if (!remark) { alert('Please enter a remark.'); document.getElementById('ysRemarkInput').focus(); return; }
-
-    YSState.staffName = staff;
-    YSState.remark = remark;
-
-    // Show sync status
+// Loads the item master + PTL configuration: from the device cache when present, else from the server with progress.
+// Returns false when there is nothing usable to scan with.
+async function ysPrepareData() {
     const syncStatus = document.getElementById('ysSyncStatus');
     const syncError = document.getElementById('ysSyncError');
-    const startBtn = document.getElementById('ysStartSessionBtn');
     syncStatus.style.display = 'flex';
     syncError.style.display = 'none';
-    startBtn.disabled = true;
 
     const hasCachedHu = loadCachedHuConfig();
     const cachedItemCount = hasCachedHu ? await ysDbCount(YS_ITEMS_STORE) : 0;
@@ -1316,18 +1313,16 @@ async function ysStartSession() {
 
     if (!AppState.isOnline) {
         syncStatus.style.display = 'none';
-        startBtn.disabled = false;
         if (!hasCache) {
             syncError.textContent = 'No internet and no cached data. Connect and try again.';
             syncError.style.display = 'block';
-            return;
+            return false;
         }
     } else if (hasCache) {
-        // Cache already populated — skip auto-sync. Use ↻ to refresh manually.
+        // Cache already populated - skip auto-sync. Use the sync button to refresh manually.
         syncStatus.style.display = 'none';
-        startBtn.disabled = false;
     } else {
-        // First launch or cache cleared — must sync
+        // First launch or cache cleared - must sync
         const syncMsg = document.getElementById('ysSyncMsg');
         syncMsg.textContent = 'Syncing PTL configuration… (1/2)';
         const huOk = await syncHuConfig();
@@ -1340,15 +1335,13 @@ async function ysStartSession() {
             bar.firstChild.style.width = Math.round(pct) + '%';
         });
         bar.style.display = 'none';
-
         syncStatus.style.display = 'none';
-        startBtn.disabled = false;
 
         if (!huOk || !imOk) {
             if (!loadCachedHuConfig()) {
                 syncError.textContent = 'Could not load the item master / PTL config. Ask your admin to upload them, or check your connection.';
                 syncError.style.display = 'block';
-                return;
+                return false;
             }
             syncError.textContent = 'Using cached data (live sync failed). Proceed with caution.';
             syncError.style.display = 'block';
@@ -1358,28 +1351,56 @@ async function ysStartSession() {
     // Build/restore HU states
     loadYsHuStates();
     buildHuStates();
+    return true;
+}
 
-    // Update UI
-    document.getElementById('ysDispStore').textContent = `${AppState.storeId} - ${AppState.storeName}`;
+function ysSetRemarkLocked(locked) {
+    const input = document.getElementById('ysRemarkInput');
+    input.readOnly = locked;
+    input.classList.toggle('locked', locked);
+    if (locked) input.value = YSState.remark;
+}
+
+// Called by the first scan. Needs the Remark and loaded data; the operator's name comes from the signed-in account.
+async function ysBeginSession() {
+    const input = document.getElementById('ysRemarkInput');
+    const remark = input.value.trim();
+    if (!remark) { alert('Please enter a remark.'); input.focus(); return false; }
+    if (!YSState.huStates.length) {
+        ysShowError('The item master and PTL configuration are not loaded yet. Check your connection and tap the sync button, or ask your admin to upload them.');
+        return false;
+    }
+    YSState.staffName = AppState.storeName || 'Operator';
+    YSState.remark = remark;
     document.getElementById('ysDispStaff').textContent = YSState.staffName;
-
     setActiveSession('yearSegregate', true);
     saveYsSession();
-
-    ysShowScreen('ysScanScreen');
-    ysRenderHuPanel();
-    ysUpdateStats();
-    await ysUpdateTotalStat();
-    await ysUpdateImCount();
+    ysSetRemarkLocked(true);
     updateBackButton();
-    document.getElementById('ysBarcodeInput').focus();
+    return true;
+}
+
+// The scan screen for a job that has not started: empty Remark, data loaded.
+async function ysOpenFresh() {
+    ysShowScreen('ysScanScreen');
+    ysSetRemarkLocked(false);
+    document.getElementById('ysRemarkInput').value = '';
+    document.getElementById('ysDispStore').textContent = `${AppState.storeId} - ${AppState.storeName}`;
+    const ok = await ysPrepareData();
+    if (ok) {
+        ysRenderHuPanel();
+        ysUpdateStats();
+        await ysUpdateTotalStat();
+        await ysUpdateImCount();
+    }
+    updateBackButton();
+    document.getElementById('ysRemarkInput').focus();
 }
 
 // ============================================
 // EVENT LISTENERS
 // ============================================
 function setupYsEventListeners() {
-    document.getElementById('ysStartSessionBtn').addEventListener('click', ysStartSession);
     document.getElementById('ysBarcodeInput').addEventListener('keypress', handleYsScan);
 
     document.getElementById('ysNuBtn').addEventListener('click', ysGuardModeToggle);
@@ -1458,13 +1479,14 @@ async function initYearSegregate() {
             document.getElementById('ysDispStore').textContent = `${AppState.storeId} - ${AppState.storeName}`;
             document.getElementById('ysDispStaff').textContent = YSState.staffName;
             ysShowScreen('ysScanScreen');
+            ysSetRemarkLocked(true);
             ysRenderHuPanel();
             ysUpdateStats();
             await ysUpdateTotalStat();
     await ysUpdateImCount();
             document.getElementById('ysBarcodeInput').focus();
         } else {
-            ysShowScreen('ysSessionScreen');
+            await ysOpenFresh();
         }
         return;
     }
@@ -1485,6 +1507,7 @@ async function initYearSegregate() {
         document.getElementById('ysDispStaff').textContent = YSState.staffName;
         setActiveSession('yearSegregate', true);
         ysShowScreen('ysScanScreen');
+        ysSetRemarkLocked(true);
         ysRenderHuPanel();
         ysUpdateStats();
         await ysUpdateTotalStat();
@@ -1492,7 +1515,7 @@ async function initYearSegregate() {
         updateBackButton();
         document.getElementById('ysBarcodeInput').focus();
     } else {
-        ysShowScreen('ysSessionScreen');
+        await ysOpenFresh();
     }
 
     // Background sync interval — same pattern as Box Scanner.

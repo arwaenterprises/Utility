@@ -174,9 +174,21 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     await refUploadList('ys_item_master', [{ barcode: 'I1', year: '2024', season: 'SS', brand: 'Nike' }, { barcode: 'I2', year: '2025', season: 'FW', brand: 'Adidas' }]);
     await refUploadList('ys_ptl_config', [{ ptl_number: '1', season: 'SS', year: '2024', year_logic: 'lte' }, { ptl_number: '2', season: 'FW', year: '2025', year_logic: 'eq' }]);
     await initYearSegregate();
-    document.getElementById('ysStaffInput').value = 'Sam'; document.getElementById('ysRemarkInput').value = 'R';
-    await ysStartSession();
-    ok('YS session start synced PTL config + item master', YSState.huConfig.length === 2 && (await ysDbCount(YS_ITEMS_STORE)) === 2 && YSState.huStates.length === 2, 'ptls=' + YSState.huConfig.length);
+    ok('YS: opening the tool loads the item master + PTL config by itself (no Start Session)', YSState.huConfig.length === 2 && (await ysDbCount(YS_ITEMS_STORE)) === 2 && YSState.huStates.length === 2 && !document.getElementById('ysStartSessionBtn') && !document.getElementById('ysSessionScreen'), 'ptls=' + YSState.huConfig.length);
+    ok('YS: it opens on the scan screen with an empty, editable Remark and no "Your name" box', document.getElementById('ysScanScreen').classList.contains('active') && document.getElementById('ysRemarkInput').value === '' && !document.getElementById('ysRemarkInput').readOnly && !document.getElementById('ysStaffInput'));
+    ok('YS: the upload buttons sit on the scan screen', !!document.querySelector('#ysScanScreen #ysUploadItemsBtn') && !!document.querySelector('#ysScanScreen #ysUploadPtlBtn'));
+    { // scanning without a Remark is refused
+      let alerts2 = []; const oa = window.alert; window.alert = m => alerts2.push(String(m));
+      document.getElementById('ysBarcodeInput').value = 'I1'; await handleYsScan({ key: 'Enter' });
+      ok('YS: a scan without a Remark is refused and asks for it', alerts2.length === 1 && !YSState.staffName && !AppState.hasActiveSession, alerts2.join());
+      document.getElementById('ysRemarkInput').value = '  '; document.getElementById('ysBarcodeInput').value = 'I1'; await handleYsScan({ key: 'Enter' });
+      ok('YS: a Remark of only spaces does not count', alerts2.length === 2 && !YSState.staffName);
+      window.alert = oa;
+    }
+    document.getElementById('ysRemarkInput').value = 'R';
+    document.getElementById('ysBarcodeInput').value = 'I1'; await handleYsScan({ key: 'Enter' });
+    ok('YS: with a Remark the first scan begins the session (operator = the signed-in account) and locks the Remark', YSState.staffName === 'Ann' && YSState.remark === 'R' && AppState.hasActiveSession === true && document.getElementById('ysRemarkInput').readOnly, YSState.staffName);
+    YSState.scanStep = 'item'; YSState.pendingItem = null; YSState.pendingHuIdx = null;
     ok('YS storeId from google account', AppState.storeId === 'a@b.c');
     // scans
     const mk = (uid, st) => ({ scanUid: uid, scanIso: new Date().toISOString(), storeId: 'a@b.c', storeName: 'Ann', staffName: 'Sam', remark: 'R', ptlNumber: '01', season: 'SS', year: 2024, brand: 'Nike', barcode: 'I1', qty: 1, boxBarcode: 'BX1', boxStatus: st, scanTimestamp: ysNow(), synced: false });
@@ -203,7 +215,8 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     { // Year/Season: a session with zero scans closes at once
       const w0 = written.length; YSState.huStates.forEach(h => h.status = 'Closed');
       await ysShowResetModal();
-      ok('YS zero scans: no "Are you sure?" pop-up, no download, session closed', !document.getElementById('ysResetModal').classList.contains('active') && written.length === w0 && document.getElementById('ysSessionScreen').classList.contains('active'));
+      await sleep(150);
+      ok('YS zero scans: no "Are you sure?" pop-up, no download, session closed with the Remark free again', !document.getElementById('ysResetModal').classList.contains('active') && written.length === w0 && document.getElementById('ysScanScreen').classList.contains('active') && !YSState.staffName && !document.getElementById('ysRemarkInput').readOnly && document.getElementById('ysRemarkInput').value === '');
     }
     // team membership changed while the phone was open: the old profile is refused once, then refreshed
     window.__enforceTeamRule = true; window.__rlsRejects = 0;

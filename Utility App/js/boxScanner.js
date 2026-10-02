@@ -19,7 +19,7 @@ const ScannerState = {
 
 const ScannerT = {
     en: {
-        lblRemark: "Remark", lblStartSession: "Start Session",
+        lblRemark: "Remark",
         lblTotal: "Total", lblBoxQty: "Box Qty", lblBoxes: "Boxes",
         lblBoxId: "Box ID", lblBarcode: "Barcode", lblCloseBox: "Close Box", lblRecentScans: "Last 5 Scans",
         thBarcode: "Barcode", thTime: "Time", thAction: "Del", lblDownload: "Download", lblReset: "Reset",
@@ -48,7 +48,7 @@ const ScannerT = {
         lblStatusOpen: "Open", lblStatusClosed: "Closed", lblViewBoxItems: "items"
     },
     ar: {
-        lblRemark: "ملاحظة", lblStartSession: "بدء الجلسة",
+        lblRemark: "ملاحظة",
         lblTotal: "الإجمالي", lblBoxQty: "الصندوق", lblBoxes: "مكتمل",
         lblBoxId: "رقم الصندوق", lblBarcode: "الباركود", lblCloseBox: "إغلاق الصندوق", lblRecentScans: "آخر 5 مسح",
         thBarcode: "الباركود", thTime: "الوقت", thAction: "حذف", lblDownload: "تحميل", lblReset: "إعادة",
@@ -366,20 +366,27 @@ function syncScannerUniqueLock() {
 // ============================================
 // BOX SCANNER - SESSION MANAGEMENT
 // ============================================
+// The Remark is mandatory: it tells the different scanning jobs apart. There is no "Start Session" screen -
+// the session begins when the first box is scanned (or whenever this is called) and the Remark is then locked
+// until Reset. Returns false (and asks for the Remark) when it is empty.
 function startScannerSession() {
-    const remark = document.getElementById('scannerRemarkInput').value.trim();
-
-    if (!remark) { alert(scannerT('errEnterRemark')); document.getElementById('scannerRemarkInput').focus(); return; }
+    const input = document.getElementById('scannerRemarkInput');
+    const remark = input.value.trim();
+    if (!remark) { alert(scannerT('errEnterRemark')); input.focus(); return false; }
 
     ScannerState.remark = remark;
-
     setActiveSession('boxScanner', true);
     saveScannerSession();
-
-    showScannerScreen('scannerScanScreen');
-    document.getElementById('boxIdInput').focus();
-    loadAndDisplayScans();
+    setScannerRemarkLocked(true);
     updateBackButton();
+    return true;
+}
+
+function setScannerRemarkLocked(locked) {
+    const input = document.getElementById('scannerRemarkInput');
+    input.readOnly = locked;
+    input.classList.toggle('locked', locked);
+    if (locked) input.value = ScannerState.remark;
 }
 
 // ============================================
@@ -389,6 +396,9 @@ function handleBoxIdScan(e) {
     if (e.key !== 'Enter') return;
     const boxId = document.getElementById('boxIdInput').value.trim();
     if (!boxId) return;
+
+    // The first scan begins the session - which needs the Remark.
+    if (!ScannerState.remark && !startScannerSession()) { document.getElementById('boxIdInput').value = ''; return; }
 
     if (!ScannerState.boxScanning) {
         if (ScannerState.completedBoxes.has(boxId)) {
@@ -825,6 +835,7 @@ async function executeResetSession(confirmed) {
 // The last step of every Reset: forget the session and go back to the start screen.
 function finishScannerReset() {
     clearScannerSession();
+    setScannerRemarkLocked(false);
     document.getElementById('scannerRemarkInput').value = '';
     document.getElementById('boxIdInput').value = '';
     document.getElementById('barcodeInput').value = '';
@@ -832,7 +843,8 @@ function finishScannerReset() {
     document.getElementById('boxIdGroup').classList.remove('hidden');
     document.getElementById('closeBoxRow').classList.remove('show');
     setActiveSession('boxScanner', false);
-    showScannerScreen('scannerSessionScreen');
+    showScannerScreen('scannerScanScreen');
+    document.getElementById('scannerRemarkInput').focus();
     updateBackButton();
 }
 
@@ -848,7 +860,6 @@ function setupScannerEventListeners() {
     document.getElementById('modeToggleBtn').addEventListener('change', (e) => setScannerInputMode(e.target.checked ? 'AlNu' : 'Nu'));
     document.getElementById('uniqueToggleBtn').addEventListener('click', guardScannerUniqueToggle);
     document.getElementById('uniqueToggleBtn').addEventListener('change', (e) => setScannerUniqueMode(e.target.checked));
-    document.getElementById('startSessionBtn').addEventListener('click', startScannerSession);
     document.getElementById('boxIdInput').addEventListener('keypress', handleBoxIdScan);
     document.getElementById('barcodeInput').addEventListener('keypress', handleBarcodeScan);
     document.getElementById('closeBoxBtn').addEventListener('click', showCloseBoxModal);
@@ -907,6 +918,7 @@ async function initBoxScanner() {
             document.getElementById('closeBoxBtnId').textContent = ScannerState.currentBox;
         }
         showScannerScreen('scannerScanScreen');
+        setScannerRemarkLocked(true);
         if (ScannerState.boxScanning) {
             document.getElementById('barcodeInput').focus();
         } else {
@@ -914,7 +926,11 @@ async function initBoxScanner() {
         }
         await loadAndDisplayScans();
     } else {
-        showScannerScreen('scannerSessionScreen');
+        // no session yet: the scan screen with an empty, editable Remark
+        showScannerScreen('scannerScanScreen');
+        setScannerRemarkLocked(false);
+        document.getElementById('scannerRemarkInput').focus();
+        await loadAndDisplayScans();
     }
 
     // initBoxScanner runs every time the app tile is opened (js/app.js), so clear any

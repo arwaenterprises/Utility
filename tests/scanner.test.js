@@ -68,8 +68,22 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     await showResetModal();
     ok('zero scans: Reset asks no "Are you sure?" pop-up', !document.getElementById('resetModal').classList.contains('active'));
     ok('zero scans: nothing is downloaded', downloads === 0);
-    ok('zero scans: the session is closed (back at the start)', document.getElementById('scannerSessionScreen').classList.contains('active') && !ScannerState.boxScanning);
-    await scan('ZB', 'boxIdInput'); // (a box id alone is not a scan)
+    ok('zero scans: the session is closed (Remark empty and editable again)', document.getElementById('scannerScanScreen').classList.contains('active') && !ScannerState.boxScanning && ScannerState.remark === '' && document.getElementById('scannerRemarkInput').value === '' && !document.getElementById('scannerRemarkInput').readOnly);
+    // the Remark is mandatory and the first box scan begins the session (there is no Start Session screen)
+    ok('there is no Start Session button or start screen any more', !document.getElementById('startSessionBtn') && !document.getElementById('scannerSessionScreen'));
+    ok('a fresh tool opens on the scan screen with an empty, editable Remark', document.getElementById('scannerScanScreen').classList.contains('active') && document.getElementById('scannerRemarkInput').value === '' && !document.getElementById('scannerRemarkInput').readOnly);
+    alerts.length = 0; document.getElementById('scannerRemarkInput').value = '';
+    await scan('ZB', 'boxIdInput');
+    ok('scanning a box without a Remark is refused and asks for it', alerts.length === 1 && !ScannerState.boxScanning && ScannerState.remark === '' && !AppState.hasActiveSession, alerts.join('|') + ' / ' + AppState.hasActiveSession);
+    document.getElementById('scannerRemarkInput').value = '   ';
+    alerts.length = 0; await scan('ZB', 'boxIdInput');
+    ok('a Remark of only spaces does not count', alerts.length === 1 && !ScannerState.boxScanning);
+    document.getElementById('scannerRemarkInput').value = 'Pallet job 7';
+    await scan('ZB', 'boxIdInput');
+    ok('with a Remark the first box scan begins the session and opens the box', ScannerState.boxScanning && ScannerState.currentBox === 'ZB' && ScannerState.remark === 'Pallet job 7' && AppState.hasActiveSession === true);
+    ok('the Remark is locked while the session runs', document.getElementById('scannerRemarkInput').readOnly && document.getElementById('scannerRemarkInput').value === 'Pallet job 7');
+    await showResetModal();              // no item scanned yet: closes at once
+    ok('Reset unlocks the Remark again for the next job', !document.getElementById('scannerRemarkInput').readOnly && document.getElementById('scannerRemarkInput').value === '' && !AppState.hasActiveSession);
 
     // ---------- enterprise member ----------
     AppState.profile = { display_name: 'Mia', enterprise_id: 'E1', tier: 'enterprise_member' };

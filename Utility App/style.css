@@ -2376,3 +2376,12 @@ body.rtl .app-back-btn { transform: scaleX(-1); }
 .invite-choice { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--ak-gray-200); }
 .invite-choice:last-child { border-bottom: none; }
 .invite-choice small { color: var(--ak-text-light); font-size: 11px; }
+
+/* the Remark card on the scan screens (the only thing asked to begin a session) */
+.remark-card { background: var(--ak-white); border: 1px solid var(--ak-gray-200); border-radius: 12px; padding: 8px 10px; margin-bottom: 8px; }
+.remark-card label { display: block; font-size: 12px; font-weight: 700; color: var(--ak-maroon); margin-bottom: 4px; }
+.remark-card .form-input { margin: 0; }
+.remark-card .form-input.locked, .remark-card .form-input[readonly] { background: var(--ak-gray-100); color: var(--ak-text-light); font-weight: 600; }
+.remark-card .ys-upload-row { margin: 8px 0 0; }
+.remark-card .ys-sync-status, .remark-card .error-msg { margin-top: 8px; }
+.remark-card .ref-progress { margin-top: 6px; }
