@@ -30,7 +30,7 @@ const SyncStatus = (function () {
         if (!m) return '';
         if (/failed to fetch|networkerror|network request failed|load failed|timeout|timed out/i.test(m)) return 'cannot reach the server';
         if (/jwt|token|not signed in|unauthor|401|refresh/i.test(m)) return 'please sign out and sign in again';
-        if (/row-level security|permission denied|403/i.test(m)) return 'not allowed - please sign in again';
+        if (/row-level security|permission denied|403/i.test(m)) return 'the server did not accept it - your team may have changed; sign out and in if this stays';
         return m.length > 60 ? m.slice(0, 57) + '...' : m;
     }
 

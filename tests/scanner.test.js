@@ -76,6 +76,28 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     await initBoxScanner();
     ok('member does not pull server data back after Reset', (await localScans()) === 0);
 
+    // ---------- team membership changed after the box was closed (the "not allowed - please sign in again" bug) ----------
+    window.__enforceTeamRule = true; window.__rlsRejects = 0;
+    window.__me = { id: 'u1', enterprise_id: 'E1', tier: 'enterprise_member', email: 'a@b.c' };
+    AppState.user = { id: 'u1', email: 'a@b.c' }; AppState.profile = { display_name: 'Mia', enterprise_id: 'E1', tier: 'enterprise_member' };
+    await initBoxScanner();
+    document.getElementById('scannerRemarkInput').value = 'R3'; startScannerSession();
+    window.__fail = true; AppState.isOnline = false;
+    await scan('B9', 'boxIdInput'); await scan('999', 'barcodeInput'); await executeCloseBox();
+    const stuck = (await getAllScans()).filter(x => !x.synced);
+    ok('box closed while a member carries the team stamp', stuck.length === 1 && stuck[0].enterprise_id === 'E1');
+    const before = serverScans();
+    window.__me = { id: 'u1', enterprise_id: null, tier: 'individual', email: 'a@b.c' };   // the admin removes the person; the phone still holds the old profile
+    window.__fail = false; AppState.isOnline = true;
+    await autoSyncScans();
+    ok('the server first refuses the old team stamp...', window.__rlsRejects === 1, window.__rlsRejects);
+    ok('...the phone re-reads the profile, re-stamps the box and uploads it', serverScans() === before + 1 && __db.scans.filter(r => r.box_number === 'B9').every(r => r.enterprise_id == null), serverScans() + ' / ' + before);
+    ok('the app now knows the person is no longer in the team', AppState.profile.enterprise_id == null && AppState.profile.tier === 'individual');
+    ok('the box is marked uploaded and the warning is gone', (await getAllScans()).every(x => x.synced) && !/not uploaded/.test(document.getElementById('syncStatusLine').textContent), document.getElementById('syncStatusLine').textContent);
+    ok('the device copy carries the same stamp as the server copy', (await getAllScans()).filter(x => x.box_number === 'B9').every(x => x.enterprise_id == null));
+    window.__enforceTeamRule = false; window.__me = { id: 'u1', enterprise_id: null, tier: 'individual', email: 'a@b.c' };
+    await clearLocalScans(); __db.scans = __db.scans.filter(r => r.box_number !== 'B9');
+
     // ---------- another account on the same device ----------
     AppState.user = { id: 'u2', email: 'x@y.z' }; AppState.profile = { display_name: 'Xi', enterprise_id: null, tier: 'individual' };
     await initBoxScanner();

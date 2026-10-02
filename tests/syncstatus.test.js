@@ -27,7 +27,7 @@ ok('long waits are shown in hours', /not uploaded for 3 h/.test(d({ pending: 2, 
 
 ok('error: network problem -> "cannot reach the server"', SyncStatus.friendlyError('Failed to fetch') === 'cannot reach the server' && SyncStatus.friendlyError('NetworkError when attempting to fetch resource.') === 'cannot reach the server');
 ok('error: expired login -> sign in again', /sign out and sign in again/.test(SyncStatus.friendlyError('JWT expired')));
-ok('error: permission problem -> sign in again', /sign in again/.test(SyncStatus.friendlyError('new row violates row-level security policy')));
+ok('error: permission problem -> says the team may have changed', /team may have changed/.test(SyncStatus.friendlyError('new row violates row-level security policy')));
 ok('error: unknown messages are kept but shortened', SyncStatus.friendlyError('x'.repeat(100)).length === 60 && SyncStatus.friendlyError('') === '');
 
 const el = { textContent: '', className: '', title: '' };

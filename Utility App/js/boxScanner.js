@@ -139,9 +139,17 @@ const SCANNER_SYNC_INTERVAL_MS = 10000;
 // Upserting on scan_uid makes a retry safe: a batch that reached Supabase but whose
 // response was lost is simply written onto the same rows again.
 async function pushScansToServer(scans, onProgress) {
+    // Every row is stamped with the team the account belongs to RIGHT NOW (not the one it belonged to
+    // when the box was scanned): the server refuses a scan stamped with a team the person has left.
+    const toRow = ({ synced, pending_since, ...row }) => ({ ...row, enterprise_id: AppState.profile?.enterprise_id || null });
     for (let i = 0; i < scans.length; i += SCANNER_SYNC_BATCH) {
-        const rows = scans.slice(i, i + SCANNER_SYNC_BATCH).map(({ synced, pending_since, ...row }) => row);
-        const { error } = await supabaseClient.from('scans').upsert(rows, { onConflict: 'scan_uid' });
+        const batch = scans.slice(i, i + SCANNER_SYNC_BATCH);
+        let { error } = await supabaseClient.from('scans').upsert(batch.map(toRow), { onConflict: 'scan_uid' });
+        if (error && isPermissionError(error)) {
+            // Most likely the team membership changed since the profile was loaded: re-read it and retry once.
+            await refreshProfile(0);
+            ({ error } = await supabaseClient.from('scans').upsert(batch.map(toRow), { onConflict: 'scan_uid' }));
+        }
         if (error) throw error;
         if (onProgress) onProgress(Math.min(i + SCANNER_SYNC_BATCH, scans.length) / scans.length * 100);
     }
@@ -171,6 +179,7 @@ async function runAutoSync() {
         await pushScansToServer(unsynced, (pct) => { if (badge) badge.textContent = Math.round(pct) + '%'; });
         for (const scan of unsynced) {
             scan.synced = true;
+            scan.enterprise_id = AppState.profile?.enterprise_id || null;   // keep the device copy in step with the server copy
             delete scan.pending_since;
             await updateScan(scan);
         }

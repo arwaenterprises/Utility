@@ -19,12 +19,21 @@ window.__rpcCalls = [];
       delete() { st.op = 'delete'; return b; },
       insert(row) { st.op = 'insert'; st.rows = [row]; return b; },
       maybeSingle() { st.single = true; return b; },
+      single() { st.single = true; return b; },
       then(res, rej) { return Promise.resolve(run()).then(res, rej); }
     };
     function run() {
       let t = db[table];
       if (window.__fail && (st.op === 'upsert' || st.op === 'insert' || st.op === 'delete')) return { data: null, error: { message: 'network down (test)' } };
       if (st.op === 'insert') { st.rows.forEach(r => t.push({ id: 'i' + Math.random(), status: 'pending', expires_at: new Date(Date.now() + 7 * 864e5).toISOString(), ...r })); return { data: null, error: null }; }
+      if (table === 'profiles') return { data: { id: window.__me.id, display_name: 'Ann', email: window.__me.email, tier: window.__me.tier, enterprise_id: window.__me.enterprise_id }, error: null };
+      // Same rule as the real database (scans_insert_own / ys_scans_insert_own): a scan may carry no team,
+      // or the team the account belongs to RIGHT NOW. Only enforced when a test sets __enforceTeamRule.
+      if (st.op === 'upsert' && window.__enforceTeamRule && (table === 'scans' || table === 'ys_scans')
+          && st.rows.some(r => r.enterprise_id && r.enterprise_id !== window.__me.enterprise_id)) {
+        window.__rlsRejects = (window.__rlsRejects || 0) + 1;
+        return { data: null, error: { code: '42501', message: 'new row violates row-level security policy for table "' + table + '"' } };
+      }
       if (st.op === 'upsert') {
         for (const r of st.rows) {
           const i = t.findIndex(x => x[st.conflict] === r[st.conflict]);

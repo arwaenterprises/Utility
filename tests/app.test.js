@@ -193,6 +193,14 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     YSState.huStates.forEach(h => h.status = 'Closed'); await ysAutoSync();
     await ysExecuteReset();
     ok('YS individual reset: downloaded, device + server cleared', written.length === 2 && (await ysDbGetAll(YS_SCANS_STORE)).length === 0 && __db.ys_scans.length === 0, 'rows exported=' + written[1]?.rows.length);
+    // team membership changed while the phone was open: the old profile is refused once, then refreshed
+    window.__enforceTeamRule = true; window.__rlsRejects = 0;
+    AppState.profile = { display_name: 'M', enterprise_id: 'E1', tier: 'enterprise_member' };   // stale on the phone
+    window.__me = { id: 'u1', enterprise_id: null, tier: 'individual', email: 'a@b.c' };          // the server already knows the person left
+    await ysDbAdd(YS_SCANS_STORE, mk(crypto.randomUUID(), 'Closed'));
+    await ysAutoSync(); await sleep(100);
+    ok('Year/Season: stale team is refused once, profile refreshed, box uploaded', window.__rlsRejects === 1 && __db.ys_scans.length === 1 && __db.ys_scans[0].enterprise_id == null && AppState.profile.enterprise_id == null, 'rejects=' + window.__rlsRejects + ' rows=' + __db.ys_scans.length);
+    window.__enforceTeamRule = false; await ysDbClearStore(YS_SCANS_STORE); __db.ys_scans = [];
     // enterprise member reset blocked while pending, then allowed
     AppState.profile = { display_name: 'M', enterprise_id: 'E1', tier: 'enterprise_member' }; __me.enterprise_id = 'E1';
     await ysDbAdd(YS_SCANS_STORE, mk(crypto.randomUUID(), 'Closed')); AppState.isOnline = false;

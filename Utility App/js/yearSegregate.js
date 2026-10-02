@@ -752,8 +752,14 @@ async function ysRunAutoSync() {
         const badge = document.getElementById('ysSyncBadge');
         for (let i = 0; i < unsynced.length; i += YS_SYNC_BATCH) {
             const batch = unsynced.slice(i, i + YS_SYNC_BATCH);
-            const { error } = await supabaseClient.from('ys_scans')
+            let { error } = await supabaseClient.from('ys_scans')
                 .upsert(batch.map(ysToServerRow), { onConflict: 'scan_uid' });
+            if (error && isPermissionError(error)) {
+                // Team membership probably changed since the profile was loaded: re-read it and retry once.
+                await refreshProfile(0);
+                ({ error } = await supabaseClient.from('ys_scans')
+                    .upsert(batch.map(ysToServerRow), { onConflict: 'scan_uid' }));
+            }
             if (error) throw error;
             for (const scan of batch) {
                 scan.synced = true;

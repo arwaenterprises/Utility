@@ -41,6 +41,32 @@ async function loadUserProfile() {
     AppState.profile = data;
 }
 
+// Re-reads this account's profile from the server. Team membership can change while a phone is
+// open (the admin removes or adds the person), and every scan is checked against the CURRENT team
+// when it is uploaded - a stale profile would stamp scans with a team the person no longer belongs to
+// and the server would refuse them. minGapMs stops repeated calls (0 = always ask).
+let lastProfileCheckMs = 0;
+async function refreshProfile(minGapMs) {
+    if (!AppState.user || !AppState.isOnline) return false;
+    const now = Date.now();
+    if (minGapMs && now - lastProfileCheckMs < minGapMs) return false;
+    lastProfileCheckMs = now;
+    const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', AppState.user.id).single();
+    if (error || !data) return false;
+    const changed = (AppState.profile?.enterprise_id || null) !== (data.enterprise_id || null) || AppState.profile?.tier !== data.tier;
+    AppState.profile = data;
+    if (changed) {
+        updateHeaderUser();
+        if (document.getElementById('homeScreen').classList.contains('active')) renderAppGrid();
+    }
+    return changed;
+}
+
+// "new row violates row-level security policy" (code 42501) = the server refused the data for this account.
+function isPermissionError(err) {
+    return !!err && (err.code === '42501' || /row-level security|permission denied/i.test(err.message || ''));
+}
+
 async function enterAppAsSignedInUser(session) {
     AppState.user = session.user;
     await loadUserProfile();
@@ -1054,6 +1080,9 @@ async function initApp() {
     } else {
         showScreen('loginScreen');
     }
+
+    window.addEventListener('online', () => refreshProfile(60000));
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshProfile(60000); });
 
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
