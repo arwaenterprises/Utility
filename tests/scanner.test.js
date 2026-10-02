@@ -61,6 +61,16 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     await executeResetSession(true);
     ok('individual Reset clears the device AND the server', (await localScans()) === 0 && serverScans() === 0);
 
+    // a session with zero scans closes at once: no confirmation pop-up, no Excel download
+    let downloads = 0; window.XLSX.writeFile = () => { downloads++; };
+    document.getElementById('scannerRemarkInput').value = 'Z'; startScannerSession();
+    ok('a new session has zero scans', (await localScans()) === 0 && document.getElementById('scannerScanScreen').classList.contains('active'));
+    await showResetModal();
+    ok('zero scans: Reset asks no "Are you sure?" pop-up', !document.getElementById('resetModal').classList.contains('active'));
+    ok('zero scans: nothing is downloaded', downloads === 0);
+    ok('zero scans: the session is closed (back at the start)', document.getElementById('scannerSessionScreen').classList.contains('active') && !ScannerState.boxScanning);
+    await scan('ZB', 'boxIdInput'); // (a box id alone is not a scan)
+
     // ---------- enterprise member ----------
     AppState.profile = { display_name: 'Mia', enterprise_id: 'E1', tier: 'enterprise_member' };
     await initBoxScanner();

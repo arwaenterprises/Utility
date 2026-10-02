@@ -23,11 +23,11 @@ const ScannerT = {
         lblTotal: "Total", lblBoxQty: "Box Qty", lblBoxes: "Boxes",
         lblBoxId: "Box ID", lblBarcode: "Barcode", lblCloseBox: "Close Box", lblRecentScans: "Last 5 Scans",
         thBarcode: "Barcode", thTime: "Time", thAction: "Del", lblDownload: "Download", lblReset: "Reset",
-        lblSettings: "Settings", lblCloseBoxTitle: "Close Box", lblQtyItems: "Quantity:", lblItems: "items",
+        lblCloseBoxTitle: "Close Box", lblQtyItems: "Quantity:", lblItems: "items",
         lblAreYouSure: "Are you sure you want to close this box?", lblScanToConfirm: "Scan box ID to confirm",
         lblResetTitle: "Reset Session?", lblResetMsg: "This will download your data and start a new session.",
-        lblDeleteTitle: "Delete Scan?", lblDeleteMsg: "Delete this scan?", lblSettingsTitle: "Settings",
-        lblLanguage: "Language", boxIdPlaceholder: "Scan box ID...", barcodePlaceholder: "Scan barcode...",
+        lblDeleteTitle: "Delete Scan?", lblDeleteMsg: "Delete this scan?",
+        boxIdPlaceholder: "Scan box ID...", barcodePlaceholder: "Scan barcode...",
         remarkPlaceholder: "e.g., Fall Winter 2023 stocks",
         errEnterRemark: "Please enter a remark",
         errBoxFirst: "Scan Box ID first", errSameBox: "Scan same Box ID!", errCloseBoxFirst: "Close the box first!",
@@ -52,11 +52,11 @@ const ScannerT = {
         lblTotal: "الإجمالي", lblBoxQty: "الصندوق", lblBoxes: "مكتمل",
         lblBoxId: "رقم الصندوق", lblBarcode: "الباركود", lblCloseBox: "إغلاق الصندوق", lblRecentScans: "آخر 5 مسح",
         thBarcode: "الباركود", thTime: "الوقت", thAction: "حذف", lblDownload: "تحميل", lblReset: "إعادة",
-        lblSettings: "الإعدادات", lblCloseBoxTitle: "إغلاق الصندوق", lblQtyItems: "الكمية:", lblItems: "قطعة",
+        lblCloseBoxTitle: "إغلاق الصندوق", lblQtyItems: "الكمية:", lblItems: "قطعة",
         lblAreYouSure: "هل أنت متأكد من إغلاق هذا الصندوق؟", lblScanToConfirm: "امسح رقم الصندوق للتأكيد",
         lblResetTitle: "إعادة تعيين؟", lblResetMsg: "سيتم تحميل البيانات وبدء جلسة جديدة.",
-        lblDeleteTitle: "حذف المسح؟", lblDeleteMsg: "حذف هذا المسح؟", lblSettingsTitle: "الإعدادات",
-        lblLanguage: "اللغة", boxIdPlaceholder: "امسح رقم الصندوق...", barcodePlaceholder: "امسح الباركود...",
+        lblDeleteTitle: "حذف المسح؟", lblDeleteMsg: "حذف هذا المسح؟",
+        boxIdPlaceholder: "امسح رقم الصندوق...", barcodePlaceholder: "امسح الباركود...",
         remarkPlaceholder: "مثال: مخزون خريف وشتاء 2023",
         errEnterRemark: "الرجاء إدخال ملاحظة",
         errBoxFirst: "امسح رقم الصندوق أولاً", errSameBox: "امسح نفس رقم الصندوق!", errCloseBoxFirst: "أغلق الصندوق أولاً!",
@@ -315,10 +315,6 @@ function applyScannerTranslations() {
     document.getElementById('modeToggleWrap').classList.toggle('locked', ScannerState.boxScanning);
     document.getElementById('uniqueToggleBtn').checked = ScannerState.uniqueMode;
     document.getElementById('uniqueToggleWrap').classList.toggle('locked', ScannerState.boxScanning);
-    document.getElementById('langEnBtn').classList.toggle('active', ScannerState.language === 'en');
-    document.getElementById('langArBtn').classList.toggle('active', ScannerState.language === 'ar');
-    document.getElementById('settingsLangEnBtn').classList.toggle('active', ScannerState.language === 'en');
-    document.getElementById('settingsLangArBtn').classList.toggle('active', ScannerState.language === 'ar');
 }
 
 // The language is chosen once for the whole app (see js/lang.js); the toggles in this tool just set it.
@@ -763,7 +759,13 @@ async function downloadScannerExcel() {
 // ============================================
 // BOX SCANNER - RESET SESSION
 // ============================================
-function showResetModal() {
+async function showResetModal() {
+    // A session with no scans has nothing to confirm or download: just close it.
+    if ((await getAllScans()).length === 0) {
+        document.getElementById('resetModal').classList.remove('active');
+        finishScannerReset();
+        return;
+    }
     if (ScannerState.boxScanning && ScannerState.currentBox) {
         alert(scannerT('errCloseBoxFirst'));
         return;
@@ -816,25 +818,22 @@ async function executeResetSession(confirmed) {
                 return;
             }
         }
-        clearScannerSession();
-        document.getElementById('scannerRemarkInput').value = '';
-        document.getElementById('boxIdInput').value = '';
-        document.getElementById('barcodeInput').value = '';
-        document.getElementById('barcodeGroup').classList.add('hidden');
-        document.getElementById('boxIdGroup').classList.remove('hidden');
-        document.getElementById('closeBoxRow').classList.remove('show');
-        setActiveSession('boxScanner', false);
-        showScannerScreen('scannerSessionScreen');
-        updateBackButton();
+        finishScannerReset();
     }
 }
 
-function openScannerSettings() {
-    document.getElementById('scannerSettingsModal').classList.add('active');
-}
-
-function closeScannerSettings() {
-    document.getElementById('scannerSettingsModal').classList.remove('active');
+// The last step of every Reset: forget the session and go back to the start screen.
+function finishScannerReset() {
+    clearScannerSession();
+    document.getElementById('scannerRemarkInput').value = '';
+    document.getElementById('boxIdInput').value = '';
+    document.getElementById('barcodeInput').value = '';
+    document.getElementById('barcodeGroup').classList.add('hidden');
+    document.getElementById('boxIdGroup').classList.remove('hidden');
+    document.getElementById('closeBoxRow').classList.remove('show');
+    setActiveSession('boxScanner', false);
+    showScannerScreen('scannerSessionScreen');
+    updateBackButton();
 }
 
 // ============================================
@@ -845,14 +844,10 @@ let scannerListenersAdded = false;
 function setupScannerEventListeners() {
     if (scannerListenersAdded) return;
     scannerListenersAdded = true;
-    document.getElementById('langEnBtn').addEventListener('click', () => setScannerLanguage('en'));
-    document.getElementById('langArBtn').addEventListener('click', () => setScannerLanguage('ar'));
     document.getElementById('modeToggleBtn').addEventListener('click', guardScannerModeToggle);
     document.getElementById('modeToggleBtn').addEventListener('change', (e) => setScannerInputMode(e.target.checked ? 'AlNu' : 'Nu'));
     document.getElementById('uniqueToggleBtn').addEventListener('click', guardScannerUniqueToggle);
     document.getElementById('uniqueToggleBtn').addEventListener('change', (e) => setScannerUniqueMode(e.target.checked));
-    document.getElementById('settingsLangEnBtn').addEventListener('click', () => setScannerLanguage('en'));
-    document.getElementById('settingsLangArBtn').addEventListener('click', () => setScannerLanguage('ar'));
     document.getElementById('startSessionBtn').addEventListener('click', startScannerSession);
     document.getElementById('boxIdInput').addEventListener('keypress', handleBoxIdScan);
     document.getElementById('barcodeInput').addEventListener('keypress', handleBarcodeScan);
@@ -882,8 +877,6 @@ function setupScannerEventListeners() {
     document.getElementById('resetSessionBtn').addEventListener('click', showResetModal);
     document.getElementById('resetYesBtn').addEventListener('click', () => executeResetSession(true));
     document.getElementById('resetNoBtn').addEventListener('click', () => executeResetSession(false));
-    document.getElementById('openScannerSettingsBtn').addEventListener('click', (e) => { e.preventDefault(); openScannerSettings(); });
-    document.getElementById('closeSettingsBtn').addEventListener('click', closeScannerSettings);
 }
 
 // ============================================

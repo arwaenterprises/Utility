@@ -10,15 +10,16 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     AppState.user = { id: 'u1', email: 'a@b.c' }; AppState.profile = { display_name: 'Ann', enterprise_id: null, tier: 'individual' };
     renderAppGrid();
     const tiles = [...document.querySelectorAll('.app-tile')].map(t => t.dataset.appId);
-    ok('home shows all 6 tools', tiles.join() === 'boxScanner,itemBarcode,boxCode,boxSegregate,priceCheck,yearSegregate', tiles.join());
-    for (const id of APPS.map(a => a.id)) {
+    ok('home shows all 6 tools + the 7th tile Data Management', tiles.join() === 'boxScanner,itemBarcode,boxCode,boxSegregate,priceCheck,yearSegregate,dataManagement', tiles.join());
+    ok('the 7th tile uses its picture icon', !!document.querySelector('.app-tile[data-app-id="dataManagement"] img.app-tile-img[src="icons/ui-data.png"]'));
+    for (const id of APPS.filter(a => !a.modal).map(a => a.id)) {
       let err = '';
       try { await initializeApp(id); await new Promise(r => setTimeout(r, 150)); } catch (e) { err = e.message; }
       ok('tool opens: ' + id, !err && !!document.getElementById(APPS.find(a => a.id === id).containerId), err);
     }
     // Help guides: every tool has one; it opens by itself once, and the "?" button opens it again.
     const modal = () => document.getElementById('helpModal').classList.contains('active');
-    for (const id of APPS.map(a => a.id)) {
+    for (const id of APPS.filter(a => !a.modal).map(a => a.id)) {
       localStorage.clear();
       ok('help guide written in English for: ' + id, !!HELP[id] && HELP[id].en.steps.length >= 3);
       ok('help guide written in Arabic for: ' + id, !!HELP[id].ar && HELP[id].ar.steps.length === HELP[id].en.steps.length && /[\u0600-\u06FF]/.test(HELP[id].ar.intro) && !!HELP[id].ar.before === !!HELP[id].en.before);
@@ -76,8 +77,13 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('Box Scanner follows the app language', ScannerState.language === 'ar' && document.body.classList.contains('rtl'));
     document.querySelector('#loginScreen .applang-toggle [data-applang="en"]').click();
     ok('English button restores the exact English text and layout', hero.innerHTML === enHero && !document.body.classList.contains('rtl') && ScannerState.language === 'en');
-    document.querySelector('#accountModal .applang-toggle [data-applang="ar"]').click();
-    ok('the Account window can change the language too', AppLang.get() === 'ar' && document.querySelector('#homeScreen .applang-toggle [data-applang="ar"]').classList.contains('active'));
+    const circle = document.getElementById('langBtn');
+    ok('the round top-bar button shows EN in English', circle.textContent === 'EN');
+    circle.click();
+    ok('tapping the round button switches to Arabic and it now shows AR', AppLang.get() === 'ar' && circle.textContent === 'AR' && document.body.classList.contains('rtl'));
+    circle.click();
+    ok('tapping again switches back to English (EN)', AppLang.get() === 'en' && circle.textContent === 'EN' && !document.body.classList.contains('rtl'));
+    ok('the home screen has no language buttons any more (they live in the top bar)', !document.querySelector('#homeScreen .applang-toggle'));
     AppLang.set('en'); localStorage.clear();
     ok('Year/Season store id comes from the Google account', AppState.storeId === 'a@b.c' && AppState.storeName === 'Ann');
     ok('no Google Apps Script / hard-coded admin code left in the app', typeof CONFIG.GOOGLE_SCRIPT_URL === 'undefined' && typeof CONFIG.ADMIN_CODE === 'undefined' && typeof CONFIG.YS_SCRIPT_URL === 'undefined' && typeof CONFIG.PC_SCRIPT_URL === 'undefined');

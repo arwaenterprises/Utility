@@ -97,6 +97,15 @@ select _t_eq('member cannot delete own scans through the API', _t_val('00000000-
 select _t_eq('admin sees the team''s scans', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from scans$$), 2);
 select _t_eq('other enterprise admin sees none', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from scans$$), 0);
 select _t_eq('individual can delete own scans', _t_val('00000000-0000-0000-0000-00000000000a', $$with d as (delete from scans where user_id='00000000-0000-0000-0000-00000000000a' returning 1) select count(*) from d$$), 1);
+-- Box Scanner data screen: same functions, own rows only for non-admins
+select _t_do('00000000-0000-0000-0000-00000000000a', $$insert into scans(user_id,box_number,barcode,qty) values ('00000000-0000-0000-0000-00000000000a','IB','5',2)$$);
+select _t_eq('individual: stats show their own total', _t_val('00000000-0000-0000-0000-00000000000a', $$select total_qty from team_member_stats() where email='indiv@x.com'$$), 2);
+select _t_eq('individual: stats show only themselves', _t_val('00000000-0000-0000-0000-00000000000a', $$select count(*) from team_member_stats()$$), 1);
+select _t_eq('member: stats show only themselves', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from team_member_stats()$$), 1);
+select _t_eq('member: stats total is their own scans only', _t_val('00000000-0000-0000-0000-0000000000b1', $$select total_qty from team_member_stats()$$), 2);
+select _t_eq('member: search finds their own box', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from search_team_scans('B',50)$$), 2);
+select _t_eq('individual: search never returns other people''s scans', _t_val('00000000-0000-0000-0000-00000000000a', $$select count(*) from search_team_scans('B',50) where user_id <> '00000000-0000-0000-0000-00000000000a'$$), 0);
+select _t_eq('admin: search covers the whole team', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(distinct user_id) from search_team_scans('B',50)$$), 1);
 select _t_eq('admin can delete team scans', _t_val('00000000-0000-0000-0000-0000000000e1', $$with d as (delete from scans where enterprise_id='11111111-1111-1111-1111-111111111111' returning 1) select count(*) from d$$), 2);
 
 -- ============ Year/Season scans ============
@@ -107,7 +116,12 @@ select _t_err('member cannot plant Year/Season scans in another enterprise', '00
 select _t_eq('member cannot delete own Year/Season scans', _t_val('00000000-0000-0000-0000-0000000000b1', $$with d as (delete from ys_scans where user_id='00000000-0000-0000-0000-0000000000b1' returning 1) select count(*) from d$$), 0);
 select _t_eq('admin team stats: member qty', _t_val('00000000-0000-0000-0000-0000000000e1', $$select total_qty from team_ys_member_stats() where email='member1@x.com'$$), 3);
 select _t_eq('admin team stats: closed boxes (distinct PTL+box)', _t_val('00000000-0000-0000-0000-0000000000e1', $$select boxes_closed from team_ys_member_stats() where email='member1@x.com'$$), 1);
-select _t_eq('member gets no team stats', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from team_ys_member_stats()$$), 0);
+select _t_eq('member sees only their own row in the stats (not the team)', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from team_ys_member_stats()$$), 1);
+select _t_eq('... and that row is their own', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from team_ys_member_stats() where email='member1@x.com'$$), 1);
+select _t_eq('member cannot see the admin in the stats', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from team_ys_member_stats() where email='admin1@x.com'$$), 0);
+select _t_eq('individual sees only their own row in the stats', _t_val('00000000-0000-0000-0000-00000000000a', $$select count(*) from team_ys_member_stats()$$), 1);
+select _t_eq('admin still sees the whole enterprise (admin + member)', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from team_ys_member_stats()$$), 2);
+select _t_eq('another enterprise admin never sees this enterprise', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from team_ys_member_stats() where email in ('member1@x.com','admin1@x.com')$$), 0);
 select _t_eq('other enterprise admin cannot delete these', _t_val('00000000-0000-0000-0000-0000000000e2', $$with d as (delete from ys_scans returning 1) select count(*) from d$$), 0);
 select _t_eq('admin can delete team Year/Season scans', _t_val('00000000-0000-0000-0000-0000000000e1', $$with d as (delete from ys_scans where enterprise_id='11111111-1111-1111-1111-111111111111' returning 1) select count(*) from d$$), 3);
 

@@ -2224,28 +2224,6 @@ body.rtl .scans-table td { text-align: right; }
 #ysSyncStatusLine { margin: 0 0 6px; padding: 0 2px; }
 
 /* New-version banner (bottom of the screen, above everything but modals) */
-.update-banner {
-    position: fixed;
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
-    z-index: 900;
-    max-width: 580px;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
-    background: var(--ak-maroon);
-    color: var(--ak-white);
-    border-radius: 12px;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
-    font-size: 13px;
-    font-weight: 600;
-}
-.update-banner span { flex: 1; }
-.update-banner .btn { padding: 8px 14px; background: var(--ak-white); color: var(--ak-maroon); font-size: 13px; }
-.update-banner .update-later { background: none; border: none; color: var(--ak-white); font-size: 16px; cursor: pointer; padding: 4px 6px; }
 
 /* Item Barcode: "Add text" toggle + text box */
 .item-text-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
@@ -2360,3 +2338,37 @@ body.rtl .app-back-btn { transform: scaleX(-1); }
 .team-tab.active { color: var(--ak-maroon); border-bottom-color: var(--ak-maroon); }
 .team-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .team-actions .btn { flex: 1 1 140px; }
+
+/* top bar v51: round EN/AR button, image buttons, update icon with dot */
+.hdr-circle { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.85); background: rgba(255, 255, 255, 0.14); color: var(--ak-white); font-weight: 800; font-size: 11px; padding: 0; cursor: pointer; flex: 0 0 auto; }
+.btn-signout { width: 34px; height: 34px; padding: 5px; }
+.btn-signout img, .hdr-btn img { width: 22px; height: 22px; display: block; }
+.hdr-btn { position: relative; width: 34px; height: 34px; padding: 5px; border-radius: 50%; border: none; background: rgba(255, 255, 255, 0.15); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
+.hdr-dot { position: absolute; top: 1px; right: 1px; width: 11px; height: 11px; border-radius: 50%; background: #ff3b30; border: 2px solid var(--ak-maroon); }
+.hdr-dot[hidden] { display: none; }
+.header { gap: 6px; }
+.header-store { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 380px) { .header-title { display: none; } }
+
+/* app update popup: centred, above everything */
+.update-overlay { z-index: 1200; }
+.update-modal { max-width: 360px; text-align: center; }
+.update-modal-icon { width: 64px; height: 64px; display: block; margin: 0 auto 6px; }
+.update-ver { font-size: 12px; color: var(--ak-text-light); margin-top: 6px; }
+
+/* Data Management tile + windows */
+.app-tile-img { width: 46px; height: 46px; display: block; margin: 0 auto; }
+.title-icon { width: 26px; height: 26px; vertical-align: middle; }
+.um-enterprise { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 15px; }
+
+/* icon pictures inside the sync / upload / template buttons */
+.btn-img { width: 100%; height: 100%; max-width: 22px; max-height: 22px; display: block; object-fit: contain; pointer-events: none; }
+.btn-small .btn-img, .bs-small-btn .btn-img { display: inline-block; width: 16px; height: 16px; vertical-align: -3px; margin-right: 3px; }
+.bs-round-btn.has-img, .bs-round-btn.bs-upload-btn.has-img { background: var(--ak-white); border: 1.5px solid var(--ak-gray-300); color: var(--ak-maroon); }
+.bs-round-btn.has-img:hover { border-color: var(--ak-maroon); }
+.bs-round-btn.has-img:disabled { color: var(--ak-maroon); font-size: 10px; font-weight: 700; }
+.ys-im-sync-btn .btn-img { width: 14px; height: 14px; }
+.btn-small-outline .btn-img { filter: none; }
+.bs-sync-btn.bs-upload-btn .btn-img { filter: none; }
+
+.help-ico { width: 18px; height: 18px; vertical-align: -4px; }

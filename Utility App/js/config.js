@@ -16,8 +16,15 @@ const APPS = [
     { id: 'boxCode', name: 'Print Box Label', icon: '🖨️', description: 'Generate box labels', sessionRequired: false, containerId: 'boxCodeApp' },
     { id: 'boxSegregate', name: 'Box Segregate', icon: '🔍', description: 'Look up box details by barcode', sessionRequired: false, containerId: 'boxSegregateApp' },
     { id: 'priceCheck', name: 'Price Check', icon: '💰', description: 'Check item price by barcode', sessionRequired: false, containerId: 'priceCheckApp' },
-    { id: 'yearSegregate', name: 'Year/Season Sort', icon: '🗂️', description: 'Sort items by year & season into PTL boxes', sessionRequired: true, containerId: 'yearSegregateApp' }
+    { id: 'yearSegregate', name: 'Year/Season Sort', icon: '🗂️', description: 'Sort items by year & season into PTL boxes', sessionRequired: true, containerId: 'yearSegregateApp' },
+    // modal: true = opens a window (Data Management) instead of a tool screen
+    { id: 'dataManagement', name: 'Data Management', icon: '🗄️', iconImg: 'icons/ui-data.png', description: 'View, download or reset your scans', sessionRequired: false, modal: true }
 ];
+
+// A tool's icon as HTML: its picture when it has one, otherwise its emoji.
+function appIconHtml(app, cls) {
+    return app.iconImg ? `<img class="${cls || 'app-icon-img'}" src="${app.iconImg}" alt="">` : app.icon;
+}
 
 // ============================================
 // GLOBAL STATE

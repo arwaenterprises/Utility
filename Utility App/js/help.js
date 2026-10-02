@@ -98,9 +98,9 @@ const HELP = {
     boxSegregate: {
         en: {
             intro: 'Scan a box barcode to see its details, or check boxes against a pallet.',
-            before: 'Your box list must be uploaded first. If you work alone or are your team\'s admin, tap the upload icon (the page icon gives you the template). Team members: your admin uploads the list; tap &#8635; to get it.',
+            before: 'Your box list must be uploaded first. If you work alone or are your team\'s admin, tap the upload icon (<img class="help-ico" src="icons/ui-upload.png" alt="">); the download icon (<img class="help-ico" src="icons/ui-download.png" alt="">) gives you the template. Team members: your admin uploads the list; tap <img class="help-ico" src="icons/ui-sync.png" alt=""> to get it.',
             steps: [
-                'Tap <b>&#8635;</b> to load the latest list. The time next to it shows when it was last updated.',
+                'Tap <img class="help-ico" src="icons/ui-sync.png" alt=""> to load the latest list. The time next to it shows when it was last updated.',
                 'Scan the box barcode with the camera (&#128247;) or a handheld scanner. Use &#9000;&#65039; to type it instead.',
                 'The result card shows the box details. If it says <b>not found</b>, check the barcode and that the list has been uploaded.',
                 '<b>Pallet mode:</b> switch on <b>Pallet</b>, then scan each box on the pallet. The app counts them and flags duplicates and boxes that are not in the list.',
@@ -110,9 +110,9 @@ const HELP = {
         },
         ar: {
             intro: 'امسح باركود الصندوق لعرض تفاصيله، أو راجع الصناديق مقابل طبلية (Pallet).',
-            before: 'يجب رفع قائمة الصناديق أولًا. إذا كنت تعمل بمفردك أو كنت مسؤول الفريق فاضغط أيقونة الرفع (أيقونة الصفحة تعطيك النموذج). أعضاء الفريق: المسؤول يرفع القائمة؛ اضغط &#8635; لتحميلها.',
+            before: 'يجب رفع قائمة الصناديق أولًا. إذا كنت تعمل بمفردك أو كنت مسؤول الفريق فاضغط أيقونة الرفع (<img class="help-ico" src="icons/ui-upload.png" alt="">)؛ وأيقونة التحميل (<img class="help-ico" src="icons/ui-download.png" alt="">) تعطيك النموذج. أعضاء الفريق: المسؤول يرفع القائمة؛ اضغط <img class="help-ico" src="icons/ui-sync.png" alt=""> لتحميلها.',
             steps: [
-                'اضغط <b>&#8635;</b> لتحميل أحدث قائمة. الوقت بجانبه يوضح آخر تحديث.',
+                'اضغط <img class="help-ico" src="icons/ui-sync.png" alt=""> لتحميل أحدث قائمة. الوقت بجانبه يوضح آخر تحديث.',
                 'امسح باركود الصندوق بالكاميرا (&#128247;) أو بالماسح اليدوي. استخدم &#9000;&#65039; للكتابة بدلًا من المسح.',
                 'تعرض البطاقة تفاصيل الصندوق. إذا ظهر <b>not found</b> فتحقق من الباركود ومن أن القائمة قد رُفعت.',
                 '<b>وضع الطبلية:</b> فعّل <b>Pallet</b> ثم امسح كل صندوق على الطبلية. يحسبها التطبيق وينبّه إلى المكرر وإلى الصناديق غير الموجودة في القائمة.',
@@ -124,9 +124,9 @@ const HELP = {
     priceCheck: {
         en: {
             intro: 'Scan an item to see its price.',
-            before: 'The price list must be uploaded first. If you work alone or are your team\'s admin, tap the upload icon (the page icon gives you the template). Team members: your admin uploads the list; tap &#8635; to get it.',
+            before: 'The price list must be uploaded first. If you work alone or are your team\'s admin, tap the upload icon (<img class="help-ico" src="icons/ui-upload.png" alt="">); the download icon (<img class="help-ico" src="icons/ui-download.png" alt="">) gives you the template. Team members: your admin uploads the list; tap <img class="help-ico" src="icons/ui-sync.png" alt=""> to get it.',
             steps: [
-                'Tap <b>&#8635;</b> to load the latest price list. The time next to it shows when it was last updated.',
+                'Tap <img class="help-ico" src="icons/ui-sync.png" alt=""> to load the latest price list. The time next to it shows when it was last updated.',
                 'Scan the item with the camera (&#128247;) or a handheld scanner. Use &#9000;&#65039; to type the barcode instead.',
                 'The price appears on screen. If it says <b>not found</b>, the item is missing from the price list.'
             ],
@@ -134,19 +134,45 @@ const HELP = {
         },
         ar: {
             intro: 'امسح القطعة لمعرفة سعرها.',
-            before: 'يجب رفع قائمة الأسعار أولًا. إذا كنت تعمل بمفردك أو كنت مسؤول الفريق فاضغط أيقونة الرفع (أيقونة الصفحة تعطيك النموذج). أعضاء الفريق: المسؤول يرفع القائمة؛ اضغط &#8635; لتحميلها.',
+            before: 'يجب رفع قائمة الأسعار أولًا. إذا كنت تعمل بمفردك أو كنت مسؤول الفريق فاضغط أيقونة الرفع (<img class="help-ico" src="icons/ui-upload.png" alt="">)؛ وأيقونة التحميل (<img class="help-ico" src="icons/ui-download.png" alt="">) تعطيك النموذج. أعضاء الفريق: المسؤول يرفع القائمة؛ اضغط <img class="help-ico" src="icons/ui-sync.png" alt=""> لتحميلها.',
             steps: [
-                'اضغط <b>&#8635;</b> لتحميل أحدث قائمة أسعار. الوقت بجانبه يوضح آخر تحديث.',
+                'اضغط <img class="help-ico" src="icons/ui-sync.png" alt=""> لتحميل أحدث قائمة أسعار. الوقت بجانبه يوضح آخر تحديث.',
                 'امسح القطعة بالكاميرا (&#128247;) أو بالماسح اليدوي. استخدم &#9000;&#65039; لكتابة الباركود بدلًا من المسح.',
                 'يظهر السعر على الشاشة. إذا ظهر <b>not found</b> فالقطعة غير موجودة في قائمة الأسعار.'
             ],
             tips: ['يعمل بدون إنترنت بعد تحميل القائمة على هذا الجهاز.']
         }
     },
+    dataManagement: {
+        en: {
+            intro: 'See what you have scanned, download it as Excel, or clear it.',
+            before: 'An enterprise admin sees everyone on the team. An individual account or a team member sees only their own data. Team members can look and download but not reset.',
+            steps: [
+                'Tap the <b>Data Management</b> tile on the home screen.',
+                'Choose the <b>Box Scanner</b> or <b>Year/Season</b> tab.',
+                'Tap <b>+</b> next to a name to see the boxes, and <b>+</b> next to a box to see its items. Use the search box to find a box number, a barcode or a person.',
+                'Tick the names you want (or <b>Select All</b>), then tap <b>Download Selected</b> to get the Excel file. The small arrow on a row downloads just that row.',
+                '<b>Reset Selected</b> downloads the data first and then deletes it from the server. It asks <b>Are you sure?</b> before it does anything.'
+            ],
+            tips: ['Reset cannot be undone, so check the downloaded file first.', 'Close the window with the ✕ in the top corner.']
+        },
+        ar: {
+            intro: 'اطّلع على ما قمت بمسحه، حمّله كملف Excel، أو امسحه.',
+            before: 'مسؤول المؤسسة يرى جميع أعضاء الفريق. أما الحساب الفردي أو عضو الفريق فيرى بياناته فقط. يستطيع عضو الفريق العرض والتحميل لكن لا يستطيع الحذف (Reset).',
+            steps: [
+                'اضغط على بطاقة <b>Data Management</b> في الشاشة الرئيسية.',
+                'اختر تبويب <b>Box Scanner</b> أو <b>Year/Season</b>.',
+                'اضغط <b>+</b> بجانب الاسم لرؤية الصناديق، و<b>+</b> بجانب الصندوق لرؤية قطعه. استخدم مربع البحث للعثور على رقم صندوق أو باركود أو شخص.',
+                'حدّد الأسماء المطلوبة (أو <b>Select All</b>) ثم اضغط <b>Download Selected</b> للحصول على ملف Excel. السهم الصغير في أي صف يحمّل ذلك الصف فقط.',
+                'زر <b>Reset Selected</b> يحمّل البيانات أولًا ثم يحذفها من الخادم. ويسألك <b>Are you sure?</b> قبل أي إجراء.'
+            ],
+            tips: ['لا يمكن التراجع عن Reset، لذا تحقق من الملف المحمّل أولًا.', 'أغلق النافذة بزر ✕ في الزاوية العلوية.']
+        }
+    },
     yearSegregate: {
         en: {
             intro: 'Sort items by year and season into PTL boxes.',
-            before: 'The <b>Item Master</b> and <b>PTL config</b> lists must be uploaded first (use the &#11014; Items and &#11014; PTL buttons; the page icons give the templates). Team members: your admin uploads them.',
+            before: 'The <b>Item Master</b> and <b>PTL config</b> lists must be uploaded first (use the <img class="help-ico" src="icons/ui-upload.png" alt=""> Items and <img class="help-ico" src="icons/ui-upload.png" alt=""> PTL buttons; the <img class="help-ico" src="icons/ui-download.png" alt=""> icons give the templates). Team members: your admin uploads them.',
             steps: [
                 'Enter <b>Your Name</b> and a <b>Remark</b>, wait for the items to finish syncing, then tap <b>Start Session</b>.',
                 'Choose <b>Nu</b> (numbers only) or <b>AlNu</b> (letters and numbers) at the top.',
@@ -164,7 +190,7 @@ const HELP = {
         },
         ar: {
             intro: 'افرز القطع حسب السنة والموسم داخل صناديق PTL.',
-            before: 'يجب رفع قائمتي <b>Item Master</b> و<b>PTL config</b> أولًا (أزرار &#11014; Items و&#11014; PTL؛ أيقونات الصفحة تعطيك النماذج). أعضاء الفريق: المسؤول يرفعهما.',
+            before: 'يجب رفع قائمتي <b>Item Master</b> و<b>PTL config</b> أولًا (أزرار <img class="help-ico" src="icons/ui-upload.png" alt=""> Items و<img class="help-ico" src="icons/ui-upload.png" alt=""> PTL؛ وأيقونات <img class="help-ico" src="icons/ui-download.png" alt=""> تعطيك النماذج). أعضاء الفريق: المسؤول يرفعهما.',
             steps: [
                 'أدخل <b>Your Name</b> و<b>Remark</b>، وانتظر حتى تكتمل مزامنة القطع، ثم اضغط <b>Start Session</b>.',
                 'اختر <b>Nu</b> (أرقام فقط) أو <b>AlNu</b> (أحرف وأرقام) في الأعلى.',
@@ -205,7 +231,7 @@ function helpRender() {
     if (!h || !app) return;
     const t = HELP_UI[helpLang], c = h[helpLang];
     const list = (arr, tag) => '<' + tag + '>' + arr.map(x => '<li>' + x + '</li>').join('') + '</' + tag + '>';
-    document.getElementById('helpTitle').innerHTML = app.icon + ' ' + t.title + ' ' + app.name;
+    document.getElementById('helpTitle').innerHTML = appIconHtml(app, 'title-icon') + ' ' + t.title + ' ' + app.name;
     document.getElementById('helpTitle').setAttribute('dir', helpLang === 'ar' ? 'rtl' : 'ltr');
     const body = document.getElementById('helpBody');
     body.setAttribute('dir', helpLang === 'ar' ? 'rtl' : 'ltr');

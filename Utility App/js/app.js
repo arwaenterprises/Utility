@@ -110,15 +110,20 @@ function tierDisplayText(profile) {
 
 async function openAccountModal() {
     document.getElementById('accountEmailDisp').textContent = AppState.user?.email || '';
-    showAppVersionInAccount();
     document.getElementById('accountTierDisp').textContent = tierDisplayText(AppState.profile);
 
     const isIndividual = AppState.profile?.tier === 'individual';
     const isAdmin = AppState.profile?.tier === 'enterprise_admin';
     document.getElementById('createEnterpriseSection').style.display = isIndividual ? 'block' : 'none';
-    document.getElementById('manageTeamSection').style.display = isAdmin ? 'block' : 'none';
+    document.getElementById('enterpriseAdminSection').style.display = isAdmin ? 'block' : 'none';
+    setInviteOpen(false);
 
     document.getElementById('accountModal').classList.add('active');
+    if (isAdmin) {
+        document.getElementById('umMemberList').innerHTML = '<p style="font-size:13px; color: var(--ak-text-light);">Loading...</p>';
+        await loadPendingInvitesList();
+        await loadUserMgmtMembers();
+    }
 }
 
 function closeAccountModal() {
@@ -281,10 +286,14 @@ function showTeamTab(tab) {
     document.getElementById('teamTabYs').classList.toggle('active', ys);
 }
 
-async function openTeamModal() {
+async function openTeamModal() {   // = Data Management (the 7th tile)
     closeAccountModal();
-    setInviteOpen(false);
     showTeamTab('bs');
+    // An enterprise MEMBER can look at and download their own data but not delete it (the database refuses);
+    // an individual account and an admin can also Reset.
+    const isMember = !!AppState.profile?.enterprise_id && AppState.profile.tier !== 'enterprise_admin';
+    document.getElementById('resetTeamSelectedBtn').style.display = isMember ? 'none' : '';
+    document.getElementById('resetTeamYsBtn').style.display = isMember ? 'none' : '';
 
     document.getElementById('teamSearchInput').value = '';
     document.getElementById('teamSearchResults').style.display = 'none';
@@ -299,18 +308,56 @@ async function openTeamModal() {
     document.getElementById('teamMemberList').innerHTML = '<p style="font-size:13px; color: var(--ak-text-light);">Loading...</p>';
     document.getElementById('teamModal').classList.add('active');
 
-    await loadPendingInvitesList();
     await refreshTeamMemberStats();
     await refreshTeamYsStats();
-    await refreshTeamTitle();
+    await setDataTitle();
+    if (typeof helpAutoShowOnce === 'function') helpAutoShowOnce('dataManagement');
 }
 
-// Title shows the enterprise name and how many people are in it (admin included).
+// User management: the enterprise name and how many people are in it (admin included).
 async function refreshTeamTitle() {
     const { data } = await supabaseClient.from('enterprises').select('name').eq('id', AppState.profile.enterprise_id).maybeSingle();
     const n = teamMemberStatsCache.length;
-    document.getElementById('teamModalTitle').textContent =
-        '👥 ' + ((data && data.name) || 'Team') + (n ? ` (${n} member${n === 1 ? '' : 's'})` : '');
+    document.getElementById('umEnterprise').textContent = ((data && data.name) || 'Team') + (n ? ` (${n} member${n === 1 ? '' : 's'})` : '');
+}
+
+// Data Management: the window title says whose data is shown.
+async function setDataTitle() {
+    let suffix = ' — my data';
+    if (AppState.profile?.tier === 'enterprise_admin') {
+        const { data } = await supabaseClient.from('enterprises').select('name').eq('id', AppState.profile.enterprise_id).maybeSingle();
+        suffix = ' — ' + ((data && data.name) || 'Team') + ' (all users)';
+    }
+    document.getElementById('teamModalTitle').innerHTML = '<img class="title-icon" src="icons/ui-data.png" alt=""> Data Management' + escapeHtml(suffix);
+}
+
+// Scans / Year-Season queries are limited to the signed-in account's own enterprise - or, for an individual
+// account (no enterprise), to rows with no enterprise.
+function scopeToMyEnterprise(query) {
+    const eid = AppState.profile?.enterprise_id;
+    return eid ? query.eq('enterprise_id', eid) : query.is('enterprise_id', null);
+}
+
+// User management: the member list with a remove button (data columns live in Data Management).
+async function loadUserMgmtMembers() {
+    const el = document.getElementById('umMemberList');
+    const { data, error } = await supabaseClient.rpc('team_member_stats');
+    if (error) { el.innerHTML = '<p style="font-size:13px;">Could not load the team.</p>'; return; }
+    teamMemberStatsCache = (data || []).sort((a, b) => teamMemberDisplayName(a).localeCompare(teamMemberDisplayName(b)));
+    el.innerHTML = teamMemberStatsCache.length === 0 ? '<div class="team-table-empty">No team members yet</div>' : `
+        <table class="team-table">
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
+            <tbody>${teamMemberStatsCache.map(m => {
+                const isSelf = m.user_id === AppState.user?.id;
+                return `<tr class="team-row">
+                    <td>${escapeHtml(teamMemberDisplayName(m))}</td>
+                    <td>${escapeHtml(m.email || '')}</td>
+                    <td>${isSelf ? 'Admin (you)' : 'Member'}</td>
+                    <td style="width:36px;">${isSelf ? '' : `<button class="icon-btn icon-btn-danger" data-remove-member="${m.user_id}" title="Remove from team">✕</button>`}</td>
+                </tr>`;
+            }).join('')}</tbody>
+        </table>`;
+    await refreshTeamTitle();
 }
 
 async function renameEnterprise() {
@@ -351,10 +398,9 @@ async function refreshTeamYsStats() {
 }
 
 async function fetchTeamYsScans(userIds) {
-    const { data, error } = await fetchAllPages((from, to) => supabaseClient
+    const { data, error } = await fetchAllPages((from, to) => scopeToMyEnterprise(supabaseClient
         .from('ys_scans')
-        .select('id, staff_name, remark, ptl_number, season, year, brand, barcode, qty, box_barcode, box_status, scan_timestamp, scanned_at, user_id, profiles(display_name, email)')
-        .eq('enterprise_id', AppState.profile.enterprise_id)
+        .select('id, staff_name, remark, ptl_number, season, year, brand, barcode, qty, box_barcode, box_status, scan_timestamp, scanned_at, user_id, profiles(display_name, email)'))
         .in('user_id', userIds)
         .order('scanned_at', { ascending: true })
         .order('id', { ascending: true })
@@ -400,11 +446,12 @@ async function resetSelectedTeamYs() {
     if (!rows) return;
     // Only delete once the export has actually been produced.
     if (rows.length > 0 && !exportYsScansToExcel(rows, 'team_year_season_reset')) return;
-    const { error } = await supabaseClient.from('ys_scans').delete()
-        .eq('enterprise_id', AppState.profile.enterprise_id).in('user_id', ids);
+    const { error } = await scopeToMyEnterprise(supabaseClient.from('ys_scans').delete()).in('user_id', ids);
     if (error) { alert(error.message); return; }
     await refreshTeamYsStats();
 }
+
+function openDataManagement() { return openTeamModal(); }
 
 function closeTeamModal() {
     document.getElementById('teamModal').classList.remove('active');
@@ -482,7 +529,6 @@ function renderTeamMemberList() {
 
     const bodyRows = teamMemberStatsCache.map(m => {
         const isExpanded = expandedMemberIds.has(m.user_id);
-        const isSelf = m.user_id === AppState.user?.id;
         const rows = [`
             <tr class="team-row">
                 <td style="width:26px;"><input type="checkbox" class="team-member-checkbox" data-member-id="${m.user_id}" ${selectedMemberIds.has(m.user_id) ? 'checked' : ''}></td>
@@ -491,14 +537,13 @@ function renderTeamMemberList() {
                 <td>${m.boxes_closed}</td>
                 <td>${m.total_qty}</td>
                 <td style="width:36px;"><button class="icon-btn" data-download-member="${m.user_id}" title="Download this member's data">⬇</button></td>
-                <td style="width:36px;">${isSelf ? '' : `<button class="icon-btn icon-btn-danger" data-remove-member="${m.user_id}" title="Remove from team">✕</button>`}</td>
             </tr>
         `];
         if (isExpanded) {
             const boxes = teamMemberBoxesCache.get(m.user_id);
             rows.push(`
                 <tr class="team-row">
-                    <td class="nested-cell" colspan="7">
+                    <td class="nested-cell" colspan="6">
                         <div id="memberBoxes_${m.user_id}">${boxes ? renderBoxTableHtml(boxes, 'member', m.user_id) : '<p style="font-size:12px; color: var(--ak-text-light); padding:8px;">Loading...</p>'}</div>
                     </td>
                 </tr>
@@ -511,7 +556,7 @@ function renderTeamMemberList() {
         <div class="team-table-scroll">
             <table class="team-table">
                 <thead>
-                    <tr><th></th><th></th><th>Member</th><th>Boxes Closed</th><th>Qty Scanned</th><th></th><th></th></tr>
+                    <tr><th></th><th></th><th>Member</th><th>Boxes Closed</th><th>Qty Scanned</th><th></th></tr>
                 </thead>
                 <tbody>${bodyRows}</tbody>
             </table>
@@ -529,10 +574,9 @@ async function toggleMemberExpand(userId) {
     renderTeamMemberList();
 
     if (!teamMemberBoxesCache.has(userId)) {
-        const { data, error } = await supabaseClient
+        const { data, error } = await scopeToMyEnterprise(supabaseClient
             .from('scans')
-            .select('id, remark, barcode, box_number, box_status, qty, scanned_at')
-            .eq('enterprise_id', AppState.profile.enterprise_id)
+            .select('id, remark, barcode, box_number, box_status, qty, scanned_at'))
             .eq('user_id', userId)
             .order('scanned_at', { ascending: false })
             .limit(5000);
@@ -655,10 +699,9 @@ function renderTeamSearchResults() {
 
 async function fetchSelectedTeamScans() {
     const ids = Array.from(selectedMemberIds);
-    const { data, error } = await fetchAllPages((from, to) => supabaseClient
+    const { data, error } = await fetchAllPages((from, to) => scopeToMyEnterprise(supabaseClient
         .from('scans')
-        .select('id, remark, barcode, box_number, box_status, qty, scanned_at, user_id, profiles(display_name, email)')
-        .eq('enterprise_id', AppState.profile.enterprise_id)
+        .select('id, remark, barcode, box_number, box_status, qty, scanned_at, user_id, profiles(display_name, email)'))
         .in('user_id', ids)
         .order('scanned_at', { ascending: true })
         .order('id', { ascending: true })
@@ -692,10 +735,9 @@ async function resetSelectedTeamData() {
     if (data.length > 0) exportScansToExcel(data, 'team_scans_reset');
 
     const ids = Array.from(selectedMemberIds);
-    const { error } = await supabaseClient
+    const { error } = await scopeToMyEnterprise(supabaseClient
         .from('scans')
-        .delete()
-        .eq('enterprise_id', AppState.profile.enterprise_id)
+        .delete())
         .in('user_id', ids);
     if (error) {
         alert(error.message);
@@ -727,7 +769,7 @@ async function removeMember(memberId) {
     selectedMemberIds.delete(memberId);
     expandedMemberIds.delete(memberId);
     teamMemberBoxesCache.delete(memberId);
-    await refreshTeamMemberStats();
+    await loadUserMgmtMembers();
     await loadPendingInvitesList();
 }
 
@@ -774,12 +816,12 @@ function renderAppGrid() {
         if (isLocked) tile.classList.add('locked');
         
         tile.innerHTML = `
-            <span class="app-tile-icon">${app.icon}</span>
+            <span class="app-tile-icon">${appIconHtml(app, 'app-tile-img')}</span>
             <span class="app-tile-name">${app.name}</span>
             <span class="app-tile-lock">🔒</span>
         `;
         
-        tile.addEventListener('click', () => { if (!isLocked) openApp(app.id); });
+        tile.addEventListener('click', () => { if (isLocked) return; if (app.modal) openDataManagement(); else openApp(app.id); });
         grid.appendChild(tile);
     });
     
@@ -799,7 +841,7 @@ function openApp(appId) {
     if (!app) return;
     
     AppState.currentApp = appId;
-    document.getElementById('appTitleText').innerHTML = `${app.icon} ${app.name}`;
+    document.getElementById('appTitleText').innerHTML = `${appIconHtml(app, 'title-icon')} ${app.name}`;
     document.getElementById('appSubtitleText').textContent = app.description;
     
     document.querySelectorAll('.app-module').forEach(m => m.classList.remove('active'));
@@ -878,13 +920,17 @@ function setupEventListeners() {
     document.getElementById('goToSessionBtn').addEventListener('click', () => { if (AppState.activeSessionApp) openApp(AppState.activeSessionApp); });
     document.getElementById('accountBtn').addEventListener('click', openAccountModal);
     document.getElementById('closeAccountBtn').addEventListener('click', closeAccountModal);
-    document.getElementById('checkUpdateBtn').addEventListener('click', checkUpdateFromAccount);
+    document.getElementById('updateBtn').addEventListener('click', onUpdateIconTap);
     document.getElementById('updateNowBtn').addEventListener('click', updateAppNow);
-    document.getElementById('updateLaterBtn').addEventListener('click', () => { document.getElementById('updateBanner').style.display = 'none'; });
+    document.getElementById('updateLaterBtn').addEventListener('click', () => { document.getElementById('updateModal').classList.remove('active'); });
     document.getElementById('createEnterpriseBtn').addEventListener('click', createEnterprise);
     document.getElementById('sendInviteBtn').addEventListener('click', sendInvite);
     document.getElementById('acceptInviteBtn').addEventListener('click', acceptMyInvite);
-    document.getElementById('openTeamModalBtn').addEventListener('click', openTeamModal);
+    document.getElementById('dataHelpBtn').addEventListener('click', () => helpShow('dataManagement'));
+    document.getElementById('umMemberList').addEventListener('click', (e) => {
+        const removeId = e.target.dataset.removeMember;
+        if (removeId) removeMember(removeId);
+    });
     document.getElementById('closeTeamBtn').addEventListener('click', closeTeamModal);
     document.getElementById('inviteToggleBtn').addEventListener('click', () => setInviteOpen(document.getElementById('teamInviteSection').style.display === 'none'));
     document.querySelectorAll('[data-team-tab]').forEach(t => t.addEventListener('click', () => showTeamTab(t.dataset.teamTab)));
@@ -980,22 +1026,49 @@ async function fetchServerAppVersion() {
 }
 
 // Returns 'newer' | 'current' | 'offline' | 'unknown'.
-async function checkForAppUpdate() {
+// 'newer' also lights the red dot on the update icon; with { popup: true } it opens the centred popup by itself
+// (unless another window is open - then only the dot shows and the popup waits for a tap on the icon).
+async function checkForAppUpdate(opts) {
     if (!AppState.isOnline) return 'offline';
     try {
         const server = await fetchServerAppVersion();
         const running = runningAppVersion();
         if (!server || !running) return 'unknown';
         if (server > running) {
-            document.getElementById('updateBannerText').textContent = `A new version (v${server}) is available.`;
-            document.getElementById('updateBanner').style.display = 'flex';
+            AppState.updatePending = server;
+            document.getElementById('updateDot').hidden = false;
+            if (opts && opts.popup && !document.querySelector('.modal-overlay.active')) showUpdateModal('newer');
             return 'newer';
         }
-        document.getElementById('updateBanner').style.display = 'none';
+        AppState.updatePending = null;
+        document.getElementById('updateDot').hidden = true;
         return 'current';
     } catch (e) {
         return 'unknown';
     }
+}
+
+// The centred update popup. state: 'checking' | 'newer' | 'current' | 'offline' | 'unknown'
+function showUpdateModal(state) {
+    const text = {
+        checking: 'Checking for a new version…',
+        newer: `A new version (v${AppState.updatePending}) is ready. Tap Update now to install it.`,
+        current: 'You have the latest version.',
+        offline: 'You are offline - connect to the internet to check for updates.',
+        unknown: 'Could not check right now. Please try again in a moment.'
+    };
+    document.getElementById('appVersionDisp').textContent = 'v' + runningAppVersion();
+    document.getElementById('updateModalText').textContent = text[state] || text.unknown;
+    document.getElementById('updateNowBtn').style.display = state === 'newer' ? '' : 'none';
+    document.getElementById('updateLaterBtn').textContent = state === 'newer' ? 'Later' : 'OK';
+    document.getElementById('updateModal').classList.add('active');
+}
+
+async function onUpdateIconTap() {
+    if (AppState.updatePending) { showUpdateModal('newer'); return; }
+    showUpdateModal('checking');
+    const result = await checkForAppUpdate();
+    showUpdateModal(result);
 }
 
 // Forget the offline copy of the app files (NOT your scans or settings) and the old service worker.
@@ -1018,29 +1091,12 @@ async function updateAppNow() {
 
 let lastUpdateCheck = 0;
 function scheduleUpdateChecks() {
-    const run = () => { lastUpdateCheck = Date.now(); checkForAppUpdate(); };
+    const run = () => { lastUpdateCheck = Date.now(); checkForAppUpdate({ popup: true }); };
     setTimeout(run, 4000);                                           // shortly after opening
     document.addEventListener('visibilitychange', () => {            // coming back to the foreground
         if (document.visibilityState === 'visible' && Date.now() - lastUpdateCheck > 5 * 60000) run();
     });
     window.addEventListener('online', () => setTimeout(run, 2000));
-}
-
-async function showAppVersionInAccount() {
-    document.getElementById('appVersionDisp').textContent = 'v' + runningAppVersion();
-    document.getElementById('appVersionStatus').textContent = '';
-}
-
-async function checkUpdateFromAccount() {
-    const btn = document.getElementById('checkUpdateBtn');
-    const status = document.getElementById('appVersionStatus');
-    btn.disabled = true; status.textContent = '· checking…';
-    const result = await checkForAppUpdate();
-    btn.disabled = false;
-    if (result === 'newer') { closeAccountModal(); status.textContent = ''; }
-    else if (result === 'current') status.textContent = '· you have the latest version';
-    else if (result === 'offline') status.textContent = '· offline - cannot check';
-    else status.textContent = '· could not check, try again';
 }
 
 function registerServiceWorker() {

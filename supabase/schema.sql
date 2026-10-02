@@ -244,11 +244,11 @@ grant execute on function public.accept_enterprise_invite(uuid) to authenticated
 grant execute on function public.remove_enterprise_member(uuid) to authenticated;
 
 -- ============================================
--- TEAM MANAGEMENT - READ-ONLY, ADMIN-ONLY RPCS
+-- DATA MANAGEMENT - READ-ONLY RPCS (same screen for everyone)
 -- ============================================
--- Both scoped to the caller's own enterprise and gated on admin status inside
--- the function body (not just by who can call it) - also protects direct
--- PostgREST calls, not just UI buttons.
+-- An enterprise ADMIN gets the whole enterprise; anyone else (an individual account or an
+-- enterprise member) gets ONLY their own rows. The rule is checked inside the function body
+-- (not just by who can call it) - also protects direct PostgREST calls, not just UI buttons.
 
 create or replace function public.team_member_stats()
 returns table (
@@ -265,7 +265,8 @@ stable
 as $$
     with my_scans as (
         select * from public.scans
-        where enterprise_id = public.current_user_enterprise_id()
+        where (public.current_user_is_enterprise_admin() and enterprise_id = public.current_user_enterprise_id())
+           or user_id = auth.uid()
     ),
     box_status_per_user as (
         select user_id, box_number, bool_and(box_status = 'Closed') as closed
@@ -279,8 +280,8 @@ as $$
         coalesce((select count(*) from box_status_per_user b where b.user_id = p.id and b.closed), 0) as boxes_closed,
         coalesce((select sum(qty) from my_scans s where s.user_id = p.id), 0) as total_qty
     from public.profiles p
-    where p.enterprise_id = public.current_user_enterprise_id()
-      and public.current_user_is_enterprise_admin();
+    where (p.enterprise_id = public.current_user_enterprise_id() and public.current_user_is_enterprise_admin())
+       or p.id = auth.uid();
 $$;
 
 -- Return type gained `remark`, and CREATE OR REPLACE cannot change a function's
@@ -307,8 +308,8 @@ as $$
     select s.id, s.remark, s.barcode, s.box_number, s.box_status, s.qty, s.scanned_at, s.user_id, p.display_name, p.email
     from public.scans s
     join public.profiles p on p.id = s.user_id
-    where s.enterprise_id = public.current_user_enterprise_id()
-      and public.current_user_is_enterprise_admin()
+    where ((s.enterprise_id = public.current_user_enterprise_id() and public.current_user_is_enterprise_admin())
+           or s.user_id = auth.uid())
       and (
         s.barcode ilike '%' || search_term || '%'
         or s.box_number ilike '%' || search_term || '%'
@@ -723,7 +724,8 @@ stable
 as $$
     with my_scans as (
         select * from public.ys_scans
-        where enterprise_id = public.current_user_enterprise_id()
+        where (public.current_user_is_enterprise_admin() and enterprise_id = public.current_user_enterprise_id())
+           or user_id = auth.uid()
     ),
     box_status_per_user as (
         select user_id, ptl_number, box_barcode, bool_and(box_status = 'Closed') as closed
@@ -737,8 +739,8 @@ as $$
         coalesce((select count(*) from box_status_per_user b where b.user_id = p.id and b.closed), 0) as boxes_closed,
         coalesce((select sum(qty) from my_scans s where s.user_id = p.id), 0) as total_qty
     from public.profiles p
-    where p.enterprise_id = public.current_user_enterprise_id()
-      and public.current_user_is_enterprise_admin();
+    where (p.enterprise_id = public.current_user_enterprise_id() and public.current_user_is_enterprise_admin())
+       or p.id = auth.uid();
 $$;
 
 grant execute on function public.team_ys_member_stats() to authenticated;

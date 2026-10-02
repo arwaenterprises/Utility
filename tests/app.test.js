@@ -85,6 +85,13 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('Pallet download: second sheet "Not scanned" lists the boxes never scanned', dl.sheets.join() === 'Segregation,Not scanned' && dl.second.length === 1 && dl.second[0]['TRN#'] === 'D1' && dl.second[0]['Store Name'] === 'Riyadh Park' && dl.second[0]['Box Number'] === 'P2', JSON.stringify(dl.sheets) + JSON.stringify(dl.second));
     ok('Pallet download: the first sheet (for AWBs) is unchanged and has no unscanned boxes', dl.rows.length === 2 && !dl.rows.some(r => r['Box Number'] === 'P2'));
     resetPalletScans(); ok('pallet reset downloads then clears', written.length === 1 && bsDocScans.length === 0);
+    { // nothing scanned: Reset neither asks nor downloads
+      let asked2 = 0, alerted = 0; const oc = window.confirm, oa = window.alert, w0 = written.length;
+      window.confirm = () => { asked2++; return true; }; window.alert = () => { alerted++; };
+      bsDocScans = []; resetPalletScans();
+      ok('pallet with zero scans: Reset asks nothing, shows no message, downloads nothing', asked2 === 0 && alerted === 0 && written.length === w0);
+      window.confirm = oc; window.alert = oa;
+    }
     bsDocScans = []; for (const v of ['p1', 'p2', 'p3']) { document.getElementById('bsBarcodeInput').value = v; bsIsLooking = false; lookupSegregateBox(); }
     downloadPalletExcel(); const full = written.pop();
     ok('Pallet download when everything was scanned: "Not scanned" sheet is present but empty', full.sheets.join() === 'Segregation,Not scanned' && full.second.length === 0 && full.rows.length === 3, JSON.stringify(full.second));
@@ -193,6 +200,11 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     YSState.huStates.forEach(h => h.status = 'Closed'); await ysAutoSync();
     await ysExecuteReset();
     ok('YS individual reset: downloaded, device + server cleared', written.length === 2 && (await ysDbGetAll(YS_SCANS_STORE)).length === 0 && __db.ys_scans.length === 0, 'rows exported=' + written[1]?.rows.length);
+    { // Year/Season: a session with zero scans closes at once
+      const w0 = written.length; YSState.huStates.forEach(h => h.status = 'Closed');
+      await ysShowResetModal();
+      ok('YS zero scans: no "Are you sure?" pop-up, no download, session closed', !document.getElementById('ysResetModal').classList.contains('active') && written.length === w0 && document.getElementById('ysSessionScreen').classList.contains('active'));
+    }
     // team membership changed while the phone was open: the old profile is refused once, then refreshed
     window.__enforceTeamRule = true; window.__rlsRejects = 0;
     AppState.profile = { display_name: 'M', enterprise_id: 'E1', tier: 'enterprise_member' };   // stale on the phone
@@ -232,16 +244,34 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     window.confirm = () => true; AppState.profile.enterprise_id = 'E1';
     await removeMember('u-gone');
     ok('removing a teammate calls the server and clears their accepted invite', window.__removedMember === 'u-gone' && !/gone@x.com/.test(document.getElementById('pendingInvitesList').innerHTML) && /stays@x.com — accepted/.test(document.getElementById('pendingInvitesList').innerHTML), document.getElementById('pendingInvitesList').textContent);
-    // Team window layout: folded invite, two tabs, one Download/Reset pair per tab, close ✕
+    // ---------- User management window (user icon): account, rename, invite, members ----------
     AppState.profile = { ...AppState.profile, tier: 'enterprise_admin', enterprise_id: 'E1' };
-    await openTeamModal();
+    window.__me = { ...window.__me, tier: 'enterprise_admin', enterprise_id: 'E1' };
     const vis = id => document.getElementById(id).style.display !== 'none';
+    await openAccountModal();
+    ok('User management shows the admin section (rename, invite, members)', vis('enterpriseAdminSection') && !vis('createEnterpriseSection'));
     ok('invite form is folded away until asked for', !vis('teamInviteSection'));
     document.getElementById('inviteToggleBtn').click();
     ok('"Invite a teammate" opens the email field', vis('teamInviteSection') && document.activeElement.id === 'inviteEmailInput');
     document.getElementById('inviteToggleBtn').click();
     ok('... and folds it again', !vis('teamInviteSection'));
+    ok('User management lists the members with a remove button for others but not for yourself', document.querySelectorAll('#umMemberList [data-remove-member]').length === 1 && /Ann/.test(document.getElementById('umMemberList').textContent) && /Bob/.test(document.getElementById('umMemberList').textContent));
+    ok('team title shows name + member count', document.getElementById('umEnterprise').textContent === 'Acme (2 members)', document.getElementById('umEnterprise').textContent);
+    window.prompt = () => '  Acme Corp  '; await renameEnterprise();
+    ok('rename updates title', document.getElementById('umEnterprise').textContent === 'Acme Corp (2 members)', document.getElementById('umEnterprise').textContent);
+    ok('User management has no data tables or Reset buttons any more', !document.querySelector('#accountModal .team-tabs, #accountModal #resetTeamSelectedBtn, #accountModal #resetTeamYsBtn'));
+    document.getElementById('closeAccountBtn').click();
+    ok('the ✕ closes User management', !document.getElementById('accountModal').classList.contains('active'));
+
+    // ---------- Data Management window (7th tile): two tabs, one Download/Reset pair per tab, close ✕ ----------
+    document.querySelector('.app-tile[data-app-id="dataManagement"]') || renderAppGrid();
+    document.querySelector('.app-tile[data-app-id="dataManagement"]').click(); await new Promise(r => setTimeout(r, 120));
+    ok('the Data Management tile opens the window', document.getElementById('teamModal').classList.contains('active'));
+    ok('admin title says whose data: the whole team', /Data Management — Acme Corp \(all users\)/.test(document.getElementById('teamModalTitle').textContent), document.getElementById('teamModalTitle').textContent);
+    document.getElementById('helpCloseBtn').click();
+    ok('Data Management has no invite or rename controls', !document.querySelector('#teamModal #inviteToggleBtn, #teamModal #renameEnterpriseBtn, #teamModal [data-remove-member]'));
     ok('opens on the Box Scanner tab', vis('teamPanelBs') && !vis('teamPanelYs'));
+    ok('admin sees everybody in the Box Scanner list', /Ann/.test(document.getElementById('teamMemberList').textContent) && /Bob/.test(document.getElementById('teamMemberList').textContent));
     document.getElementById('teamTabYs').click();
     ok('Year/Season tab shows its own list and hides the Box Scanner one', !vis('teamPanelBs') && vis('teamPanelYs') && document.getElementById('teamTabYs').classList.contains('active'));
     ok('each tab has exactly one Download and one Reset button', document.querySelectorAll('#teamPanelBs .team-actions .btn').length === 2 && document.querySelectorAll('#teamPanelYs .team-actions .btn').length === 2 && document.querySelectorAll('#teamModal [id*="Reset"], #teamModal [id*="reset"]').length === 2);
@@ -256,12 +286,38 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('both Reset buttons ask "Are you sure?" first', asked === 2, 'asked ' + asked);
     document.getElementById('closeTeamBtn').click();
     ok('the ✕ in the corner closes the window', !document.getElementById('teamModal').classList.contains('active') && document.getElementById('closeTeamBtn').textContent.trim() === '✕');
-    await refreshTeamMemberStats(); await refreshTeamTitle();
-    ok('team title shows name + member count', document.getElementById('teamModalTitle').textContent === '👥 Acme (2 members)', document.getElementById('teamModalTitle').textContent);
-    window.prompt = () => '  Acme Corp  '; await renameEnterprise();
-    ok('rename updates title', document.getElementById('teamModalTitle').textContent === '👥 Acme Corp (2 members)', document.getElementById('teamModalTitle').textContent);
+
+    // individual account: same window, only their own data, can download and reset
+    AppState.profile = { display_name: 'Ann', enterprise_id: null, tier: 'individual' };
+    window.__me = { ...window.__me, tier: 'individual', enterprise_id: null };
+    __db.scans.push({ id: 'ind1', scan_uid: 'ind1', user_id: 'u1', enterprise_id: null, remark: 'R', box_number: 'IB1', barcode: '123', qty: 2, box_status: 'Closed', scanned_at: new Date().toISOString() },
+                    { id: 'oth1', scan_uid: 'oth1', user_id: 'u2', enterprise_id: null, remark: 'R', box_number: 'OB1', barcode: '999', qty: 1, box_status: 'Closed', scanned_at: new Date().toISOString() });
+    await openDataManagement(); document.getElementById('helpCloseBtn').click();
+    ok('individual: title says "my data"', /Data Management — my data/.test(document.getElementById('teamModalTitle').textContent), document.getElementById('teamModalTitle').textContent);
+    ok('individual: sees only their own row', document.querySelectorAll('#teamMemberList .team-member-checkbox').length === 1);
+    ok('individual: Reset is available', document.getElementById('resetTeamSelectedBtn').style.display !== 'none' && document.getElementById('resetTeamYsBtn').style.display !== 'none');
+    selectedMemberIds.clear(); selectedMemberIds.add('u1'); written.length = 0;
+    await downloadSelectedTeamData();
+    ok('individual: Download exports their own rows (and nobody else\'s)', written.length === 1 && written[0].rows.length === 1 && written[0].rows[0]['Box Number'] === 'IB1', JSON.stringify(written[0] && written[0].rows));
+    window.confirm = () => true; await resetSelectedTeamData();
+    ok('individual: Reset removes only their own scans', !__db.scans.some(r => r.id === 'ind1') && __db.scans.some(r => r.id === 'oth1'));
+    document.getElementById('closeTeamBtn').click();
+
+    // enterprise member: same window, own data only, download only (no Reset)
+    AppState.profile = { display_name: 'Mia', enterprise_id: 'E1', tier: 'enterprise_member' };
+    window.__me = { ...window.__me, tier: 'enterprise_member', enterprise_id: 'E1' };
+    await openDataManagement(); document.getElementById('helpCloseBtn').click();
+    ok('member: sees only their own row', document.querySelectorAll('#teamMemberList .team-member-checkbox').length === 1);
+    ok('member: Download only - both Reset buttons are hidden', document.getElementById('resetTeamSelectedBtn').style.display === 'none' && document.getElementById('resetTeamYsBtn').style.display === 'none');
+    ok('member: Download buttons are there', document.getElementById('downloadTeamSelectedBtn').style.display !== 'none' && document.getElementById('downloadTeamYsBtn').style.display !== 'none');
+    document.getElementById('closeTeamBtn').click();
+    AppState.profile = { display_name: 'Admin', enterprise_id: 'E1', tier: 'enterprise_admin' };
+    window.__me = { ...window.__me, tier: 'enterprise_admin', enterprise_id: 'E1' };
+    await openDataManagement(); document.getElementById('helpCloseBtn').click();
+    ok('admin again: Reset buttons are back', document.getElementById('resetTeamSelectedBtn').style.display !== 'none');
+    document.getElementById('closeTeamBtn').click();
     ok('photo capture is gone', !document.getElementById('photoCaptureApp') && !APPS.some(a => a.id === 'photoCapture') && typeof initPhotoCapture === 'undefined');
-    ok('6 tools + scanner tiles', APPS.length === 6, APPS.map(a => a.id).join());
+    ok('6 tools + the Data Management tile', APPS.length === 7 && APPS.filter(a => a.modal).map(a => a.id).join() === 'dataManagement', APPS.map(a => a.id).join());
     ok('NO content-security-policy violations during the whole run', window.__csp.length === 0, JSON.stringify(window.__csp));
 
     // ---------- usage statistics ----------
@@ -291,27 +347,48 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     // ---------- account deletion was rolled back ----------
     ok('no Delete-account button, modal or code in the app', !document.getElementById('openDeleteAccountBtn') && !document.getElementById('deleteAccountModal') && typeof openDeleteAccount === 'undefined' && typeof confirmDeleteAccount === 'undefined');
 
+    // ---------- sync / upload / template buttons are pictures; the % display still works and the picture returns ----------
+    const syncBtn = document.getElementById('bsRefreshBtn');
+    ok('sync, upload and template buttons use the picture icons', !!syncBtn.querySelector('img[src="icons/ui-sync.png"]') && !!document.querySelector('#bsUploadBtn img[src="icons/ui-upload.png"]') && !!document.querySelector('#bsTemplateBtn img[src="icons/ui-download.png"]') && !!document.querySelector('#pcRefreshBtn img[src="icons/ui-sync.png"]') && !!document.querySelector('#ysImSyncBtn img[src="icons/ui-sync.png"]') && !!document.querySelector('#uploadCsvBtn img[src="icons/ui-upload.png"]') && !!document.querySelector('#downloadTemplateBtn img[src="icons/ui-download.png"]'));
+    const prog = refProgress(syncBtn, 'Syncing'); prog.update(40, 'Syncing');
+    ok('while syncing the button shows the percentage and is disabled', syncBtn.textContent === '40%' && syncBtn.disabled);
+    prog.done();
+    ok('... and the picture icon comes back afterwards', !!syncBtn.querySelector('img[src="icons/ui-sync.png"]') && !syncBtn.disabled && syncBtn.textContent.trim() === '');
+    ok('no old text icons are left on those buttons', !/[↻⬆📄]/.test(['pcRefreshBtn','pcUploadBtn','pcTemplateBtn','bsRefreshBtn','bsUploadBtn','bsTemplateBtn','ysImSyncBtn','ysUploadItemsBtn','ysUploadPtlBtn'].map(id => document.getElementById(id).textContent).join('')));
+
     // ---------- app updates ----------
     AppState.isOnline = true;
     const realFetch = window.fetch;
     const swText = v => `const CACHE_VERSION = 'ak-utility-v${v}';`;
     const running = runningAppVersion();
     ok('the running version is read from the script tags', running > 0 && Number.isInteger(running), running);
-    ok('against the real server file: up to date, no banner', (await checkForAppUpdate()) === 'current' && document.getElementById('updateBanner').style.display === 'none');
+    const popup = () => document.getElementById('updateModal').classList.contains('active');
+    const dot = () => !document.getElementById('updateDot').hidden;
+    document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+    ok('against the real server file: up to date, no dot, no popup', (await checkForAppUpdate({ popup: true })) === 'current' && !dot() && !popup());
     window.fetch = async (u, o) => /sw\.js/.test(u) ? new Response(swText(running + 1)) : realFetch(u, o);
-    ok('a newer version on the server shows the banner with its number', (await checkForAppUpdate()) === 'newer' && document.getElementById('updateBanner').style.display === 'flex' && document.getElementById('updateBannerText').textContent.includes('v' + (running + 1)), document.getElementById('updateBannerText').textContent);
+    ok('a newer version lights the red dot but a plain check does not open the popup', (await checkForAppUpdate()) === 'newer' && dot() && !popup());
+    ok('an automatic check opens the CENTRED popup with the new number and an Update now button', (await checkForAppUpdate({ popup: true })) === 'newer' && popup() && document.getElementById('updateModalText').textContent.includes('v' + (running + 1)) && document.getElementById('updateNowBtn').style.display !== 'none');
+    ok('the popup is centred on screen, not pinned to the bottom corner', (() => { const r = document.querySelector('#updateModal .modal').getBoundingClientRect(); return Math.abs((r.top + r.bottom) / 2 - innerHeight / 2) < 60 && Math.abs((r.left + r.right) / 2 - innerWidth / 2) < 30; })());
+    document.getElementById('updateLaterBtn').click();
+    ok('Later closes it, the dot stays until the app is updated', !popup() && dot());
+    document.getElementById('updateBtn').click(); await sleep(30);
+    ok('tapping the update icon with an update waiting opens the popup again', popup());
+    document.getElementById('updateLaterBtn').click();
+    document.getElementById('accountModal').classList.add('active');
+    window.fetch = async (u, o) => /sw\.js/.test(u) ? new Response(swText(running + 1)) : realFetch(u, o);
+    ok('an automatic check does not interrupt another open window (only the dot)', (await checkForAppUpdate({ popup: true })) === 'newer' && !popup());
+    document.getElementById('accountModal').classList.remove('active');
     window.fetch = async (u, o) => /sw\.js/.test(u) ? new Response(swText(running)) : realFetch(u, o);
-    ok('same version again hides the banner', (await checkForAppUpdate()) === 'current' && document.getElementById('updateBanner').style.display === 'none');
+    ok('same version again clears the dot', (await checkForAppUpdate()) === 'current' && !dot());
     window.fetch = async () => { throw new TypeError('Failed to fetch'); };
-    ok('a failed check is harmless ("unknown", no banner)', (await checkForAppUpdate()) === 'unknown' && document.getElementById('updateBanner').style.display === 'none');
+    ok('a failed check is harmless ("unknown", no dot)', (await checkForAppUpdate()) === 'unknown' && !dot());
     window.fetch = realFetch; AppState.isOnline = false;
     ok('offline: no check is made', (await checkForAppUpdate()) === 'offline'); AppState.isOnline = true;
-    AppState.user = { id: 'u1', email: 'a@b.c' }; AppState.profile = { display_name: 'Ann', enterprise_id: null, tier: 'individual' };
-    await openAccountModal();
-    ok('Account screen shows the running version and a Check for updates button', document.getElementById('appVersionDisp').textContent === 'v' + running && !!document.getElementById('checkUpdateBtn'), document.getElementById('appVersionDisp').textContent);
-    await checkUpdateFromAccount();
-    ok('Check for updates reports "latest version" when current', /latest version/.test(document.getElementById('appVersionStatus').textContent), document.getElementById('appVersionStatus').textContent);
-    document.getElementById('accountModal').classList.remove('active');
+    window.fetch = async (u, o) => /sw\.js/.test(u) ? new Response(swText(running)) : realFetch(u, o);
+    document.getElementById('updateBtn').click(); await sleep(150);
+    ok('tapping the update icon when up to date says so and shows the running version', popup() && /latest version/.test(document.getElementById('updateModalText').textContent) && document.getElementById('appVersionDisp').textContent === 'v' + running && document.getElementById('updateNowBtn').style.display === 'none', document.getElementById('updateModalText').textContent);
+    document.getElementById('updateLaterBtn').click(); window.fetch = realFetch;
 
     // ---------- Box Scanner badge % ----------
     ok('uids valid UUIDs', /^[0-9a-f-]{36}$/.test(newScanUid()));

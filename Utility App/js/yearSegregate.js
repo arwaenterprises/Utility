@@ -825,7 +825,13 @@ async function ysDownloadExcel() {
 // ============================================
 // RESET SESSION
 // ============================================
-function ysShowResetModal() {
+async function ysShowResetModal() {
+    // A session with no scans has nothing to confirm or download: just close it.
+    if ((await ysDbGetAll(YS_SCANS_STORE)).length === 0) {
+        document.getElementById('ysResetModal').classList.remove('active');
+        ysFinishReset();
+        return;
+    }
     const openPtls = YSState.huStates.filter(h => h.status === 'Open').map(h => `PTL ${h.ptlNumber}`);
     if (openPtls.length > 0) {
         ysShowError(`Cannot reset — ${openPtls.join(', ')} ${openPtls.length === 1 ? 'is' : 'are'} still open. Close all boxes before resetting.`);
@@ -879,6 +885,11 @@ async function ysExecuteReset() {
         }
         await ysDbClearStore(YS_SCANS_STORE);
     }
+    ysFinishReset();
+}
+
+// The last step of every Reset: forget the session and go back to the start screen.
+function ysFinishReset() {
     clearYsSession();
     setActiveSession('yearSegregate', false);
     ysShowScreen('ysSessionScreen');

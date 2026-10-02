@@ -328,7 +328,11 @@ function downloadPalletExcel() {
 }
 
 function resetPalletScans() {
-    if (!bsDocScans.length) { alert('Nothing to reset.'); return; }
+    if (!bsDocScans.length) {            // nothing scanned: nothing to confirm or download, just clear the screen quietly
+        document.getElementById('bsDocResult').style.display = 'none';
+        bsRenderDocSummary();
+        return;
+    }
     if (!confirm('Download the ' + bsDocScans.length + ' scanned boxes and then clear them from this device?')) return;
     if (!downloadPalletExcel()) return;
     bsDocScans = [];

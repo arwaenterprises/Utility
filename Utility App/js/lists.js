@@ -90,7 +90,7 @@ function refScope(query) {
 function refProgress(anchorEl, baseLabel) {
     let bar = null;
     const btn = anchorEl && anchorEl.tagName === 'BUTTON' ? anchorEl : null;
-    const original = btn ? btn.textContent : '';
+    const original = btn ? btn.innerHTML : '';              // innerHTML, so an icon picture comes back after the % display
     function ensureBar() {
         if (bar || !anchorEl) return;
         bar = document.createElement('div');
@@ -110,7 +110,7 @@ function refProgress(anchorEl, baseLabel) {
         },
         done() {
             if (bar) { bar.remove(); bar = null; }
-            if (btn) { btn.disabled = false; btn.textContent = original; }
+            if (btn) { btn.disabled = false; btn.innerHTML = original; }
         }
     };
 }

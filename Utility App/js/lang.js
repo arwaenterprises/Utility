@@ -1,7 +1,7 @@
 // ============================================
 // APP LANGUAGE (English / Arabic) - one choice for the whole app
 // ============================================
-// Chosen on the welcome screen (also on the home screen and in the Account window) and
+// Chosen on the welcome screen or with the round EN / AR button in the top bar, and
 // remembered on this device. It decides the language of: the welcome and home screens, the
 // Box Scanner, the step-by-step guides and the long-press hints. It also turns the page
 // right-to-left for Arabic.
@@ -62,6 +62,8 @@ const AppLang = (function () {
         document.documentElement.setAttribute('lang', lang);
         translatePage(lang);
         document.querySelectorAll('.applang-toggle .lang-btn').forEach(b => b.classList.toggle('active', b.dataset.applang === lang));
+        const circle = document.getElementById('langBtn');                 // the round EN / AR button in the top bar
+        if (circle) circle.textContent = lang === 'ar' ? 'AR' : 'EN';
         listeners.forEach(fn => { try { fn(lang); } catch (e) { console.error(e); } });
     }
 
@@ -72,6 +74,8 @@ const AppLang = (function () {
 
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.applang-toggle .lang-btn').forEach(b => b.addEventListener('click', () => set(b.dataset.applang)));
+        const circle = document.getElementById('langBtn');
+        if (circle) circle.addEventListener('click', () => set(get() === 'ar' ? 'en' : 'ar'));
         apply();
     });
 
