@@ -1052,7 +1052,7 @@ function setupEventListeners() {
 // deploy can go unnoticed for days. Every deploy bumps the version number (the ?v= on the script tags
 // and CACHE_VERSION in sw.js). The app compares the version it is running with the one on the server
 // when it opens, when it comes back to the foreground and when the connection returns, and shows a
-// banner instead of reloading by itself (a reload in the middle of a scan would be worse).
+// red dot and a popup instead of reloading by itself (a reload in the middle of a scan would be worse).
 function runningAppVersion() {
     const tag = document.querySelector('script[src*="js/app.js"]');
     const m = tag && tag.getAttribute('src').match(/[?&]v=(\d+)/);
