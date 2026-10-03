@@ -85,6 +85,80 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('the next box is scanned without touching anything', /B200/.test(document.body.textContent) && !bcam.stopped);
     await stopBsCamera();
     ok('closing works', bcam.stopped && find('bsCamOverlay').style.display === 'none');
+    ok('no unexpected alerts (library engine)', !(window.__alerts || []).length, JSON.stringify(window.__alerts));
+
+    // ============ the phone's own detector: "+", nearest barcode wins, red rectangle ============
+    window.__alerts = [];
+    window.__streams = [];
+    const realGum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = async (c) => { const st = await realGum(c); window.__streams.push(st); return st; };
+    window.__torchCalls = [];
+    MediaStreamTrack.prototype.getCapabilities = function () { return { torch: window.__hasTorch !== false }; };
+    MediaStreamTrack.prototype.applyConstraints = async function (c) { window.__torchCalls.push(JSON.stringify(c)); };
+    window.__dets = [];
+    window.BarcodeDetector = class { static async getSupportedFormats() { return ['qr_code', 'code_128', 'ean_13']; } async detect(v) { if (window.__detFail) throw new Error('not supported on this phone'); return window.__dets.map(d => d(v)); } };
+    // a detection placed by picture coordinates relative to the picture centre
+    const box = (value, dx, dy, w = 80, h = 40) => (v) => { const cx = v.videoWidth / 2 + dx, cy = v.videoHeight / 2 + dy; const x = cx - w / 2, y = cy - h / 2;
+      return { rawValue: value, format: 'code_128', boundingBox: { x, y, width: w, height: h }, cornerPoints: [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }] }; };
+
+    openApp('priceCheck'); document.getElementById('helpCloseBtn')?.click();
+    window.__prices['777'] = { Current_Price: '77' }; window.__prices['888'] = { Current_Price: '88' };
+    window.__vibrations.length = 0;
+    await togglePcCamera(); await sleep(400);
+    ok('with the built-in detector the picture is a real video inside the strip', pcCamera.engine === 'native' && !!document.querySelector('#pcQrReader video') && find('pcCamOverlay').style.display === 'block', pcCamera.engine);
+    ok('a transparent layer for the "+" and rectangles sits over the picture', !!document.querySelector('#pcCamOverlay canvas.cam-hud'));
+    const hud = document.querySelector('#pcCamOverlay canvas.cam-hud');
+    const hudBox = hud.getBoundingClientRect(), stripBox = find('pcQrReader').getBoundingClientRect();
+    ok('...and it covers exactly the visible strip', Math.abs(hudBox.top - stripBox.top) < 2 && Math.abs(hudBox.height - stripBox.height) < 2 && stripBox.height < 150, hudBox.height + ' vs ' + stripBox.height);
+    const dpr = window.devicePixelRatio || 1;
+    const px = (x, y) => { const d = hud.getContext('2d').getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data; return [d[0], d[1], d[2], d[3]]; };
+    const isRed = (c) => c[0] > 200 && c[1] < 90 && c[2] < 90 && c[3] > 150;
+    await sleep(120);
+    const sw = stripBox.width, sh = stripBox.height;
+    ok('a red "+" is drawn at the centre of the strip', isRed(px(sw / 2, sh / 2 - 6)) || isRed(px(sw / 2 + 6, sh / 2)) || isRed(px(sw / 2 - 6, sh / 2)), px(sw / 2, sh / 2 - 6));
+
+    // two barcodes in view: one on the "+", one off to the side
+    window.__dets = [box('777', 0, 0), box('888', 90, 0)];
+    await sleep(400);
+    ok('the barcode nearest the "+" is the one read', /77/.test(find('pcResultCard').textContent) && document.getElementById('pcBarcodeInput').value === '777', document.getElementById('pcBarcodeInput').value);
+    ok('only one code was registered and the phone vibrated once', window.__vibrations.length === 1);
+    const q = pcCamera.read;
+    ok('a red rectangle is kept for the barcode that was read', !!q && q.length === 4);
+    const midLeft = { x: (q[0].x + q[3].x) / 2, y: (q[0].y + q[3].y) / 2 };
+    await sleep(60);
+    ok('...and it is really drawn in red on its edge', [0, 1, 2, 3].some(i => isRed(px(midLeft.x + i - 1, midLeft.y))), px(midLeft.x, midLeft.y) + ' @ ' + midLeft.x + ',' + midLeft.y);
+    ok('the other barcode in view is only outlined faintly (not read)', pcCamera.others.length === 1);
+    // the user moves so the OTHER barcode is on the "+"
+    window.__dets = [box('777', -90, 0), box('888', 0, 0)];
+    await sleep(400);
+    ok('moving the "+" onto the other barcode reads that one next', document.getElementById('pcBarcodeInput').value === '888' && /88/.test(find('pcResultCard').textContent) && window.__vibrations.length === 2);
+    // a barcode outside the visible strip is ignored
+    window.__dets = [box('777', 0, -9999)];
+    await sleep(300);
+    ok('a barcode outside the visible strip is ignored', document.getElementById('pcBarcodeInput').value === '888' && window.__vibrations.length === 2);
+    // the rectangle goes away when nothing is read any more
+    window.__dets = []; await sleep(1000);
+    ok('the red rectangle fades away after the barcode leaves the view', pcCamera.read === null || Date.now() > pcCamera.readUntil);
+    // torch with the native engine
+    ok('torch button shows (this camera reports a torch)', find('pcTorchBtn').style.display !== 'none');
+    await find('pcTorchBtn').click(); await sleep(50);
+    ok('torch on: asks the camera for the torch', window.__torchCalls.some(c => /"torch":true/.test(c)) && find('pcTorchBtn').classList.contains('on'), window.__torchCalls.join());
+    await stopPcCamera();
+    ok('closing stops the camera stream completely', window.__streams.every(st => st.getTracks().every(t => t.readyState === 'ended')) && !document.querySelector('#pcQrReader video'));
+
+    // the built-in detector exists but fails on this phone: the library takes over
+    window.__detFail = true;
+    window.__cams.length = 0;
+    await togglePcCamera(); await sleep(500);
+    ok('if the built-in detector fails, the library takes over and the camera stays usable', pcCamera.engine === 'library' && window.__cams.length === 1 && find('pcCamOverlay').style.display === 'block', pcCamera.engine);
+    await stopPcCamera(); window.__detFail = false;
+
+    // Box Segregate with the built-in detector
+    openApp('boxSegregate'); document.getElementById('helpCloseBtn')?.click();
+    window.__dets = [box('B100', 0, 0)];
+    await toggleBsCamera(); await sleep(400);
+    ok('Box Segregate uses the same camera with the "+" and the result below', bsCamera.engine === 'native' && /B100/.test(document.body.textContent) && !!document.querySelector('#bsCamOverlay canvas.cam-hud'));
+    await stopBsCamera();
     ok('no unexpected alerts', !(window.__alerts || []).length, JSON.stringify(window.__alerts));
     return log;
   });

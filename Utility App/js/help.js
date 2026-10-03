@@ -105,7 +105,7 @@ const HELP = {
             before: 'Your box list must be uploaded first. If you work alone or are your team\'s admin, tap the upload icon (<img class="help-ico" src="icons/ui-upload.png" alt="">); the download icon (<img class="help-ico" src="icons/ui-download.png" alt="">) gives you the template. Team members: your admin uploads the list; tap <img class="help-ico" src="icons/ui-sync.png" alt=""> to get it.',
             steps: [
                 'Tap <img class="help-ico" src="icons/ui-sync.png" alt=""> to load the latest list. The time next to it shows when it was last updated.',
-                'Scan the box barcode with a handheld scanner, or tap the camera (&#128247;): it stays open and keeps scanning, showing each result under the picture, and the phone vibrates on every read. Tap &#128294; for light. Use &#9000;&#65039; to type it instead.',
+                'Scan the box barcode with a handheld scanner, or tap the camera (&#128247;): it stays open and keeps scanning. Put the red <b>+</b> on the barcode you want: the one nearest the + is read and gets a red rectangle, and the result shows under the picture. The phone vibrates on every read. Tap &#128294; for light. Use &#9000;&#65039; to type it instead.',
                 'The result card shows the box details. If it says <b>not found</b>, check the barcode and that the list has been uploaded.',
                 '<b>Pallet mode:</b> switch on <b>Pallet</b>, then scan each box on the pallet. The app counts them and flags duplicates and boxes that are not in the list.',
                 'In Pallet mode, tap <b>Download</b> for the Excel file, and <b>Reset</b> when the pallet is done.'
@@ -117,7 +117,7 @@ const HELP = {
             before: 'يجب رفع قائمة الصناديق أولًا. إذا كنت تعمل بمفردك أو كنت مسؤول الفريق فاضغط أيقونة الرفع (<img class="help-ico" src="icons/ui-upload.png" alt="">)؛ وأيقونة التحميل (<img class="help-ico" src="icons/ui-download.png" alt="">) تعطيك النموذج. أعضاء الفريق: المسؤول يرفع القائمة؛ اضغط <img class="help-ico" src="icons/ui-sync.png" alt=""> لتحميلها.',
             steps: [
                 'اضغط <img class="help-ico" src="icons/ui-sync.png" alt=""> لتحميل أحدث قائمة. الوقت بجانبه يوضح آخر تحديث.',
-                'امسح باركود الصندوق بالماسح اليدوي، أو اضغط الكاميرا (&#128247;): تبقى مفتوحة وتواصل المسح وتعرض كل نتيجة أسفل الصورة، ويهتز الهاتف عند كل قراءة. اضغط &#128294; للإضاءة. استخدم &#9000;&#65039; للكتابة بدلًا من المسح.',
+                'امسح باركود الصندوق بالماسح اليدوي، أو اضغط الكاميرا (&#128247;): تبقى مفتوحة وتواصل المسح. ضع علامة <b>+</b> الحمراء على الباركود المطلوب: يُقرأ الأقرب إلى العلامة ويُحاط بمستطيل أحمر، وتظهر النتيجة أسفل الصورة. ويهتز الهاتف عند كل قراءة. اضغط &#128294; للإضاءة. استخدم &#9000;&#65039; للكتابة بدلًا من المسح.',
                 'تعرض البطاقة تفاصيل الصندوق. إذا ظهر <b>not found</b> فتحقق من الباركود ومن أن القائمة قد رُفعت.',
                 '<b>وضع الطبلية:</b> فعّل <b>Pallet</b> ثم امسح كل صندوق على الطبلية. يحسبها التطبيق وينبّه إلى المكرر وإلى الصناديق غير الموجودة في القائمة.',
                 'في وضع الطبلية اضغط <b>Download</b> لملف Excel، و<b>Reset</b> عند انتهاء الطبلية.'
@@ -131,7 +131,7 @@ const HELP = {
             before: 'The price list must be uploaded first. If you work alone or are your team\'s admin, tap the upload icon (<img class="help-ico" src="icons/ui-upload.png" alt="">); the download icon (<img class="help-ico" src="icons/ui-download.png" alt="">) gives you the template. Team members: your admin uploads the list; tap <img class="help-ico" src="icons/ui-sync.png" alt=""> to get it.',
             steps: [
                 'Tap <img class="help-ico" src="icons/ui-sync.png" alt=""> to load the latest price list. The time next to it shows when it was last updated.',
-                'Scan the item with a handheld scanner, or tap the camera (&#128247;): it stays open and keeps scanning, showing each price under the picture, and the phone vibrates on every read. Tap &#128294; for light. Use &#9000;&#65039; to type the barcode instead.',
+                'Scan the item with a handheld scanner, or tap the camera (&#128247;): it stays open and keeps scanning. Put the red <b>+</b> on the barcode you want: the one nearest the + is read and gets a red rectangle, and the price shows under the picture. The phone vibrates on every read. Tap &#128294; for light. Use &#9000;&#65039; to type the barcode instead.',
                 'The price appears on screen. If it says <b>not found</b>, the item is missing from the price list.'
             ],
             tips: ['Works offline once the list has been loaded on this device.']
@@ -141,7 +141,7 @@ const HELP = {
             before: 'يجب رفع قائمة الأسعار أولًا. إذا كنت تعمل بمفردك أو كنت مسؤول الفريق فاضغط أيقونة الرفع (<img class="help-ico" src="icons/ui-upload.png" alt="">)؛ وأيقونة التحميل (<img class="help-ico" src="icons/ui-download.png" alt="">) تعطيك النموذج. أعضاء الفريق: المسؤول يرفع القائمة؛ اضغط <img class="help-ico" src="icons/ui-sync.png" alt=""> لتحميلها.',
             steps: [
                 'اضغط <img class="help-ico" src="icons/ui-sync.png" alt=""> لتحميل أحدث قائمة أسعار. الوقت بجانبه يوضح آخر تحديث.',
-                'امسح القطعة بالماسح اليدوي، أو اضغط الكاميرا (&#128247;): تبقى مفتوحة وتواصل المسح وتعرض كل سعر أسفل الصورة، ويهتز الهاتف عند كل قراءة. اضغط &#128294; للإضاءة. استخدم &#9000;&#65039; لكتابة الباركود بدلًا من المسح.',
+                'امسح القطعة بالماسح اليدوي، أو اضغط الكاميرا (&#128247;): تبقى مفتوحة وتواصل المسح. ضع علامة <b>+</b> الحمراء على الباركود المطلوب: يُقرأ الأقرب إلى العلامة ويُحاط بمستطيل أحمر، ويظهر السعر أسفل الصورة. ويهتز الهاتف عند كل قراءة. اضغط &#128294; للإضاءة. استخدم &#9000;&#65039; لكتابة الباركود بدلًا من المسح.',
                 'يظهر السعر على الشاشة. إذا ظهر <b>not found</b> فالقطعة غير موجودة في قائمة الأسعار.'
             ],
             tips: ['يعمل بدون إنترنت بعد تحميل القائمة على هذا الجهاز.']
