@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=57"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=57"></script>
-    <script src="vendor/qrcode.min.js?v=57"></script>
-    <script src="vendor/html5-qrcode.min.js?v=57"></script>
-    <script src="vendor/supabase.js?v=57"></script>
+    <script src="vendor/xlsx.full.min.js?v=58"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=58"></script>
+    <script src="vendor/qrcode.min.js?v=58"></script>
+    <script src="vendor/html5-qrcode.min.js?v=58"></script>
+    <script src="vendor/supabase.js?v=58"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -63,6 +63,16 @@
                 <div id="enterpriseAdminSection" style="display:none;">
                     <div class="um-enterprise"><strong id="umEnterprise">Team</strong>
                         <button class="icon-btn" id="renameEnterpriseBtn" title="Rename enterprise" aria-label="Rename enterprise" style="font-size:14px;">✏️</button></div>
+                    <div class="settings-section" id="qrLinksSection">
+                        <h4 data-i18n="ql_h">Team QR links</h4>
+                        <p class="ql-hint" data-i18n="ql_p">Labourers join with a QR code &mdash; no Google account. Each link is for one tool and one job. A new link for the same tool replaces the old one.</p>
+                        <div id="qrLinkList"></div>
+                        <div class="ql-new">
+                            <select id="qrToolSelect" class="form-input"></select>
+                            <input type="text" id="qrJobInput" class="form-input" maxlength="60" autocomplete="off">
+                            <button class="btn btn-primary btn-block" id="qrCreateBtn" type="button" data-i18n="ql_create">Create QR link</button>
+                        </div>
+                    </div>
                     <button class="btn btn-secondary team-invite-toggle" id="inviteToggleBtn" type="button" aria-expanded="false">✉️ Invite a teammate</button>
                     <div class="settings-section" id="teamInviteSection" style="display:none;">
                         <input type="email" id="inviteEmailInput" class="form-input" placeholder="teammate@email.com" style="margin-bottom: 10px;">
@@ -72,6 +82,30 @@
                     <h4 style="margin: 10px 0 6px;">Team members</h4>
                     <div id="umMemberList"></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR SHEET: the code with the names a labourer must check (enterprise, admin, tool, job) -->
+    <div class="modal-overlay" id="qrSheetModal">
+        <div class="modal" style="max-width: 420px;">
+            <div class="modal-body qr-sheet" id="qrSheetBox" style="text-align:center;">
+                <div class="qs-ent" id="qsEnterprise"></div>
+                <dl class="qs-facts">
+                    <dt id="qsAdmLbl"></dt><dd id="qsAdmin"></dd>
+                    <dt id="qsToolLbl"></dt><dd id="qsTool"></dd>
+                    <dt id="qsJobLbl"></dt><dd id="qsJob"></dd>
+                </dl>
+                <div id="qsQr" class="qs-qr"></div>
+                <p class="qs-line" id="qsLine"></p>
+                <p class="qs-url" id="qsUrl"></p>
+                <span id="qsEntLbl" style="display:none;"></span>
+            </div>
+            <div class="modal-buttons qs-buttons">
+                <button class="btn btn-primary" id="qsPrintBtn" type="button" data-i18n="qs_print">Print</button>
+                <button class="btn btn-secondary" id="qsShareBtn" type="button" data-i18n="qs_share">Share</button>
+                <button class="btn btn-secondary" id="qsCopyBtn" type="button" data-i18n="qs_copy">Copy link</button>
+                <button class="btn btn-secondary" id="qsCloseBtn" type="button" data-i18n="qs_close">Close</button>
             </div>
         </div>
     </div>
@@ -1069,21 +1103,22 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=57"></script>
-    <script src="js/lang.js?v=57"></script>
-    <script src="js/supabaseClient.js?v=57"></script>
-    <script src="js/lists.js?v=57"></script>
-    <script src="js/usage.js?v=57"></script>
-    <script src="js/syncstatus.js?v=57"></script>
-    <script src="js/help.js?v=57"></script>
-    <script src="js/tooltip.js?v=57"></script>
-    <script src="js/operator.js?v=57"></script>
-    <script src="js/app.js?v=57"></script>
-    <script src="js/boxScanner.js?v=57"></script>
-    <script src="js/itemBarcode.js?v=57"></script>
-    <script src="js/boxCode.js?v=57"></script>
-    <script src="js/boxSegregate.js?v=57"></script>
-    <script src="js/priceCheck.js?v=57"></script>
-    <script src="js/yearSegregate.js?v=57"></script>
+    <script src="js/config.js?v=58"></script>
+    <script src="js/lang.js?v=58"></script>
+    <script src="js/supabaseClient.js?v=58"></script>
+    <script src="js/lists.js?v=58"></script>
+    <script src="js/usage.js?v=58"></script>
+    <script src="js/syncstatus.js?v=58"></script>
+    <script src="js/help.js?v=58"></script>
+    <script src="js/tooltip.js?v=58"></script>
+    <script src="js/operator.js?v=58"></script>
+    <script src="js/teamlinks.js?v=58"></script>
+    <script src="js/app.js?v=58"></script>
+    <script src="js/boxScanner.js?v=58"></script>
+    <script src="js/itemBarcode.js?v=58"></script>
+    <script src="js/boxCode.js?v=58"></script>
+    <script src="js/boxSegregate.js?v=58"></script>
+    <script src="js/priceCheck.js?v=58"></script>
+    <script src="js/yearSegregate.js?v=58"></script>
 </body>
 </html>

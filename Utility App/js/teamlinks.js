@@ -1,0 +1,175 @@
+// ============================================
+// TEAM QR LINKS - the admin's side (User management window)
+// ============================================
+// The admin picks a tool, types a job name (it becomes the Remark of every scan) and gets a QR code. Labourers
+// scan it with the phone's own scanner - see js/operator.js for what happens on their device.
+// One active link per tool: creating a new one stops the old one. A link also switches itself off after 3 days
+// without scans (the server decides - supabase/schema.sql); data is never deleted by this.
+const QL_T = {
+    en: {
+        none: 'No QR links yet. Create one below.',
+        people1: '1 person joined', peopleN: '{n} people joined',
+        active: 'Active', inactive: 'Switched off (3 days without scans)',
+        show: 'Show QR', stop: 'Stop this link',
+        stopAsk: 'Stop this link? Nobody can start new work on it. Scans already made are kept.',
+        pickTool: 'Choose a tool', jobPlaceholder: 'Job name (becomes the Remark)',
+        needJob: 'Please type a job name.', needTool: 'Please choose a tool.',
+        replaces: 'This replaces the current link for {tool}. Continue?',
+        copied: 'Link copied.', copyFail: 'Could not copy. Select the link and copy it by hand.',
+        failed: 'Could not do that. Please try again.',
+        sheetLine: 'Scan with your phone camera or QR scanner. Only your name is needed.',
+        enterprise: 'Enterprise', admin: 'Admin', tool: 'Tool', job: 'Job'
+    },
+    ar: {
+        none: 'لا توجد روابط QR بعد. أنشئ واحدًا أدناه.',
+        people1: 'انضم شخص واحد', peopleN: 'انضم {n} أشخاص',
+        active: 'نشط', inactive: 'متوقف (3 أيام دون مسح)',
+        show: 'عرض QR', stop: 'إيقاف هذا الرابط',
+        stopAsk: 'هل تريد إيقاف هذا الرابط؟ لن يستطيع أحد بدء عمل جديد عليه. عمليات المسح التي تمت تبقى محفوظة.',
+        pickTool: 'اختر أداة', jobPlaceholder: 'اسم المهمة (يصبح الملاحظة)',
+        needJob: 'الرجاء كتابة اسم المهمة.', needTool: 'الرجاء اختيار أداة.',
+        replaces: 'سيحلّ هذا محل الرابط الحالي لأداة {tool}. هل تريد المتابعة؟',
+        copied: 'تم نسخ الرابط.', copyFail: 'تعذّر النسخ. حدّد الرابط وانسخه يدويًا.',
+        failed: 'تعذّر تنفيذ ذلك. حاول مرة أخرى.',
+        sheetLine: 'امسح بكاميرا الهاتف أو ماسح QR. يكفي اسمك فقط.',
+        enterprise: 'المؤسسة', admin: 'المسؤول', tool: 'الأداة', job: 'المهمة'
+    }
+};
+function qlT(key) {
+    const lang = (typeof AppLang !== 'undefined' && AppLang.get() === 'ar') ? 'ar' : 'en';
+    return QL_T[lang][key] !== undefined ? QL_T[lang][key] : QL_T.en[key];
+}
+
+let teamLinksCache = [];
+
+function teamLinkUrl(token) {
+    return window.location.origin + '/j/' + token;
+}
+
+function qlApplyTexts() {
+    const sel = document.getElementById('qrToolSelect');
+    if (!sel) return;
+    const keep = sel.value;
+    sel.innerHTML = '<option value="">' + escapeHtml(qlT('pickTool')) + '</option>' +
+        APPS.filter(a => !a.modal).map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+    sel.value = keep;
+    document.getElementById('qrJobInput').placeholder = qlT('jobPlaceholder');
+    qlRenderList();
+}
+
+function qlRenderList() {
+    const el = document.getElementById('qrLinkList');
+    if (!el) return;
+    const live = teamLinksCache.filter(l => l.state !== 'stopped');
+    if (!live.length) { el.innerHTML = '<p class="ql-none">' + escapeHtml(qlT('none')) + '</p>'; return; }
+    el.innerHTML = live.map(l => {
+        const n = Number(l.operators) || 0;
+        const people = n === 1 ? qlT('people1') : qlT('peopleN').replace('{n}', n);
+        return `<div class="ql-row ql-${l.state}">
+            <div class="ql-main"><b>${escapeHtml(l.job_name)}</b>
+                <span class="ql-tool">${escapeHtml(opToolName(l.tool))}</span>
+                <span class="ql-meta">${escapeHtml(people)} &middot; ${escapeHtml(l.state === 'active' ? qlT('active') : qlT('inactive'))}</span></div>
+            <div class="ql-btns">
+                ${l.state === 'active' ? `<button class="btn btn-secondary" type="button" data-ql-show="${l.id}">${escapeHtml(qlT('show'))}</button>` : ''}
+                <button class="btn btn-secondary" type="button" data-ql-stop="${l.id}">${escapeHtml(qlT('stop'))}</button>
+            </div></div>`;
+    }).join('');
+}
+
+async function loadTeamLinks() {
+    const { data, error } = await supabaseClient.rpc('list_team_links');
+    teamLinksCache = error || !Array.isArray(data) ? [] : data;
+    qlRenderList();
+}
+
+async function createTeamLink() {
+    const tool = document.getElementById('qrToolSelect').value;
+    const job = document.getElementById('qrJobInput').value.trim();
+    if (!tool) { alert(qlT('needTool')); return; }
+    if (!job) { alert(qlT('needJob')); return; }
+    const existing = teamLinksCache.find(l => l.tool === tool && l.state === 'active');
+    if (existing && !confirm(qlT('replaces').replace('{tool}', opToolName(tool)))) return;
+    const btn = document.getElementById('qrCreateBtn');
+    btn.disabled = true;
+    try {
+        const { data, error } = await supabaseClient.rpc('create_team_link', { p_tool: tool, p_job: job });
+        if (error || !data) { alert(error ? error.message : qlT('failed')); return; }
+        document.getElementById('qrJobInput').value = '';
+        await loadTeamLinks();
+        await showQrSheet({ token: data.token, tool: data.tool, job_name: data.job_name });
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function stopTeamLinkById(id) {
+    if (!confirm(qlT('stopAsk'))) return;
+    const { error } = await supabaseClient.rpc('stop_team_link', { p_link_id: id });
+    if (error) { alert(error.message); return; }
+    await loadTeamLinks();
+}
+
+// The QR sheet: everything a labourer must check before scanning (enterprise, admin, tool, job) next to the code.
+async function showQrSheet(link) {
+    const { data: ent } = await supabaseClient.from('enterprises').select('name').eq('id', AppState.profile.enterprise_id).maybeSingle();
+    const adminName = AppState.profile.display_name || AppState.user.email || '';
+    const url = teamLinkUrl(link.token);
+    document.getElementById('qsEnterprise').textContent = (ent && ent.name) || '';
+    document.getElementById('qsAdmin').textContent = adminName;
+    document.getElementById('qsTool').textContent = opToolName(link.tool);
+    document.getElementById('qsJob').textContent = link.job_name;
+    document.getElementById('qsUrl').textContent = url;
+    document.getElementById('qsLine').textContent = qlT('sheetLine');
+    ['qsEntLbl', 'qsAdmLbl', 'qsToolLbl', 'qsJobLbl'].forEach((id, i) => { document.getElementById(id).textContent = qlT(['enterprise', 'admin', 'tool', 'job'][i]); });
+    const box = document.getElementById('qsQr');
+    box.innerHTML = '';
+    new QRCode(box, { text: url, width: 240, height: 240, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+    document.getElementById('qsCopyBtn').dataset.url = url;
+    document.getElementById('qsShareBtn').style.display = navigator.share ? '' : 'none';
+    document.getElementById('qrSheetModal').classList.add('active');
+}
+
+function closeQrSheet() {
+    document.getElementById('qrSheetModal').classList.remove('active');
+}
+
+async function copyQrLink() {
+    const url = document.getElementById('qsCopyBtn').dataset.url;
+    try { await navigator.clipboard.writeText(url); alert(qlT('copied')); }
+    catch (e) { alert(qlT('copyFail')); }
+}
+
+async function shareQrLink() {
+    const url = document.getElementById('qsCopyBtn').dataset.url;
+    try {
+        await navigator.share({
+            title: document.getElementById('qsJob').textContent + ' - ' + document.getElementById('qsEnterprise').textContent,
+            text: document.getElementById('qsEnterprise').textContent + ' / ' + document.getElementById('qsJob').textContent,
+            url
+        });
+    } catch (e) { /* the person closed the share sheet */ }
+}
+
+function printQrSheet() {
+    document.body.classList.add('printing-qr');
+    const done = () => { document.body.classList.remove('printing-qr'); window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    window.print();
+}
+
+function setupTeamLinkListeners() {
+    document.getElementById('qrCreateBtn').addEventListener('click', createTeamLink);
+    document.getElementById('qrJobInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') createTeamLink(); });
+    document.getElementById('qrLinkList').addEventListener('click', (e) => {
+        const show = e.target.dataset.qlShow, stop = e.target.dataset.qlStop;
+        if (show) { const l = teamLinksCache.find(x => x.id === show); if (l) showQrSheet(l); }
+        if (stop) stopTeamLinkById(stop);
+    });
+    document.getElementById('qsCloseBtn').addEventListener('click', closeQrSheet);
+    document.getElementById('qsCopyBtn').addEventListener('click', copyQrLink);
+    document.getElementById('qsShareBtn').addEventListener('click', shareQrLink);
+    document.getElementById('qsPrintBtn').addEventListener('click', printQrSheet);
+    if (typeof AppLang !== 'undefined') AppLang.onChange(() => qlApplyTexts());
+    qlApplyTexts();
+}
+document.addEventListener('DOMContentLoaded', setupTeamLinkListeners);

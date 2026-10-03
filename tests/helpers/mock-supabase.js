@@ -72,6 +72,16 @@ window.__rpcCalls = [];
       const l = window.__teamLink, o = JSON.parse(localStorage.getItem('mock_operator') || 'null');
       return l && o ? [{ link_id: l.id, tool: l.tool, job_name: l.job_name, enterprise_name: 'Acme', admin_name: 'Akhtar', operator_name: o.name, state: l.state }] : [];
     },
+    list_team_links: () => (window.__links = window.__links || []).map(l => ({ ...l, operators: l.operators || 0 })),
+    create_team_link: ({ p_tool, p_job }) => {
+      if (!p_job || !p_job.trim()) throw { message: 'Please type a job name (1 to 60 characters).' };
+      window.__links = window.__links || [];
+      window.__links.forEach(l => { if (l.tool === p_tool && l.state === 'active') l.state = 'stopped'; });
+      const l = { id: 'L' + (window.__links.length + 1), token: 'f'.repeat(31) + (window.__links.length + 1), tool: p_tool, job_name: p_job.trim(), state: 'active', operators: 0 };
+      window.__links.push(l);
+      return { id: l.id, token: l.token, tool: l.tool, job_name: l.job_name };
+    },
+    stop_team_link: ({ p_link_id }) => { (window.__links || []).forEach(l => { if (l.id === p_link_id) l.state = 'stopped'; }); },
     remove_enterprise_member: ({ member_user_id }) => { window.__removedMember = member_user_id; return true; },
     my_pending_invites: () => window.__me.enterprise_id ? [] : db.enterprise_invites
       .filter(i => i.status === 'pending' && new Date(i.expires_at) > new Date() && String(i.invited_email).toLowerCase() === String(window.__me.email).toLowerCase())

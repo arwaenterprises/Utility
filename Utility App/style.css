@@ -2400,3 +2400,30 @@ body.rtl .app-back-btn { transform: scaleX(-1); }
 .operator-bar .op-who { font-size: 12px; color: var(--ak-text-light); word-break: break-word; }
 .operator-bar .op-notice { margin-top: 6px; padding: 8px 10px; background: #fdecea; color: #8a1c10; border-radius: 6px; font-size: 13px; font-weight: 700; }
 body.operator-mode .app-back-btn, body.operator-mode #accountBtn { display: none !important; }
+
+/* ---------- Team QR links: admin list and QR sheet ---------- */
+.ql-hint, .ql-none { font-size: 13px; color: var(--ak-text-light); margin: 0 0 10px; }
+.ql-row { border: 1px solid var(--ak-border, #d9dee7); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+.ql-row.ql-inactive { background: #fdf6e7; }
+.ql-main { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.ql-main b { font-size: 16px; word-break: break-word; }
+.ql-tool { font-size: 13px; }
+.ql-meta { font-size: 12px; color: var(--ak-text-light); }
+.ql-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.ql-btns .btn { flex: 1 1 auto; }
+.ql-new { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.qr-sheet .qs-ent { font-size: 22px; font-weight: 800; margin-bottom: 8px; word-break: break-word; }
+.qs-facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; text-align: start; margin: 0 0 12px; }
+.qs-facts dt { font-weight: 700; color: var(--ak-text-light); font-size: 13px; }
+.qs-facts dd { margin: 0; font-weight: 700; font-size: 16px; word-break: break-word; }
+.qs-qr { display: flex; justify-content: center; margin: 8px 0; }
+.qs-line { font-size: 13px; margin: 6px 0; }
+.qs-url { font-size: 11px; color: var(--ak-text-light); word-break: break-all; margin: 0; }
+.qs-buttons { flex-wrap: wrap; }
+@media print {
+    body.printing-qr * { visibility: hidden; }
+    body.printing-qr #qrSheetBox, body.printing-qr #qrSheetBox * { visibility: visible; }
+    body.printing-qr #qrSheetBox { position: absolute; left: 0; top: 0; width: 100%; padding: 10mm; box-sizing: border-box; }
+    body.printing-qr .qs-ent { font-size: 28pt; }
+    body.printing-qr .qs-facts dd { font-size: 18pt; }
+}

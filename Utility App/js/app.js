@@ -129,6 +129,7 @@ async function openAccountModal() {
     if (isAdmin) {
         document.getElementById('umMemberList').innerHTML = '<p style="font-size:13px; color: var(--ak-text-light);">Loading...</p>';
         await loadPendingInvitesList();
+        await loadTeamLinks();
         await loadUserMgmtMembers();
     }
 }

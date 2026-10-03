@@ -107,6 +107,46 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   j = await joinShown();
   ok('a device signed in with Google is asked to sign out first', /Google/.test(j.msg) && j.form === 'none', JSON.stringify(j));
 
+  // --- 8. the admin side: create, show, replace, stop ---
+  const c = await openApp(ctx, null, 'index.html');
+  errors.push(...c.errors);
+  page = c.page;
+  await page.evaluate(() => {
+    window.__me = { id: 'u1', enterprise_id: 'E1', tier: 'enterprise_admin', email: 'akhtar@x.y' };
+    window.alert = (m) => { window.__alerts = (window.__alerts || []).concat(m); }; window.confirm = () => true;
+    AppState.user = { id: 'u1', email: 'akhtar@x.y' }; AppState.profile = { id: 'u1', display_name: 'Akhtar', enterprise_id: 'E1', tier: 'enterprise_admin' };
+  });
+  await page.evaluate(() => openAccountModal());
+  await page.waitForTimeout(300);
+  ok('admin sees the Team QR links section with an empty list', /No QR links/.test(await page.textContent('#qrLinkList')));
+  ok('the tool menu lists the six tools (not Data Management)', (await page.$$eval('#qrToolSelect option', o => o.map(x => x.value).filter(Boolean))).join() === 'boxScanner,itemBarcode,boxCode,boxSegregate,priceCheck,yearSegregate');
+  await page.click('#qrCreateBtn');
+  ok('a tool is required', (await page.evaluate(() => (window.__alerts || []).length)) === 1);
+  await page.selectOption('#qrToolSelect', 'boxScanner');
+  await page.click('#qrCreateBtn');
+  ok('a job name is required', (await page.evaluate(() => (window.__alerts || []).length)) === 2);
+  await page.fill('#qrJobInput', 'Inbound 7');
+  await page.click('#qrCreateBtn');
+  await page.waitForTimeout(400);
+  const q = await page.evaluate(() => ({
+    open: document.getElementById('qrSheetModal').classList.contains('active'), ent: qsEnterprise.textContent, adm: qsAdmin.textContent, tool: qsTool.textContent, job: qsJob.textContent,
+    url: qsUrl.textContent, qr: !!document.querySelector('#qsQr img, #qsQr canvas'), list: document.getElementById('qrLinkList').textContent
+  }));
+  ok('creating a link opens the QR sheet with enterprise, admin, tool, job and the address', q.open && q.ent === 'Acme' && q.adm === 'Akhtar' && q.tool === 'Box-Item Scan' && q.job === 'Inbound 7' && /\/j\/f{31}1$/.test(q.url), JSON.stringify(q));
+  ok('the sheet draws a QR code', q.qr);
+  ok('the new link appears in the list', /Inbound 7/.test(q.list) && /Active/.test(q.list));
+  await page.click('#qsCloseBtn');
+  await page.selectOption('#qrToolSelect', 'boxScanner'); await page.fill('#qrJobInput', 'Inbound 8'); await page.click('#qrCreateBtn'); await page.waitForTimeout(400);
+  await page.click('#qsCloseBtn');
+  const list2 = await page.textContent('#qrLinkList');
+  ok('a new link for the same tool replaces the old one in the list', /Inbound 8/.test(list2) && !/Inbound 7/.test(list2), list2);
+  await page.click('[data-ql-show]'); 
+  ok('"Show QR" reopens the sheet for that link', (await page.textContent('#qsJob')) === 'Inbound 8');
+  await page.click('#qsCloseBtn');
+  await page.click('[data-ql-stop]'); await page.waitForTimeout(300);
+  ok('"Stop this link" removes it from the list', /No QR links/.test(await page.textContent('#qrLinkList')));
+  await page.evaluate(() => AppLang.set('ar'));
+  ok('the section is in Arabic when the app is Arabic', /[\u0600-\u06FF]/.test(await page.textContent('#qrLinksSection')) && /[\u0600-\u06FF]/.test(await page.getAttribute('#qrJobInput', 'placeholder')));
   ok('no content-security-policy violations', (await page.evaluate(() => window.__csp.length)) === 0);
   const fails = report(log, errors);
   await stop(ctx);
