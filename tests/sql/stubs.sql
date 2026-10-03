@@ -8,6 +8,8 @@ create schema auth;
 create table auth.users (id uuid primary key default gen_random_uuid(), email text, raw_user_meta_data jsonb default '{}');
 -- auth.uid() reads the "current user" the tests set with set_config('request.uid', ...)
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.uid', true), '')::uuid $$;
+-- auth.jwt() reads the claims the tests set; the only one used is is_anonymous (set request.anon to 'true')
+create function auth.jwt() returns jsonb language sql stable as $$ select jsonb_build_object('is_anonymous', coalesce(current_setting('request.anon', true) = 'true', false)) $$;
 grant usage on schema public, auth to anon, authenticated;
 
 -- Supabase gives the API roles access to every new table / function in "public" by default; Row-Level

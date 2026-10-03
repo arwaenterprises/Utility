@@ -191,3 +191,142 @@ select _t_err('the closed invitation can no longer be accepted', '00000000-0000-
 -- tidy up the person created for the invitation checks, so later checks see the same people as before
 delete from enterprise_invites where lower(invited_email) = 'invitee@x.com';
 delete from auth.users where id = '00000000-0000-0000-0000-0000000000d1';
+
+-- ============ Team QR links (labourers without accounts) ============
+-- helpers that behave like an ANONYMOUS sign-in (the JWT says is_anonymous = true) or like the API's anon role
+create function public._ta_do(uid uuid, stmt text) returns void language plpgsql as $$
+begin
+  perform set_config('request.uid', uid::text, true); perform set_config('request.anon', 'true', true);
+  set local role authenticated; execute stmt; reset role;
+  perform set_config('request.anon', 'false', true);
+end $$;
+create function public._ta_err(name text, uid uuid, stmt text, needle text) returns void language plpgsql as $$
+declare msg text := null;
+begin
+  perform set_config('request.uid', uid::text, true); perform set_config('request.anon', 'true', true);
+  set local role authenticated;
+  begin execute stmt; exception when others then msg := sqlerrm; end;
+  reset role; perform set_config('request.anon', 'false', true);
+  if msg is null then raise exception 'FAIL %: expected an error but it succeeded', name; end if;
+  if position(lower(needle) in lower(msg)) = 0 then raise exception 'FAIL %: error was "%", expected to contain "%"', name, msg, needle; end if;
+  raise notice 'PASS %', name;
+end $$;
+create function public._ta_val(uid uuid, stmt text) returns bigint language plpgsql as $$
+declare v bigint;
+begin
+  perform set_config('request.uid', uid::text, true); perform set_config('request.anon', 'true', true);
+  set local role authenticated; execute stmt into v; reset role; perform set_config('request.anon', 'false', true);
+  return v;
+end $$;
+-- as the API's signed-out "anon" role (no user at all)
+create function public._tn_val(stmt text) returns bigint language plpgsql as $$
+declare v bigint;
+begin
+  perform set_config('request.uid', '', true); set local role anon; execute stmt into v; reset role;
+  return v;
+end $$;
+
+insert into auth.users(id,email) values
+  ('00000000-0000-0000-0000-0000000000f1', null),     -- anonymous labourer 1
+  ('00000000-0000-0000-0000-0000000000f2', null);     -- anonymous labourer 2
+
+-- creating links: admin only, one active link per tool
+select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('boxScanner','Inbound 7')$$);
+select token as tok1 from team_links where job_name = 'Inbound 7' \gset
+select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('boxScanner','Inbound 8')$$);
+select token as tok2 from team_links where job_name = 'Inbound 8' \gset
+select _t_eq('a new link for the same tool stops the old one', (select count(*) from team_links where job_name='Inbound 7' and stopped_at is not null), 1);
+select _t_eq('...and the new one is the only active one', (select count(*) from team_links where tool='boxScanner' and stopped_at is null), 1);
+select _t_err('an enterprise member cannot create links', '00000000-0000-0000-0000-0000000000b1', $$select create_team_link('boxScanner','x')$$, 'Only the enterprise admin');
+select _t_err('an individual cannot create links', '00000000-0000-0000-0000-00000000000a', $$select create_team_link('boxScanner','x')$$, 'Only the enterprise admin');
+select _t_err('a made-up tool is refused', '00000000-0000-0000-0000-0000000000e1', $$select create_team_link('hackTool','x')$$, 'choose a tool');
+select _t_err('an empty job name is refused', '00000000-0000-0000-0000-0000000000e1', $$select create_team_link('boxScanner','   ')$$, 'job name');
+select _t_eq('the API cannot read the link table directly', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from (select 1) q where exists (select 1 from information_schema.role_table_grants where table_name='team_links' and grantee='authenticated')$$), 0);
+
+-- the join page can read WHO a link belongs to before anybody signs in
+select _t_eq('signed out: the link info (names only) can be read with the token', _tn_val(format($$select count(*) from get_team_link_info(%L) where job_name='Inbound 8' and tool='boxScanner' and state='active' and enterprise_name is not null and admin_name is not null$$, :'tok2')), 1);
+select _t_eq('an old (replaced) link reports state "stopped"', _tn_val(format($$select count(*) from get_team_link_info(%L) where state='stopped'$$, :'tok1')), 1);
+select _t_eq('a made-up token gives nothing', _tn_val($$select count(*) from get_team_link_info('nope')$$), 0);
+select _t_eq('signed out: the link tables themselves are closed', _tn_val($$select count(*) from pg_catalog.pg_tables where tablename='team_links' and has_table_privilege('anon', 'public.team_links', 'select')$$), 0);
+
+-- joining
+select _t_err('a Google (non-anonymous) user cannot use the labourer join', '00000000-0000-0000-0000-00000000000a', format($$select join_team_link(%L,'Ann')$$, :'tok2'), 'labourer who scanned');
+select _t_err('...and a plain (not anonymous) sign-in is refused too', '00000000-0000-0000-0000-0000000000f1', format($$select join_team_link(%L,'Ann')$$, :'tok2'), 'labourer who scanned');
+select _ta_err('a made-up QR is refused', '00000000-0000-0000-0000-0000000000f1', $$select join_team_link('nope','Ravi')$$, 'not valid');
+select _ta_err('a replaced (stopped) link cannot be joined', '00000000-0000-0000-0000-0000000000f1', format($$select join_team_link(%L,'Ravi')$$, :'tok1'), 'has ended');
+select _ta_err('a name is required', '00000000-0000-0000-0000-0000000000f1', format($$select join_team_link(%L,'  ')$$, :'tok2'), 'type your name');
+select _ta_err('a name over 40 characters is refused', '00000000-0000-0000-0000-0000000000f1', format($$select join_team_link(%L,%L)$$, :'tok2', repeat('x',41)), 'type your name');
+select _ta_do('00000000-0000-0000-0000-0000000000f1', format($$select join_team_link(%L,'Ravi')$$, :'tok2'));
+select _ta_do('00000000-0000-0000-0000-0000000000f2', format($$select join_team_link(%L,'Sana')$$, :'tok2'));
+select _t_eq('joining makes an operator in the admin''s team', (select count(*) from profiles where id in ('00000000-0000-0000-0000-0000000000f1','00000000-0000-0000-0000-0000000000f2') and tier='operator' and enterprise_id='11111111-1111-1111-1111-111111111111'), 2);
+select _ta_do('00000000-0000-0000-0000-0000000000f1', format($$select join_team_link(%L,'Ravi K')$$, :'tok2'));
+select _t_eq('joining again with the same identity only changes the name', (select count(*) from team_operators where user_id='00000000-0000-0000-0000-0000000000f1' and name='Ravi K'), 1);
+select _ta_do('00000000-0000-0000-0000-0000000000f1', format($$select join_team_link(%L,'Ravi')$$, :'tok2'));
+
+-- what an operator can and cannot do
+select _t_eq('operator: the device can ask for its job and it is active', _ta_val('00000000-0000-0000-0000-0000000000f1', $$select count(*) from my_team_link() where state='active' and job_name='Inbound 8' and operator_name='Ravi' and enterprise_name is not null and admin_name is not null$$), 1);
+select _ta_do('00000000-0000-0000-0000-0000000000f1', $$insert into scans(user_id,box_number,barcode,qty,enterprise_id,remark,operator_name,link_id) values ('00000000-0000-0000-0000-0000000000f1','OB1','111',2,'22222222-2222-2222-2222-222222222222','forged remark','Somebody Else',gen_random_uuid())$$);
+select _t_eq('operator scan: the team, the job (Remark) and the name come from the link - forged values are ignored', (select count(*) from scans where box_number='OB1' and enterprise_id='11111111-1111-1111-1111-111111111111' and remark='Inbound 8' and operator_name='Ravi' and link_id=(select id from team_links where job_name='Inbound 8')), 1);
+select _ta_err('operator cannot scan into a tool their link is not for', '00000000-0000-0000-0000-0000000000f1', $$insert into ys_scans(user_id,scan_uid,barcode,ptl_number) values ('00000000-0000-0000-0000-0000000000f1',gen_random_uuid(),'5','01')$$, 'not for this tool');
+select _t_eq('operator cannot delete scans', _ta_val('00000000-0000-0000-0000-0000000000f1', $$with d as (delete from scans where user_id='00000000-0000-0000-0000-0000000000f1' returning 1) select count(*) from d$$), 0);
+select _ta_do('00000000-0000-0000-0000-0000000000f1', $$update scans set remark='changed', operator_name='Mallory', enterprise_id='22222222-2222-2222-2222-222222222222', qty=3 where box_number='OB1'$$);
+select _t_eq('operator cannot change the job, name or team of a scan afterwards (a re-send keeps them)', (select count(*) from scans where box_number='OB1' and remark='Inbound 8' and operator_name='Ravi' and enterprise_id='11111111-1111-1111-1111-111111111111'), 1);
+select _ta_do('00000000-0000-0000-0000-0000000000f2', $$insert into scans(user_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000f2','OB2','222')$$);
+select _t_eq('operator sees only their own scans, not the other operator''s', _ta_val('00000000-0000-0000-0000-0000000000f1', $$select count(*) from scans$$), 1);
+select _ta_err('operator cannot upload lists', '00000000-0000-0000-0000-0000000000f1', $$select begin_list_upload('box_list')$$, 'Only an enterprise admin');
+select _ta_err('operator cannot create an enterprise', '00000000-0000-0000-0000-0000000000f1', $$select create_enterprise('My own')$$, 'already belong');
+select _ta_err('operator cannot create links', '00000000-0000-0000-0000-0000000000f1', $$select create_team_link('boxScanner','x')$$, 'Only the enterprise admin');
+select _t_eq('operator cannot see the other team''s data', _ta_val('00000000-0000-0000-0000-0000000000f1', $$select count(*) from scans where enterprise_id='22222222-2222-2222-2222-222222222222'$$), 0);
+select _t_eq('the team admin sees the operators'' scans, with their names', (select count(*) from scans where box_number in ('OB1','OB2') and operator_name in ('Ravi','Sana')), 2);
+select _t_eq('a normal (Google) user cannot fake an operator name on their own scans', (select count(*) from (select 1) q where _t_val('00000000-0000-0000-0000-0000000000b1', $$with i as (insert into scans(user_id,enterprise_id,box_number,barcode,operator_name) values ('00000000-0000-0000-0000-0000000000b1','11111111-1111-1111-1111-111111111111','FB','9','Fake Name') returning operator_name) select count(*) from i where operator_name is null$$) = 1), 1);
+
+-- the admin's views and tools
+select _t_eq('admin: list of links shows state and the number of people who joined', _t_val('00000000-0000-0000-0000-0000000000e1', $$select operators from list_team_links() where job_name='Inbound 8' and state='active'$$), 2);
+select _t_eq('admin: list of people', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from list_team_operators() where name in ('Ravi','Sana')$$), 2);
+select _t_eq('a member cannot list links', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from list_team_links()$$), 0);
+select _t_eq('another team''s admin sees none of these links', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from list_team_links()$$), 0);
+select _t_eq('another team''s admin sees none of these people', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from list_team_operators()$$), 0);
+select id as op_ravi from team_operators where name = 'Ravi' \gset
+select _t_do('00000000-0000-0000-0000-0000000000e2', format($$select stop_team_link(%L)$$, (select id from team_links where job_name='Inbound 8')));
+select _t_eq('another team''s admin cannot stop this link', (select count(*) from team_links where job_name='Inbound 8' and stopped_at is null), 1);
+select _t_err('another team''s admin cannot rename these people', '00000000-0000-0000-0000-0000000000e2', format($$select rename_team_operator(%L,'Hacked')$$, :'op_ravi'), 'not found');
+select _t_err('an operator cannot rename', '00000000-0000-0000-0000-0000000000f1', format($$select rename_team_operator(%L,'Hacked')$$, :'op_ravi'), 'Only the enterprise admin');
+select _t_do('00000000-0000-0000-0000-0000000000e1', format($$select rename_team_operator(%L,'Ravi Kumar')$$, :'op_ravi'));
+select _t_eq('admin renames a person: also on the scans already sent', (select count(*) from scans where box_number='OB1' and operator_name='Ravi Kumar'), 1);
+select _t_eq('...and the next scan carries the new name', (select count(*) from (select 1) q where _ta_val('00000000-0000-0000-0000-0000000000f1', $$with i as (insert into scans(user_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000f1','OB3','333') returning operator_name) select count(*) from i where operator_name='Ravi Kumar'$$) = 1), 1);
+
+-- stopping a link: NEW work is refused, work recorded earlier (offline devices) is still accepted
+select _t_do('00000000-0000-0000-0000-0000000000e1', format($$select stop_team_link(%L)$$, (select id from team_links where token=:'tok2')));
+select _t_eq('a stopped link reports "stopped" to the device', _ta_val('00000000-0000-0000-0000-0000000000f1', $$select count(*) from my_team_link() where state='stopped'$$), 1);
+select _ta_err('after Stop: a NEW scan is refused', '00000000-0000-0000-0000-0000000000f1', $$insert into scans(user_id,box_number,barcode,scanned_at) values ('00000000-0000-0000-0000-0000000000f1','OB4','444',now())$$, 'has ended');
+select _ta_do('00000000-0000-0000-0000-0000000000f1', $$insert into scans(user_id,box_number,barcode,scanned_at) values ('00000000-0000-0000-0000-0000000000f1','OB5','555',now() - interval '1 hour')$$);
+select _t_eq('...but a scan made BEFORE the stop (unsent on an offline device) is still accepted', (select count(*) from scans where box_number='OB5'), 1);
+select _ta_err('a stopped link cannot be joined', '00000000-0000-0000-0000-0000000000f2', format($$select join_team_link(%L,'Sana')$$, :'tok2'), 'has ended');
+
+-- 3 days without scanning switches a link off
+select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('yearSegregate','Sort run A')$$);
+select token as tok3 from team_links where job_name = 'Sort run A' \gset
+select _ta_do('00000000-0000-0000-0000-0000000000f2', format($$select join_team_link(%L,'Sana')$$, :'tok3'));
+select _ta_do('00000000-0000-0000-0000-0000000000f2', $$insert into ys_scans(user_id,scan_uid,barcode,ptl_number) values ('00000000-0000-0000-0000-0000000000f2',gen_random_uuid(),'7','01')$$);
+select _t_eq('a Year/Season operator''s scan carries the job and name too', (select count(*) from ys_scans where barcode='7' and remark='Sort run A' and operator_name='Sana' and enterprise_id='11111111-1111-1111-1111-111111111111'), 1);
+update team_links set last_scan_at = now() - interval '4 days', created_at = now() - interval '5 days' where job_name = 'Sort run A';
+select _t_eq('after 4 quiet days the link reads "inactive"', _tn_val(format($$select count(*) from get_team_link_info(%L) where state='inactive'$$, :'tok3')), 1);
+select _t_eq('...and the device sees its screen is no longer active', _ta_val('00000000-0000-0000-0000-0000000000f2', $$select count(*) from my_team_link() where state='inactive'$$), 1);
+select _ta_err('...a NEW scan on it is refused', '00000000-0000-0000-0000-0000000000f2', $$insert into ys_scans(user_id,scan_uid,barcode,ptl_number) values ('00000000-0000-0000-0000-0000000000f2',gen_random_uuid(),'8','01')$$, '3 days');
+select _ta_do('00000000-0000-0000-0000-0000000000f2', $$insert into ys_scans(user_id,scan_uid,barcode,ptl_number,scanned_at) values ('00000000-0000-0000-0000-0000000000f2',gen_random_uuid(),'9','01',now() - interval '3 days 12 hours')$$);
+select _t_eq('...but a scan made inside the window, sent late, is accepted', (select count(*) from ys_scans where barcode='9'), 1);
+select _ta_err('nobody new can join an inactive link', '00000000-0000-0000-0000-0000000000f1', format($$select join_team_link(%L,'Ravi')$$, :'tok3'), '3 days');
+select _t_eq('the data of an inactive link stays (nothing is deleted)', (select count(*) from ys_scans where barcode in ('7','9')), 2);
+
+-- removing a person
+select id as op_sana from team_operators where name = 'Sana' and link_id = (select id from team_links where job_name='Sort run A') \gset
+update team_links set last_scan_at = now(), created_at = now() where job_name = 'Sort run A';
+select _t_do('00000000-0000-0000-0000-0000000000e1', format($$select remove_team_operator(%L)$$, :'op_sana'));
+select _t_eq('a removed person''s device is told so', _ta_val('00000000-0000-0000-0000-0000000000f2', $$select count(*) from my_team_link() where state='removed'$$), 1);
+select _ta_err('a removed person cannot scan', '00000000-0000-0000-0000-0000000000f2', $$insert into ys_scans(user_id,scan_uid,barcode,ptl_number) values ('00000000-0000-0000-0000-0000000000f2',gen_random_uuid(),'10','01')$$, 'has ended');
+select _ta_err('a removed person cannot rejoin the same job', '00000000-0000-0000-0000-0000000000f2', format($$select join_team_link(%L,'Sana')$$, :'tok3'), 'removed');
+
+-- tidy up the people and links created here, so later checks see the same data as before
+delete from auth.users where id in ('00000000-0000-0000-0000-0000000000f1','00000000-0000-0000-0000-0000000000f2');
+delete from scans where box_number = 'FB';
+delete from team_links;

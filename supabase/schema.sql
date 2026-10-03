@@ -927,6 +927,408 @@ revoke all on public.usage_report from anon, authenticated;
 
 
 -- ============================================
+-- TEAM QR LINKS - labourers join a job with a QR code, no Google account (ROADMAP item 90, stage 1)
+-- ============================================
+-- An enterprise admin creates a LINK for one tool + one job name. A labourer scans the QR, the page signs them in
+-- anonymously (Supabase "anonymous sign-in") and calls join_team_link(token, name). That attaches the anonymous
+-- identity to the team as an 'operator' (profiles.tier = 'operator', profiles.enterprise_id = the team), so the
+-- normal row-level-security rules already keep teams apart. Everything below is reached only through the
+-- functions: the two tables are closed to the API.
+--
+--  * one active link per tool: creating a new link for the same tool stops the old one (new job = new link)
+--  * a link stops accepting NEW work when the admin stops it, or after 3 days without any scan (judged by the
+--    time the scan was made, so scans recorded earlier on an offline device are still accepted when they arrive)
+--  * the job name becomes the Remark of every scan, and the operator's name is stamped on every scan
+--  * an operator can only scan (insert) for the tool of their link; they cannot delete, and cannot upload lists
+
+-- profiles: the new tier, and anonymous users have no e-mail
+alter table public.profiles drop constraint if exists profiles_tier_check;
+alter table public.profiles add constraint profiles_tier_check
+    check (tier in ('individual', 'enterprise_admin', 'enterprise_member', 'operator'));
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    insert into public.profiles (id, email, display_name)
+    values (new.id, coalesce(new.email, ''), coalesce(new.raw_user_meta_data->>'full_name', new.email, ''));
+    return new;
+end;
+$$;
+
+create table if not exists public.team_links (
+    id uuid primary key default gen_random_uuid(),
+    enterprise_id uuid not null references public.enterprises(id) on delete cascade,
+    tool text not null check (tool in ('boxScanner', 'itemBarcode', 'boxCode', 'boxSegregate', 'priceCheck', 'yearSegregate')),
+    job_name text not null check (char_length(job_name) between 1 and 60),
+    token text not null unique default replace(gen_random_uuid()::text, '-', ''),
+    created_by uuid references auth.users(id) on delete set null,
+    created_at timestamptz not null default now(),
+    stopped_at timestamptz,
+    last_scan_at timestamptz
+);
+create index if not exists team_links_enterprise_idx on public.team_links(enterprise_id);
+
+create table if not exists public.team_operators (
+    id uuid primary key default gen_random_uuid(),
+    enterprise_id uuid not null references public.enterprises(id) on delete cascade,
+    link_id uuid not null references public.team_links(id) on delete cascade,
+    user_id uuid not null references auth.users(id) on delete cascade,
+    name text not null check (char_length(name) between 1 and 40),
+    joined_at timestamptz not null default now(),
+    removed_at timestamptz,
+    unique (link_id, user_id)
+);
+create index if not exists team_operators_user_idx on public.team_operators(user_id);
+
+alter table public.team_links enable row level security;        -- no policies: the API can never read or write them directly
+alter table public.team_operators enable row level security;
+revoke all on public.team_links from anon, authenticated;
+revoke all on public.team_operators from anon, authenticated;
+
+-- who scanned, and under which job
+alter table public.scans add column if not exists operator_name text;
+alter table public.scans add column if not exists link_id uuid references public.team_links(id) on delete set null;
+alter table public.ys_scans add column if not exists operator_name text;
+alter table public.ys_scans add column if not exists link_id uuid references public.team_links(id) on delete set null;
+
+-- A link's state as one word. 'inactive' = no scan for 3 days (counted from creation if nobody has scanned yet).
+create or replace function public.team_link_state(p_stopped_at timestamptz, p_last_scan_at timestamptz, p_created_at timestamptz)
+returns text
+language sql
+immutable
+as $$
+    select case
+        when p_stopped_at is not null then 'stopped'
+        when now() > coalesce(p_last_scan_at, p_created_at) + interval '3 days' then 'inactive'
+        else 'active'
+    end;
+$$;
+
+-- Every scan an operator sends is checked and stamped here; nobody can forge the job, the name or the team.
+create or replace function public.stamp_operator_scan()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_tier text;
+    op record;
+    lk record;
+    v_tool text := case TG_TABLE_NAME when 'scans' then 'boxScanner' else 'yearSegregate' end;
+    v_at timestamptz;
+begin
+    select tier into v_tier from public.profiles where id = auth.uid();
+    if v_tier is distinct from 'operator' then
+        new.operator_name := null;       -- only the link mechanism may set these
+        new.link_id := null;
+        return new;
+    end if;
+
+    select * into op from public.team_operators where user_id = auth.uid() order by joined_at desc limit 1;
+    if op.id is null or op.removed_at is not null then
+        raise exception 'Your access to this job has ended. Ask your admin for the QR code.';
+    end if;
+    select * into lk from public.team_links where id = op.link_id;
+    if lk.tool <> v_tool then
+        raise exception 'This QR code is not for this tool.';
+    end if;
+
+    v_at := coalesce(new.scanned_at, now());
+    if v_at > now() + interval '1 day' then v_at := now(); end if;       -- a wrong clock cannot keep a link alive
+
+    if lk.stopped_at is not null and v_at > lk.stopped_at then
+        raise exception 'This job has ended. Ask your admin for the new QR code.';
+    end if;
+    if v_at > coalesce(lk.last_scan_at, lk.created_at) + interval '3 days' then
+        raise exception 'This job was switched off after 3 days without scanning. Ask your admin for a new QR code.';
+    end if;
+
+    new.enterprise_id := lk.enterprise_id;
+    new.operator_name := op.name;
+    new.link_id := lk.id;
+    new.remark := lk.job_name;
+
+    update public.team_links
+    set last_scan_at = greatest(coalesce(last_scan_at, v_at), v_at)
+    where id = lk.id;
+    return new;
+end;
+$$;
+
+-- An existing row keeps its job, name and team (a re-send of the same scan changes nothing here).
+create or replace function public.keep_operator_fields()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_tier text;
+begin
+    if current_setting('app.allow_operator_rename', true) = 'on' then
+        return new;
+    end if;
+    select tier into v_tier from public.profiles where id = auth.uid();
+    if v_tier = 'operator' then
+        new.enterprise_id := old.enterprise_id;
+        new.remark := old.remark;
+    end if;
+    new.operator_name := old.operator_name;
+    new.link_id := old.link_id;
+    return new;
+end;
+$$;
+
+drop trigger if exists scans_stamp_operator on public.scans;
+create trigger scans_stamp_operator before insert on public.scans
+    for each row execute function public.stamp_operator_scan();
+drop trigger if exists scans_keep_operator on public.scans;
+create trigger scans_keep_operator before update on public.scans
+    for each row execute function public.keep_operator_fields();
+drop trigger if exists ys_scans_stamp_operator on public.ys_scans;
+create trigger ys_scans_stamp_operator before insert on public.ys_scans
+    for each row execute function public.stamp_operator_scan();
+drop trigger if exists ys_scans_keep_operator on public.ys_scans;
+create trigger ys_scans_keep_operator before update on public.ys_scans
+    for each row execute function public.keep_operator_fields();
+
+-- ---- the admin's functions ----
+
+create or replace function public.create_team_link(p_tool text, p_job text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_eid uuid := public.current_user_enterprise_id();
+    v_job text := btrim(coalesce(p_job, ''));
+    new_link public.team_links;
+begin
+    if not public.current_user_is_enterprise_admin() then
+        raise exception 'Only the enterprise admin can create QR links.';
+    end if;
+    if p_tool is null or p_tool not in ('boxScanner', 'itemBarcode', 'boxCode', 'boxSegregate', 'priceCheck', 'yearSegregate') then
+        raise exception 'Please choose a tool.';
+    end if;
+    if char_length(v_job) < 1 or char_length(v_job) > 60 then
+        raise exception 'Please type a job name (1 to 60 characters).';
+    end if;
+
+    -- a new job replaces the old link for the same tool
+    update public.team_links set stopped_at = now()
+    where enterprise_id = v_eid and tool = p_tool and stopped_at is null;
+
+    insert into public.team_links (enterprise_id, tool, job_name, created_by)
+    values (v_eid, p_tool, v_job, auth.uid())
+    returning * into new_link;
+
+    return jsonb_build_object('id', new_link.id, 'token', new_link.token, 'tool', new_link.tool, 'job_name', new_link.job_name);
+end;
+$$;
+
+create or replace function public.stop_team_link(p_link_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if not public.current_user_is_enterprise_admin() then
+        raise exception 'Only the enterprise admin can stop QR links.';
+    end if;
+    update public.team_links set stopped_at = now()
+    where id = p_link_id and enterprise_id = public.current_user_enterprise_id() and stopped_at is null;
+end;
+$$;
+
+create or replace function public.list_team_links()
+returns table (id uuid, tool text, job_name text, token text, created_at timestamptz, stopped_at timestamptz,
+               last_scan_at timestamptz, state text, operators bigint)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select l.id, l.tool, l.job_name, l.token, l.created_at, l.stopped_at, l.last_scan_at,
+           public.team_link_state(l.stopped_at, l.last_scan_at, l.created_at),
+           (select count(*) from public.team_operators o where o.link_id = l.id and o.removed_at is null)
+    from public.team_links l
+    where l.enterprise_id = public.current_user_enterprise_id()
+      and public.current_user_is_enterprise_admin()
+    order by l.created_at desc;
+$$;
+
+create or replace function public.list_team_operators()
+returns table (id uuid, name text, link_id uuid, job_name text, tool text, joined_at timestamptz, removed_at timestamptz)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select o.id, o.name, o.link_id, l.job_name, l.tool, o.joined_at, o.removed_at
+    from public.team_operators o
+    join public.team_links l on l.id = o.link_id
+    where o.enterprise_id = public.current_user_enterprise_id()
+      and public.current_user_is_enterprise_admin()
+    order by o.joined_at desc;
+$$;
+
+-- fixes a typo in a name everywhere (also on the scans already sent)
+create or replace function public.rename_team_operator(p_operator_id uuid, p_name text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_name text := btrim(coalesce(p_name, ''));
+    op public.team_operators;
+begin
+    if not public.current_user_is_enterprise_admin() then
+        raise exception 'Only the enterprise admin can rename people.';
+    end if;
+    if char_length(v_name) < 1 or char_length(v_name) > 40 then
+        raise exception 'Please type a name (1 to 40 characters).';
+    end if;
+    select * into op from public.team_operators where id = p_operator_id and enterprise_id = public.current_user_enterprise_id();
+    if op.id is null then raise exception 'That person was not found in your team.'; end if;
+
+    update public.team_operators set name = v_name where id = op.id;
+    perform set_config('app.allow_operator_rename', 'on', true);
+    update public.scans set operator_name = v_name where link_id = op.link_id and user_id = op.user_id;
+    update public.ys_scans set operator_name = v_name where link_id = op.link_id and user_id = op.user_id;
+    perform set_config('app.allow_operator_rename', 'off', true);
+end;
+$$;
+
+-- stops one person from scanning on that job (their earlier scans stay)
+create or replace function public.remove_team_operator(p_operator_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if not public.current_user_is_enterprise_admin() then
+        raise exception 'Only the enterprise admin can remove people.';
+    end if;
+    update public.team_operators set removed_at = now()
+    where id = p_operator_id and enterprise_id = public.current_user_enterprise_id() and removed_at is null;
+end;
+$$;
+
+-- ---- the labourer's functions ----
+
+-- Who does this link belong to? Names only, so the join page can show them BEFORE anybody signs in.
+create or replace function public.get_team_link_info(p_token text)
+returns table (enterprise_name text, admin_name text, tool text, job_name text, state text)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select e.name, coalesce(nullif(p.display_name, ''), p.email), l.tool, l.job_name,
+           public.team_link_state(l.stopped_at, l.last_scan_at, l.created_at)
+    from public.team_links l
+    join public.enterprises e on e.id = l.enterprise_id
+    left join public.profiles p on p.id = e.admin_user_id
+    where l.token = p_token;
+$$;
+
+create or replace function public.join_team_link(p_token text, p_name text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_name text := btrim(coalesce(p_name, ''));
+    lk public.team_links;
+    op public.team_operators;
+begin
+    if coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) is not true then
+        raise exception 'Only a labourer who scanned the QR can join like this. Admins sign in with Google.';
+    end if;
+    if char_length(v_name) < 1 or char_length(v_name) > 40 then
+        raise exception 'Please type your name (1 to 40 characters).';
+    end if;
+
+    select * into lk from public.team_links where token = p_token;
+    if lk.id is null then
+        raise exception 'This QR code is not valid. Ask your admin for a new one.';
+    end if;
+    if public.team_link_state(lk.stopped_at, lk.last_scan_at, lk.created_at) = 'stopped' then
+        raise exception 'This job has ended. Ask your admin for the new QR code.';
+    end if;
+    if public.team_link_state(lk.stopped_at, lk.last_scan_at, lk.created_at) = 'inactive' then
+        raise exception 'This job was switched off after 3 days without scanning. Ask your admin for a new QR code.';
+    end if;
+
+    select * into op from public.team_operators where link_id = lk.id and user_id = auth.uid();
+    if op.id is not null and op.removed_at is not null then
+        raise exception 'You were removed from this job. Ask your admin.';
+    end if;
+
+    insert into public.team_operators (enterprise_id, link_id, user_id, name)
+    values (lk.enterprise_id, lk.id, auth.uid(), v_name)
+    on conflict (link_id, user_id) do update set name = excluded.name, joined_at = now()
+    returning * into op;
+
+    update public.profiles
+    set tier = 'operator', enterprise_id = lk.enterprise_id, display_name = v_name
+    where id = auth.uid();
+
+    return jsonb_build_object('operator_id', op.id, 'link_id', lk.id, 'enterprise_id', lk.enterprise_id,
+                              'tool', lk.tool, 'job_name', lk.job_name, 'name', v_name);
+end;
+$$;
+
+-- The device asks: is my job still open? (state: active | stopped | inactive | removed)
+create or replace function public.my_team_link()
+returns table (link_id uuid, tool text, job_name text, enterprise_name text, admin_name text, operator_name text, state text)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select l.id, l.tool, l.job_name, e.name, coalesce(nullif(p.display_name, ''), p.email), o.name,
+           case when o.removed_at is not null then 'removed'
+                else public.team_link_state(l.stopped_at, l.last_scan_at, l.created_at) end
+    from public.team_operators o
+    join public.team_links l on l.id = o.link_id
+    join public.enterprises e on e.id = l.enterprise_id
+    left join public.profiles p on p.id = e.admin_user_id
+    where o.user_id = auth.uid()
+    order by o.joined_at desc
+    limit 1;
+$$;
+
+revoke execute on function public.create_team_link(text, text) from public, anon;
+revoke execute on function public.stop_team_link(uuid) from public, anon;
+revoke execute on function public.list_team_links() from public, anon;
+revoke execute on function public.list_team_operators() from public, anon;
+revoke execute on function public.rename_team_operator(uuid, text) from public, anon;
+revoke execute on function public.remove_team_operator(uuid) from public, anon;
+revoke execute on function public.join_team_link(text, text) from public, anon;
+revoke execute on function public.my_team_link() from public, anon;
+grant execute on function public.create_team_link(text, text) to authenticated;
+grant execute on function public.stop_team_link(uuid) to authenticated;
+grant execute on function public.list_team_links() to authenticated;
+grant execute on function public.list_team_operators() to authenticated;
+grant execute on function public.rename_team_operator(uuid, text) to authenticated;
+grant execute on function public.remove_team_operator(uuid) to authenticated;
+grant execute on function public.join_team_link(text, text) to authenticated;
+grant execute on function public.my_team_link() to authenticated;
+grant execute on function public.get_team_link_info(text) to anon, authenticated;
+
+
+-- ============================================
 -- ROLLED BACK: self-service account deletion
 -- ============================================
 -- delete_my_account() was added and then removed again (owner's decision). If an earlier version of this
