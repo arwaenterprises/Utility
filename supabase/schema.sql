@@ -50,6 +50,8 @@ create table if not exists public.scans (
     scan_uid uuid not null default gen_random_uuid() unique,
     scanned_at timestamptz not null default now()
 );
+-- (also added again in TEAM QR LINKS below; harmless) the functions further down read this column
+alter table public.scans add column if not exists operator_name text;
 
 -- Migration for an already-existing scans table (originally pointed at
 -- auth.users directly): repoint user_id at public.profiles instead, so
@@ -339,13 +341,23 @@ grant execute on function public.remove_enterprise_member(uuid) to authenticated
 -- enterprise member) gets ONLY their own rows. The rule is checked inside the function body
 -- (not just by who can call it) - also protects direct PostgREST calls, not just UI buttons.
 
+-- One row per PERSON the admin should see: every ordinary account in the team, plus every labourer (grouped by
+-- name, ignoring capitals and spaces at the ends - the same person who Reset and re-joined on another handheld is
+-- still one person). Labourers have no e-mail. member_ids / operator_names say which rows belong to a labourer, so
+-- the app can fetch, download and delete exactly that person's scans.
+drop function if exists public.team_member_stats();
 create or replace function public.team_member_stats()
 returns table (
     user_id uuid,
     display_name text,
     email text,
     boxes_closed bigint,
-    total_qty bigint
+    total_qty bigint,
+    person_key text,
+    is_operator boolean,
+    member_ids uuid[],
+    operator_names text[],
+    jobs text
 )
 language sql
 security definer
@@ -360,17 +372,48 @@ as $$
     box_status_per_user as (
         select user_id, box_number, bool_and(box_status = 'Closed') as closed
         from my_scans
+        where operator_name is null
         group by user_id, box_number
+    ),
+    ops as (
+        select lower(btrim(operator_name)) as k,
+               (array_agg(operator_name order by scanned_at desc))[1] as shown,
+               array_agg(distinct user_id) as ids,
+               array_agg(distinct operator_name) as names,
+               string_agg(distinct remark, ', ') as jobs,
+               sum(qty) as qty
+        from my_scans
+        where operator_name is not null and public.current_user_is_enterprise_admin()
+        group by 1
+    ),
+    ops_box as (
+        select lower(btrim(operator_name)) as k, box_number, bool_and(box_status = 'Closed') as closed
+        from my_scans
+        where operator_name is not null
+        group by 1, 2
     )
     select
         p.id as user_id,
         p.display_name,
         p.email,
         coalesce((select count(*) from box_status_per_user b where b.user_id = p.id and b.closed), 0) as boxes_closed,
-        coalesce((select sum(qty) from my_scans s where s.user_id = p.id), 0) as total_qty
+        coalesce((select sum(qty) from my_scans s where s.user_id = p.id and s.operator_name is null), 0)::bigint as total_qty,
+        'u:' || p.id::text as person_key,
+        false as is_operator,
+        array[p.id] as member_ids,
+        null::text[] as operator_names,
+        (select string_agg(distinct s.remark, ', ') from my_scans s where s.user_id = p.id and s.operator_name is null) as jobs
     from public.profiles p
-    where (p.enterprise_id = public.current_user_enterprise_id() and public.current_user_is_enterprise_admin())
-       or p.id = auth.uid();
+    where p.tier <> 'operator'
+      and ((p.enterprise_id = public.current_user_enterprise_id() and public.current_user_is_enterprise_admin())
+           or p.id = auth.uid())
+    union all
+    select
+        o.ids[1], o.shown, ''::text,
+        coalesce((select count(*) from ops_box b where b.k = o.k and b.closed), 0),
+        o.qty::bigint,
+        'o:' || o.k, true, o.ids, o.names, o.jobs
+    from ops o;
 $$;
 
 -- Return type gained `remark`, and CREATE OR REPLACE cannot change a function's
@@ -387,14 +430,15 @@ returns table (
     scanned_at timestamptz,
     user_id uuid,
     display_name text,
-    email text
+    email text,
+    operator_name text
 )
 language sql
 security definer
 set search_path = public
 stable
 as $$
-    select s.id, s.remark, s.barcode, s.box_number, s.box_status, s.qty, s.scanned_at, s.user_id, p.display_name, p.email
+    select s.id, s.remark, s.barcode, s.box_number, s.box_status, s.qty, s.scanned_at, s.user_id, p.display_name, p.email, s.operator_name
     from public.scans s
     join public.profiles p on p.id = s.user_id
     where ((s.enterprise_id = public.current_user_enterprise_id() and public.current_user_is_enterprise_admin())
@@ -402,6 +446,8 @@ as $$
       and (
         s.barcode ilike '%' || search_term || '%'
         or s.box_number ilike '%' || search_term || '%'
+        or s.operator_name ilike '%' || search_term || '%'
+        or s.remark ilike '%' || search_term || '%'
         or p.display_name ilike '%' || search_term || '%'
         or p.email ilike '%' || search_term || '%'
       )
@@ -755,6 +801,7 @@ create table if not exists public.ys_scans (
     scan_timestamp text,
     scanned_at timestamptz not null default now()
 );
+alter table public.ys_scans add column if not exists operator_name text;
 
 create index if not exists ys_scans_user_id_idx on public.ys_scans(user_id);
 create index if not exists ys_scans_enterprise_id_idx on public.ys_scans(enterprise_id);
@@ -802,13 +849,19 @@ create policy "ys_scans_delete_team" on public.ys_scans for delete
     );
 
 -- Per-member summary for the Team console's Year/Season section.
+drop function if exists public.team_ys_member_stats();
 create or replace function public.team_ys_member_stats()
 returns table (
     user_id uuid,
     display_name text,
     email text,
     boxes_closed bigint,
-    total_qty bigint
+    total_qty bigint,
+    person_key text,
+    is_operator boolean,
+    member_ids uuid[],
+    operator_names text[],
+    jobs text
 )
 language sql
 security definer
@@ -823,17 +876,48 @@ as $$
     box_status_per_user as (
         select user_id, ptl_number, box_barcode, bool_and(box_status = 'Closed') as closed
         from my_scans
+        where operator_name is null
         group by user_id, ptl_number, box_barcode
+    ),
+    ops as (
+        select lower(btrim(operator_name)) as k,
+               (array_agg(operator_name order by scanned_at desc))[1] as shown,
+               array_agg(distinct user_id) as ids,
+               array_agg(distinct operator_name) as names,
+               string_agg(distinct remark, ', ') as jobs,
+               sum(qty) as qty
+        from my_scans
+        where operator_name is not null and public.current_user_is_enterprise_admin()
+        group by 1
+    ),
+    ops_box as (
+        select lower(btrim(operator_name)) as k, ptl_number, box_barcode, bool_and(box_status = 'Closed') as closed
+        from my_scans
+        where operator_name is not null
+        group by 1, 2, 3
     )
     select
         p.id as user_id,
         p.display_name,
         p.email,
         coalesce((select count(*) from box_status_per_user b where b.user_id = p.id and b.closed), 0) as boxes_closed,
-        coalesce((select sum(qty) from my_scans s where s.user_id = p.id), 0) as total_qty
+        coalesce((select sum(qty) from my_scans s where s.user_id = p.id and s.operator_name is null), 0)::bigint as total_qty,
+        'u:' || p.id::text as person_key,
+        false as is_operator,
+        array[p.id] as member_ids,
+        null::text[] as operator_names,
+        (select string_agg(distinct s.remark, ', ') from my_scans s where s.user_id = p.id and s.operator_name is null) as jobs
     from public.profiles p
-    where (p.enterprise_id = public.current_user_enterprise_id() and public.current_user_is_enterprise_admin())
-       or p.id = auth.uid();
+    where p.tier <> 'operator'
+      and ((p.enterprise_id = public.current_user_enterprise_id() and public.current_user_is_enterprise_admin())
+           or p.id = auth.uid())
+    union all
+    select
+        o.ids[1], o.shown, ''::text,
+        coalesce((select count(*) from ops_box b where b.k = o.k and b.closed), 0),
+        o.qty::bigint,
+        'o:' || o.k, true, o.ids, o.names, o.jobs
+    from ops o;
 $$;
 
 grant execute on function public.team_ys_member_stats() to authenticated;

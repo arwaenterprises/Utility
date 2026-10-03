@@ -147,6 +147,50 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   ok('"Stop this link" removes it from the list', /No QR links/.test(await page.textContent('#qrLinkList')));
   await page.evaluate(() => AppLang.set('ar'));
   ok('the section is in Arabic when the app is Arabic', /[\u0600-\u06FF]/.test(await page.textContent('#qrLinksSection')) && /[\u0600-\u06FF]/.test(await page.getAttribute('#qrJobInput', 'placeholder')));
+  // --- 9. Data Management and User management with labourers ---
+  await page.evaluate(() => AppLang.set('en'));
+  await page.evaluate(() => {
+    window.__operatorPeople = [{ user_id: 'anon1', display_name: 'Ravi', email: '', boxes_closed: 2, total_qty: 5, person_key: 'o:ravi', is_operator: true, member_ids: ['anon1', 'anon2'], operator_names: ['Ravi', 'ravi '], jobs: 'Inbound 9' }];
+    const at = (m) => new Date(Date.now() - m * 60000).toISOString();
+    __db.scans = [
+      { id: 's1', enterprise_id: 'E1', user_id: 'anon1', operator_name: 'Ravi', remark: 'Inbound 9', box_number: 'B1', barcode: '111', qty: 2, box_status: 'Closed', scanned_at: at(5) },
+      { id: 's2', enterprise_id: 'E1', user_id: 'anon2', operator_name: 'ravi ', remark: 'Inbound 9', box_number: 'B2', barcode: '222', qty: 3, box_status: 'Closed', scanned_at: at(4) },
+      { id: 's3', enterprise_id: 'E1', user_id: 'u1', operator_name: null, remark: 'Own', box_number: 'B3', barcode: '333', qty: 1, box_status: 'Closed', scanned_at: at(3) }
+    ];
+    window.__sheets = []; const orig = XLSX.utils.json_to_sheet; XLSX.utils.json_to_sheet = (rows) => { window.__sheets.push(rows); return orig(rows); };
+    XLSX.writeFile = () => {};
+  });
+  await page.evaluate(() => openDataManagement());
+  await page.waitForTimeout(400);
+  const dm = await page.evaluate(() => ({ text: document.getElementById('teamMemberList').textContent, tag: !!document.querySelector('#teamMemberList .person-tag') }));
+  ok('Data Management lists the labourer by name, tagged, with the job', /Ravi/.test(dm.text) && dm.tag && /Inbound 9/.test(dm.text), dm.text.slice(0, 160));
+  await page.evaluate(() => document.getElementById('helpCloseBtn').click());
+  await page.click('[data-expand-member="o:ravi"]'); await page.waitForTimeout(300);
+  await page.evaluate(() => { document.querySelectorAll('[data-expand-box]').forEach(b => b.click()); });
+  await page.waitForTimeout(200);
+  const ex = await page.evaluate(() => document.getElementById('teamMemberList').textContent);
+  ok('expanding shows both boxes of that person (two handhelds, one name) with the name on each item', /B1/.test(ex) && /B2/.test(ex) && !/B3/.test(ex) && /Ravi/.test(ex), ex.slice(0, 220));
+  await page.evaluate(() => downloadMemberData('o:ravi'));
+  const dl = await page.evaluate(() => window.__sheets.slice(-1)[0]);
+  ok('the Excel export has the operator name and the job on every row', dl && dl.length === 2 && dl.every(r => /^ravi/i.test(r['Scanned By'].trim()) && r['Remark'] === 'Inbound 9'), JSON.stringify(dl));
+  await page.evaluate(() => { document.querySelector('[data-member-id="o:ravi"]').click(); });
+  await page.evaluate(() => resetSelectedTeamData());
+  await page.waitForTimeout(300);
+  ok('admin Reset of a labourer deletes only that person\'s scans', await page.evaluate(() => __db.scans.length === 1 && __db.scans[0].id === 's3'));
+  ok('...and the download was made first', (await page.evaluate(() => window.__sheets.length)) >= 2);
+  // User management: labourers list, rename, remove
+  await page.evaluate(() => {
+    window.__labourers = [{ id: 'op1', name: 'Ravi', link_id: 'L1', job_name: 'Inbound 9', tool: 'boxScanner', joined_at: new Date().toISOString(), removed_at: null }];
+    window.prompt = () => 'Ravi Kumar';
+  });
+  await page.evaluate(() => { closeTeamModal(); return openAccountModal(); });
+  await page.waitForTimeout(400);
+  ok('User management lists labourers without listing them as team members', /Ravi/.test(await page.textContent('#umLabourList')) && !/Ravi/.test(await page.textContent('#umMemberList')));
+  await page.click('[data-rename-labourer]'); await page.waitForTimeout(300);
+  ok('the admin can correct a labourer name', /Ravi Kumar/.test(await page.textContent('#umLabourList')));
+  await page.click('[data-remove-labourer]'); await page.waitForTimeout(300);
+  ok('the admin can remove a labourer', /Nobody has joined/.test(await page.textContent('#umLabourList')));
+
   ok('no content-security-policy violations', (await page.evaluate(() => window.__csp.length)) === 0);
   const fails = report(log, errors);
   await stop(ctx);

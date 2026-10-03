@@ -82,6 +82,9 @@ window.__rpcCalls = [];
       return { id: l.id, token: l.token, tool: l.tool, job_name: l.job_name };
     },
     stop_team_link: ({ p_link_id }) => { (window.__links || []).forEach(l => { if (l.id === p_link_id) l.state = 'stopped'; }); },
+    list_team_operators: () => (window.__labourers = window.__labourers || []).map(o => ({ ...o })),
+    rename_team_operator: ({ p_operator_id, p_name }) => { window.__labourers.forEach(o => { if (o.id === p_operator_id) o.name = p_name; }); },
+    remove_team_operator: ({ p_operator_id }) => { window.__labourers.forEach(o => { if (o.id === p_operator_id) o.removed_at = new Date().toISOString(); }); },
     remove_enterprise_member: ({ member_user_id }) => { window.__removedMember = member_user_id; return true; },
     my_pending_invites: () => window.__me.enterprise_id ? [] : db.enterprise_invites
       .filter(i => i.status === 'pending' && new Date(i.expires_at) > new Date() && String(i.invited_email).toLowerCase() === String(window.__me.email).toLowerCase())
@@ -132,9 +135,9 @@ window.__rpcCalls = [];
     },
     rename_enterprise: ({ new_name }) => { db.enterprises[0].name = new_name.trim(); },
     // like the real functions: an enterprise admin gets everyone, anybody else only their own row
-    team_member_stats: () => window.__me.tier === 'enterprise_admin' || window.__teamAll
+    team_member_stats: () => (window.__operatorPeople || []).concat(window.__me.tier === 'enterprise_admin' || window.__teamAll
       ? [{ user_id: 'u1', display_name: 'Ann', email: 'a@b.c', boxes_closed: 0, total_qty: 0 }, { user_id: 'u2', display_name: 'Bob', email: 'b@b.c', boxes_closed: 0, total_qty: 0 }]
-      : [{ user_id: window.__me.id, display_name: 'Ann', email: window.__me.email, boxes_closed: 0, total_qty: 0 }],
+      : [{ user_id: window.__me.id, display_name: 'Ann', email: window.__me.email, boxes_closed: 0, total_qty: 0 }]),
     team_ys_member_stats: () => window.__me.tier === 'enterprise_admin' || window.__teamAll
       ? [{ user_id: 'u1', display_name: 'Ann', email: 'a@b.c', boxes_closed: 1, total_qty: db.ys_scans.length }, { user_id: 'u2', display_name: 'Bob', email: 'b@b.c', boxes_closed: 0, total_qty: 0 }]
       : [{ user_id: window.__me.id, display_name: 'Ann', email: window.__me.email, boxes_closed: 1, total_qty: db.ys_scans.length }]

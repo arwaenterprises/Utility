@@ -130,6 +130,7 @@ async function openAccountModal() {
         document.getElementById('umMemberList').innerHTML = '<p style="font-size:13px; color: var(--ak-text-light);">Loading...</p>';
         await loadPendingInvitesList();
         await loadTeamLinks();
+        await loadLabourers();
         await loadUserMgmtMembers();
     }
 }
@@ -236,6 +237,48 @@ function teamMemberDisplayName(m) {
     return m.display_name || m.email || '—';
 }
 
+// A "person" in the people lists is either an ordinary account (key 'u:<id>') or a labourer who joined by QR
+// (key 'o:<name in lower case>', which can span several handhelds). The database builds the key; older rows
+// without one fall back to the account id.
+function personKey(m) { return m.person_key || m.user_id; }
+function personName(m) { return teamMemberDisplayName(m); }
+function findTeamPerson(key) {
+    return teamMemberStatsCache.find(m => personKey(m) === key) || teamYsStatsCache.find(m => personKey(m) === key) || null;
+}
+function splitPeople(people) {
+    return {
+        ids: people.filter(p => !p.is_operator).map(p => p.user_id),
+        names: people.filter(p => p.is_operator).flatMap(p => p.operator_names || [])
+    };
+}
+// Reads the scans of a set of people from one table: accounts by user id, labourers by the name on the scan.
+// build(query) adds the select/ordering to a page query; two lists are fetched (accounts, then labourers) and merged.
+async function fetchScansForPeople(table, selectCols, people) {
+    const { ids, names } = splitPeople(people);
+    const parts = [];
+    for (const [col, values] of [['user_id', ids], ['operator_name', names]]) {
+        if (!values.length) continue;
+        const { data, error } = await fetchAllPages((from, to) => scopeToMyEnterprise(supabaseClient.from(table).select(selectCols))
+            .in(col, values)
+            .order('scanned_at', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to));
+        if (error) return { data: null, error };
+        parts.push(...data);
+    }
+    parts.sort((a, b) => (a.scanned_at < b.scanned_at ? -1 : a.scanned_at > b.scanned_at ? 1 : 0));
+    return { data: parts, error: null };
+}
+async function deleteScansForPeople(table, people) {
+    const { ids, names } = splitPeople(people);
+    for (const [col, values] of [['user_id', ids], ['operator_name', names]]) {
+        if (!values.length) continue;
+        const { error } = await scopeToMyEnterprise(supabaseClient.from(table).delete()).in(col, values);
+        if (error) return error;
+    }
+    return null;
+}
+
 function escapeHtml(str) {
     return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -261,7 +304,7 @@ function exportScansToExcel(rows, filenamePrefix) {
         return;
     }
     const sheetRows = rows.map(s => ({
-        'Scanned By': s.display_name || s.email || s.profiles?.display_name || s.profiles?.email || '—',
+        'Scanned By': s.operator_name || s.display_name || s.email || s.profiles?.display_name || s.profiles?.email || '—',
         'Remark': s.remark || '',
         'Box Number': s.box_number,
         'Barcode': s.barcode,
@@ -323,7 +366,7 @@ async function openTeamModal() {   // = Data Management (the 7th tile)
 // User management: the enterprise name and how many people are in it (admin included).
 async function refreshTeamTitle() {
     const { data } = await supabaseClient.from('enterprises').select('name').eq('id', AppState.profile.enterprise_id).maybeSingle();
-    const n = teamMemberStatsCache.length;
+    const n = teamMemberStatsCache.filter(m => !m.is_operator).length;
     document.getElementById('umEnterprise').textContent = ((data && data.name) || 'Team') + (n ? ` (${n} member${n === 1 ? '' : 's'})` : '');
 }
 
@@ -350,10 +393,11 @@ async function loadUserMgmtMembers() {
     const { data, error } = await supabaseClient.rpc('team_member_stats');
     if (error) { el.innerHTML = '<p style="font-size:13px;">Could not load the team.</p>'; return; }
     teamMemberStatsCache = (data || []).sort((a, b) => teamMemberDisplayName(a).localeCompare(teamMemberDisplayName(b)));
-    el.innerHTML = teamMemberStatsCache.length === 0 ? '<div class="team-table-empty">No team members yet</div>' : `
+    const accounts = teamMemberStatsCache.filter(m => !m.is_operator);          // labourers have their own list below
+    el.innerHTML = accounts.length === 0 ? '<div class="team-table-empty">No team members yet</div>' : `
         <table class="team-table">
             <thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
-            <tbody>${teamMemberStatsCache.map(m => {
+            <tbody>${accounts.map(m => {
                 const isSelf = m.user_id === AppState.user?.id;
                 return `<tr class="team-row">
                     <td>${escapeHtml(teamMemberDisplayName(m))}</td>
@@ -364,6 +408,41 @@ async function loadUserMgmtMembers() {
             }).join('')}</tbody>
         </table>`;
     await refreshTeamTitle();
+}
+
+// Labourers who joined by QR: the admin can fix a misspelt name (also changes it on their past scans) or remove
+// a person (their handheld stops accepting new scans; what they scanned stays).
+async function loadLabourers() {
+    const el = document.getElementById('umLabourList');
+    const { data, error } = await supabaseClient.rpc('list_team_operators');
+    if (error) { el.textContent = ''; return; }
+    const live = (data || []).filter(o => !o.removed_at);
+    el.innerHTML = live.length === 0 ? '<div class="team-table-empty">' + escapeHtml(qlT('noLabourers')) + '</div>' : `
+        <table class="team-table">
+            <thead><tr><th>${escapeHtml(qlT('name'))}</th><th>${escapeHtml(qlT('job'))}</th><th></th></tr></thead>
+            <tbody>${live.map(o => `<tr class="team-row">
+                <td>${escapeHtml(o.name)}</td>
+                <td>${escapeHtml(o.job_name)}<small class="person-jobs">${escapeHtml(opToolName(o.tool))}</small></td>
+                <td style="width:70px;"><button class="icon-btn" data-rename-labourer="${o.id}" data-name="${escapeHtml(o.name)}" aria-label="${escapeHtml(qlT('rename'))}">✏️</button>
+                    <button class="icon-btn icon-btn-danger" data-remove-labourer="${o.id}" aria-label="${escapeHtml(qlT('removeLabourer'))}">✕</button></td>
+            </tr>`).join('')}</tbody>
+        </table>`;
+}
+
+async function renameLabourer(id, current) {
+    const name = prompt(qlT('renamePrompt'), current);
+    if (name === null) return;
+    if (!name.trim() || name.trim().length > 40) { alert(qlT('nameBad')); return; }
+    const { error } = await supabaseClient.rpc('rename_team_operator', { p_operator_id: id, p_name: name.trim() });
+    if (error) { alert(error.message); return; }
+    await loadLabourers();
+}
+
+async function removeLabourer(id) {
+    if (!confirm(qlT('removeAsk'))) return;
+    const { error } = await supabaseClient.rpc('remove_team_operator', { p_operator_id: id });
+    if (error) { alert(error.message); return; }
+    await loadLabourers();
 }
 
 async function renameEnterprise() {
@@ -393,24 +472,20 @@ async function refreshTeamYsStats() {
             <thead><tr><th></th><th>Member</th><th>Boxes closed</th><th>Qty</th><th></th></tr></thead>
             <tbody>${teamYsStatsCache.map(m => `
                 <tr class="team-row">
-                    <td style="width:26px;"><input type="checkbox" class="team-ys-checkbox" data-ys-member="${m.user_id}"></td>
-                    <td>${escapeHtml(teamMemberDisplayName(m))}</td>
+                    <td style="width:26px;"><input type="checkbox" class="team-ys-checkbox" data-ys-member="${escapeHtml(personKey(m))}"></td>
+                    <td>${personCellHtml(m)}</td>
                     <td>${m.boxes_closed}</td>
                     <td>${m.total_qty}</td>
-                    <td style="width:36px;"><button class="icon-btn" data-ys-download="${m.user_id}" title="Download this member's Year/Season data">⬇</button></td>
+                    <td style="width:36px;"><button class="icon-btn" data-ys-download="${escapeHtml(personKey(m))}" title="Download this member's Year/Season data">⬇</button></td>
                 </tr>`).join('')}
             </tbody>
         </table>`;
 }
 
-async function fetchTeamYsScans(userIds) {
-    const { data, error } = await fetchAllPages((from, to) => scopeToMyEnterprise(supabaseClient
-        .from('ys_scans')
-        .select('id, staff_name, remark, ptl_number, season, year, brand, barcode, qty, box_barcode, box_status, scan_timestamp, scanned_at, user_id, profiles(display_name, email)'))
-        .in('user_id', userIds)
-        .order('scanned_at', { ascending: true })
-        .order('id', { ascending: true })
-        .range(from, to));
+async function fetchTeamYsScans(keys) {
+    const { data, error } = await fetchScansForPeople('ys_scans',
+        'id, staff_name, remark, ptl_number, season, year, brand, barcode, qty, box_barcode, box_status, scan_timestamp, scanned_at, user_id, operator_name, profiles(display_name, email)',
+        keys.map(findTeamPerson).filter(Boolean));
     if (error) { alert(error.message); return null; }
     return data || [];
 }
@@ -418,7 +493,7 @@ async function fetchTeamYsScans(userIds) {
 function exportYsScansToExcel(rows, filenamePrefix) {
     if (!rows || rows.length === 0) { alert('No data to download.'); return false; }
     const sheetRows = rows.map(s => ({
-        'Scanned By': s.profiles?.display_name || s.profiles?.email || '—',
+        'Scanned By': s.operator_name || s.profiles?.display_name || s.profiles?.email || '—',
         'Staff': s.staff_name || '',
         'Remark': s.remark || '',
         'PTL Number': s.ptl_number,
@@ -452,7 +527,7 @@ async function resetSelectedTeamYs() {
     if (!rows) return;
     // Only delete once the export has actually been produced.
     if (rows.length > 0 && !exportYsScansToExcel(rows, 'team_year_season_reset')) return;
-    const { error } = await scopeToMyEnterprise(supabaseClient.from('ys_scans').delete()).in('user_id', ids);
+    const error = await deleteScansForPeople('ys_scans', ids.map(findTeamPerson).filter(Boolean));
     if (error) { alert(error.message); return; }
     await refreshTeamYsStats();
 }
@@ -502,7 +577,7 @@ function renderBoxTableHtml(boxes, scope, ownerId) {
                                     ${b.items.map(s => `
                                         <tr class="team-row">
                                             <td>${escapeHtml(s.barcode)}</td>
-                                            <td>${escapeHtml(s.display_name || s.email || '')}</td>
+                                            <td>${escapeHtml(s.operator_name || s.display_name || s.email || '')}</td>
                                             <td>${new Date(s.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                                         </tr>
                                     `).join('')}
@@ -526,6 +601,12 @@ function renderBoxTableHtml(boxes, scope, ownerId) {
     `;
 }
 
+// The name cell of a people row: the name, a "labourer" tag for QR joiners, and the job(s) they scanned for.
+function personCellHtml(m) {
+    return escapeHtml(personName(m)) + (m.is_operator ? ' <span class="person-tag">' + escapeHtml(qlT('labourer')) + '</span>' : '') +
+        (m.jobs ? '<small class="person-jobs">' + escapeHtml(m.jobs) + '</small>' : '');
+}
+
 function renderTeamMemberList() {
     const listEl = document.getElementById('teamMemberList');
     if (teamMemberStatsCache.length === 0) {
@@ -534,23 +615,23 @@ function renderTeamMemberList() {
     }
 
     const bodyRows = teamMemberStatsCache.map(m => {
-        const isExpanded = expandedMemberIds.has(m.user_id);
+        const isExpanded = expandedMemberIds.has(personKey(m));
         const rows = [`
             <tr class="team-row">
-                <td style="width:26px;"><input type="checkbox" class="team-member-checkbox" data-member-id="${m.user_id}" ${selectedMemberIds.has(m.user_id) ? 'checked' : ''}></td>
-                <td style="width:30px;"><button class="expand-btn" title="Show / hide details" data-expand-member="${m.user_id}">${isExpanded ? '−' : '+'}</button></td>
-                <td>${escapeHtml(teamMemberDisplayName(m))}</td>
+                <td style="width:26px;"><input type="checkbox" class="team-member-checkbox" data-member-id="${escapeHtml(personKey(m))}" ${selectedMemberIds.has(personKey(m)) ? 'checked' : ''}></td>
+                <td style="width:30px;"><button class="expand-btn" title="Show / hide details" data-expand-member="${escapeHtml(personKey(m))}">${isExpanded ? '−' : '+'}</button></td>
+                <td>${personCellHtml(m)}</td>
                 <td>${m.boxes_closed}</td>
                 <td>${m.total_qty}</td>
-                <td style="width:36px;"><button class="icon-btn" data-download-member="${m.user_id}" title="Download this member's data">⬇</button></td>
+                <td style="width:36px;"><button class="icon-btn" data-download-member="${escapeHtml(personKey(m))}" title="Download this member's data">⬇</button></td>
             </tr>
         `];
         if (isExpanded) {
-            const boxes = teamMemberBoxesCache.get(m.user_id);
+            const boxes = teamMemberBoxesCache.get(personKey(m));
             rows.push(`
                 <tr class="team-row">
                     <td class="nested-cell" colspan="6">
-                        <div id="memberBoxes_${m.user_id}">${boxes ? renderBoxTableHtml(boxes, 'member', m.user_id) : '<p style="font-size:12px; color: var(--ak-text-light); padding:8px;">Loading...</p>'}</div>
+                        <div>${boxes ? renderBoxTableHtml(boxes, 'member', personKey(m)) : '<p style="font-size:12px; color: var(--ak-text-light); padding:8px;">Loading...</p>'}</div>
                     </td>
                 </tr>
             `);
@@ -580,20 +661,17 @@ async function toggleMemberExpand(userId) {
     renderTeamMemberList();
 
     if (!teamMemberBoxesCache.has(userId)) {
-        const { data, error } = await scopeToMyEnterprise(supabaseClient
-            .from('scans')
-            .select('id, remark, barcode, box_number, box_status, qty, scanned_at'))
-            .eq('user_id', userId)
-            .order('scanned_at', { ascending: false })
-            .limit(5000);
-
+        const person = findTeamPerson(userId);
+        const { data: rows, error } = person
+            ? await fetchScansForPeople('scans', 'id, remark, barcode, box_number, box_status, qty, scanned_at, operator_name', [person])
+            : { data: null, error: true };
         if (error) {
             teamMemberBoxesCache.set(userId, []);
         } else {
-            const member = teamMemberStatsCache.find(m => m.user_id === userId);
-            const memberName = member ? teamMemberDisplayName(member) : '';
+            const memberName = person ? personName(person) : '';
+            const data = rows.slice().reverse().slice(0, 5000);        // newest first, like before
             const groups = new Map();
-            (data || []).forEach(s => {
+            data.forEach(s => {
                 s.display_name = memberName;
                 if (!groups.has(s.box_number)) groups.set(s.box_number, []);
                 groups.get(s.box_number).push(s);
@@ -621,31 +699,26 @@ function toggleBoxExpand(key) {
 
 function toggleSelectAll(checked) {
     selectedMemberIds.clear();
-    if (checked) teamMemberStatsCache.forEach(m => selectedMemberIds.add(m.user_id));
+    if (checked) teamMemberStatsCache.forEach(m => selectedMemberIds.add(personKey(m)));
     renderTeamMemberList();
 }
 
 function downloadMemberData(userId) {
     const boxes = teamMemberBoxesCache.get(userId);
-    const member = teamMemberStatsCache.find(m => m.user_id === userId);
-    const name = member ? teamMemberDisplayName(member) : userId;
+    const person = findTeamPerson(userId);
+    const name = person ? personName(person) : userId;
+    const prefix = `team_scans_${name.replace(/[^a-z0-9]/gi, '_')}`;
     if (boxes) {
-        exportScansToExcel(boxes.flatMap(b => b.items), `team_scans_${name.replace(/[^a-z0-9]/gi, '_')}`);
+        exportScansToExcel(boxes.flatMap(b => b.items), prefix);
         return;
     }
     // Not expanded yet (nothing cached) - fetch fresh for the download.
-    fetchAllPages((from, to) => supabaseClient
-        .from('scans')
-        .select('id, remark, barcode, box_number, box_status, qty, scanned_at')
-        .eq('enterprise_id', AppState.profile.enterprise_id)
-        .eq('user_id', userId)
-        .order('scanned_at', { ascending: true })
-        .order('id', { ascending: true })
-        .range(from, to))
+    if (!person) return;
+    fetchScansForPeople('scans', 'id, remark, barcode, box_number, box_status, qty, scanned_at, operator_name', [person])
         .then(({ data, error }) => {
             if (error) { alert(error.message); return; }
             (data || []).forEach(s => { s.display_name = name; });
-            exportScansToExcel(data || [], `team_scans_${name.replace(/[^a-z0-9]/gi, '_')}`);
+            exportScansToExcel(data || [], prefix);
         });
 }
 
@@ -704,14 +777,9 @@ function renderTeamSearchResults() {
 }
 
 async function fetchSelectedTeamScans() {
-    const ids = Array.from(selectedMemberIds);
-    const { data, error } = await fetchAllPages((from, to) => scopeToMyEnterprise(supabaseClient
-        .from('scans')
-        .select('id, remark, barcode, box_number, box_status, qty, scanned_at, user_id, profiles(display_name, email)'))
-        .in('user_id', ids)
-        .order('scanned_at', { ascending: true })
-        .order('id', { ascending: true })
-        .range(from, to));
+    const people = Array.from(selectedMemberIds).map(findTeamPerson).filter(Boolean);
+    const { data, error } = await fetchScansForPeople('scans',
+        'id, remark, barcode, box_number, box_status, qty, scanned_at, user_id, operator_name, profiles(display_name, email)', people);
     if (error) {
         alert(error.message);
         return null;
@@ -740,11 +808,7 @@ async function resetSelectedTeamData() {
     if (!data) return;
     if (data.length > 0) exportScansToExcel(data, 'team_scans_reset');
 
-    const ids = Array.from(selectedMemberIds);
-    const { error } = await scopeToMyEnterprise(supabaseClient
-        .from('scans')
-        .delete())
-        .in('user_id', ids);
+    const error = await deleteScansForPeople('scans', Array.from(selectedMemberIds).map(findTeamPerson).filter(Boolean));
     if (error) {
         alert(error.message);
         return;
@@ -985,6 +1049,11 @@ function setupEventListeners() {
         const removeId = e.target.dataset.removeMember;
         if (removeId) removeMember(removeId);
     });
+    document.getElementById('umLabourList').addEventListener('click', (e) => {
+        const ren = e.target.dataset.renameLabourer, rem = e.target.dataset.removeLabourer;
+        if (ren) renameLabourer(ren, e.target.dataset.name || '');
+        if (rem) removeLabourer(rem);
+    });
     document.getElementById('closeTeamBtn').addEventListener('click', closeTeamModal);
     document.getElementById('inviteToggleBtn').addEventListener('click', () => setInviteOpen(document.getElementById('teamInviteSection').style.display === 'none'));
     document.querySelectorAll('[data-team-tab]').forEach(t => t.addEventListener('click', () => showTeamTab(t.dataset.teamTab)));
@@ -1015,7 +1084,7 @@ function setupEventListeners() {
     document.getElementById('teamYsList').addEventListener('click', (e) => {
         const id = e.target.dataset.ysDownload;
         if (id) {
-            const m = teamYsStatsCache.find(x => x.user_id === id);
+            const m = teamYsStatsCache.find(x => personKey(x) === id);
             downloadTeamYs([id], 'team_year_season_' + teamMemberDisplayName(m || {}).replace(/[^a-z0-9]/gi, '_'));
         }
     });

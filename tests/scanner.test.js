@@ -59,7 +59,7 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('local-only bookkeeping field never reaches the server', __db.scans.every(r => !('pending_since' in r) && !('synced' in r)));
 
     await executeResetSession(true);
-    ok('individual Reset clears the device AND the server', (await localScans()) === 0 && serverScans() === 0);
+    ok('Reset clears only the DEVICE; the uploaded data stays on the server', (await localScans()) === 0 && serverScans() === 3);
 
     // a session with zero scans closes at once: no confirmation pop-up, no Excel download
     let downloads = 0; window.XLSX.writeFile = () => { downloads++; };
@@ -97,6 +97,7 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     await showResetModal(); document.getElementById('scannerRemarkInput').value = '';
 
     // ---------- enterprise member ----------
+    __db.scans = [];
     AppState.profile = { display_name: 'Mia', enterprise_id: 'E1', tier: 'enterprise_member' };
     await initBoxScanner();
     document.getElementById('scannerRemarkInput').value = 'R2'; startScannerSession();

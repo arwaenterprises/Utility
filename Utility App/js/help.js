@@ -18,7 +18,7 @@ const HELP = {
                 'Scan each <b>item barcode</b> that goes into that box. The last 5 scans show below; tap <b>Del</b> to remove a mistake.',
                 'When the box is full, tap <b>Close Box</b>, tap <b>Yes</b>, then scan the Box ID again to confirm.',
                 'Repeat for the next box. Tap <b>View Box</b> and scan any box ID to see what is inside it.',
-                'When you are finished, tap <b>Download</b> to get the Excel file, then <b>Reset</b> to start a new session.'
+                'When you are finished, tap <b>Download</b> to get the Excel file, then <b>Reset</b> to start a new session. Reset clears only this device; everything already uploaded stays with your admin.'
             ],
             tips: [
                 '<b>Nu</b> accepts numbers only; <b>AlNu</b> accepts letters and numbers. You can change it only when no box is open.',
@@ -36,7 +36,7 @@ const HELP = {
                 'امسح <b>باركود</b> كل قطعة توضع في هذا الصندوق. تظهر آخر 5 عمليات مسح في الأسفل؛ اضغط <b>حذف</b> لإزالة أي خطأ.',
                 'عندما يمتلئ الصندوق اضغط <b>إغلاق الصندوق</b>، ثم <b>Yes</b>، ثم امسح رقم الصندوق مرة أخرى للتأكيد.',
                 'كرر العملية للصندوق التالي. اضغط <b>عرض الصندوق</b> وامسح أي رقم صندوق لترى محتوياته.',
-                'عند الانتهاء اضغط <b>تحميل</b> للحصول على ملف Excel، ثم <b>إعادة</b> لبدء جلسة جديدة.'
+                'عند الانتهاء اضغط <b>تحميل</b> للحصول على ملف Excel، ثم <b>إعادة</b> لبدء جلسة جديدة. تمسح الإعادة هذا الجهاز فقط؛ وما تم رفعه يبقى لدى المسؤول.'
             ],
             tips: [
                 '<b>Nu</b> للأرقام فقط، و<b>AlNu</b> للأحرف والأرقام. لا يمكن تغييره إلا عندما لا يكون هناك صندوق مفتوح.',
@@ -148,7 +148,7 @@ const HELP = {
     dataManagement: {
         en: {
             intro: 'See what you have scanned, download it as Excel, or clear it.',
-            before: 'An enterprise admin sees everyone on the team. An individual account or a team member sees only their own data. Team members can look and download but not reset.',
+            before: 'An enterprise admin sees everyone on the team. An individual account or a team member sees only their own data. Team members can look and download but not reset. Labourers who joined by QR appear by name, with their job.',
             steps: [
                 'Tap the <b>Data Management</b> tile on the home screen.',
                 'Choose the <b>Box-Item Scan</b> or <b>Year/Season</b> tab.',
@@ -160,7 +160,7 @@ const HELP = {
         },
         ar: {
             intro: 'اطّلع على ما قمت بمسحه، حمّله كملف Excel، أو امسحه.',
-            before: 'مسؤول المؤسسة يرى جميع أعضاء الفريق. أما الحساب الفردي أو عضو الفريق فيرى بياناته فقط. يستطيع عضو الفريق العرض والتحميل لكن لا يستطيع الحذف (Reset).',
+            before: 'مسؤول المؤسسة يرى جميع أعضاء الفريق. أما الحساب الفردي أو عضو الفريق فيرى بياناته فقط. يستطيع عضو الفريق العرض والتحميل لكن لا يستطيع الحذف (Reset). ويظهر العمال الذين انضموا عبر QR بأسمائهم مع مهمتهم.',
             steps: [
                 'اضغط على بطاقة <b>Data Management</b> في الشاشة الرئيسية.',
                 'اختر تبويب <b>Box-Item Scan</b> أو <b>Year/Season</b>.',
@@ -182,7 +182,7 @@ const HELP = {
                 'Go to that PTL and scan its <b>ST</b> code (for example ST05) to open the box. For a new box, scan the physical box label when asked.',
                 'Keep scanning items for that PTL. The app warns you if you scan the wrong PTL or box.',
                 'When the box is full, close it (scan the PTL\'s close code, or tap the PTL and choose Close) and scan the box barcode to confirm.',
-                'When all boxes are closed and the sync badge shows &#10003;, tap <b>Download</b>, then <b>Reset</b> for a new session.'
+                'When all boxes are closed and the sync badge shows &#10003;, tap <b>Download</b>, then <b>Reset</b> for a new session. Reset clears only this device; uploaded data stays with your admin.'
             ],
             tips: [
                 'You cannot change Nu/AlNu or Reset while a PTL box is still open.',
@@ -200,7 +200,7 @@ const HELP = {
                 'اذهب إلى ذلك الـ PTL وامسح رمز <b>ST</b> الخاص به (مثل ST05) لفتح الصندوق. للصندوق الجديد امسح ملصق الصندوق الفعلي عند الطلب.',
                 'استمر في مسح القطع لهذا الـ PTL. ينبّهك التطبيق إذا مسحت PTL أو صندوقًا خاطئًا.',
                 'عندما يمتلئ الصندوق أغلقه (امسح رمز الإغلاق الخاص بالـ PTL، أو اضغط على الـ PTL واختر Close) ثم امسح باركود الصندوق للتأكيد.',
-                'عندما تُغلق كل الصناديق وتظهر علامة المزامنة &#10003;، اضغط <b>Download</b> ثم <b>Reset</b> لبدء جلسة جديدة.'
+                'عندما تُغلق كل الصناديق وتظهر علامة المزامنة &#10003;، اضغط <b>Download</b> ثم <b>Reset</b> لبدء جلسة جديدة. يمسح Reset هذا الجهاز فقط؛ وما تم رفعه يبقى لدى المسؤول.'
             ],
             tips: [
                 'لا يمكنك تغيير Nu/AlNu أو عمل Reset وهناك صندوق PTL مفتوح.',

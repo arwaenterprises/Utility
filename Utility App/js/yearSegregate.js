@@ -724,15 +724,6 @@ function ysToServerRow(s) {
     };
 }
 
-function ysFromServerRow(r) {
-    return {
-        scanUid: r.scan_uid, storeId: AppState.storeId, storeName: AppState.storeName,
-        staffName: r.staff_name, remark: r.remark, ptlNumber: r.ptl_number, season: r.season,
-        year: r.year, brand: r.brand, barcode: r.barcode, qty: r.qty, boxBarcode: r.box_barcode,
-        boxStatus: r.box_status, scanTimestamp: r.scan_timestamp, scanIso: r.scanned_at, synced: true
-    };
-}
-
 // The in-page isSyncing flag cannot see a second tab or the installed PWA, which share
 // the same IndexedDB. The Web Lock is held across the whole origin, so only one instance
 // on the device can be syncing at a time.
@@ -845,51 +836,20 @@ async function ysShowResetModal() {
     document.getElementById('ysResetModal').classList.add('active');
 }
 
-// Individuals own their data: Reset clears this device AND their server copy.
-// Enterprise members only clear their own device - the data stays in Supabase until
-// the enterprise admin resets it from the Team console. Either way the data is
-// downloaded first, and an enterprise member's Reset waits until every closed box has
-// reached the server so nothing the admin should see is lost.
+// Reset only ever clears THIS device (after downloading it and making sure every closed box has reached the
+// server). Uploaded data stays on the server until the enterprise admin deletes it in Data Management.
 async function ysExecuteReset() {
     document.getElementById('ysResetModal').classList.remove('active');
-    const isEnterpriseMember = !!AppState.profile?.enterprise_id;
-
-    if (isEnterpriseMember) {
-        if (AppState.isOnline) await ysAutoSync();
-        const pending = (await ysDbGetAll(YS_SCANS_STORE)).filter(s => !s.synced && s.boxStatus === 'Closed');
-        if (pending.length > 0) {
-            ysUpdateSyncBadge();
-            ysShowError("Some closed boxes haven't uploaded to your admin yet. Connect to the internet and wait for the sync badge to show ✓, then reset.");
-            return;
-        }
-        await ysDownloadExcel();
-        await ysDbClearStore(YS_SCANS_STORE);
-    } else {
-        if (!AppState.isOnline) {
-            ysShowError('Reset needs an internet connection so your server data is cleared too.');
-            return;
-        }
-        try {
-            // Pull in anything on the server this device lacks so the export holds every
-            // row that the reset is about to delete.
-            const { data, error } = await supabaseClient.from('ys_scans').select('*').eq('user_id', AppState.user.id);
-            if (error) throw error;
-            const have = new Set((await ysDbGetAll(YS_SCANS_STORE)).map(s => s.scanUid));
-            for (const r of data || []) if (!have.has(r.scan_uid)) await ysDbAdd(YS_SCANS_STORE, ysFromServerRow(r));
-        } catch (err) {
-            console.error('Pre-reset refresh failed:', err);
-            ysShowError('Could not load your data from the server. Please try again.');
-            return;
-        }
-        await ysDownloadExcel();
-        const del = await supabaseClient.from('ys_scans').delete().eq('user_id', AppState.user.id);
-        if (del.error) {
-            console.error('Clear server scans failed:', del.error);
-            ysShowError('Could not clear your server data. Please try again.');
-            return;
-        }
-        await ysDbClearStore(YS_SCANS_STORE);
+    // Nothing closed may be lost before the device is cleared: wait until it has reached the server.
+    if (AppState.isOnline) await ysAutoSync();
+    const pending = (await ysDbGetAll(YS_SCANS_STORE)).filter(s => !s.synced && s.boxStatus === 'Closed');
+    if (pending.length > 0) {
+        ysUpdateSyncBadge();
+        ysShowError("Some closed boxes haven't uploaded yet. Connect to the internet and wait for the sync badge to show ✓, then reset.");
+        return;
     }
+    await ysDownloadExcel();
+    await ysDbClearStore(YS_SCANS_STORE);
     ysFinishReset();
 }
 

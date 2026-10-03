@@ -2427,3 +2427,5 @@ body.operator-mode .app-back-btn, body.operator-mode #accountBtn { display: none
     body.printing-qr .qs-ent { font-size: 28pt; }
     body.printing-qr .qs-facts dd { font-size: 18pt; }
 }
+.person-tag { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; background: #eef3fb; color: var(--ak-text-light); vertical-align: middle; }
+.person-jobs { display: block; font-size: 11px; color: var(--ak-text-light); }

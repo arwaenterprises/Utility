@@ -18,7 +18,11 @@ const QL_T = {
         copied: 'Link copied.', copyFail: 'Could not copy. Select the link and copy it by hand.',
         failed: 'Could not do that. Please try again.',
         sheetLine: 'Scan with your phone camera or QR scanner. Only your name is needed.',
-        enterprise: 'Enterprise', admin: 'Admin', tool: 'Tool', job: 'Job'
+        enterprise: 'Enterprise', admin: 'Admin', tool: 'Tool', job: 'Job',
+        labourer: 'labourer', name: 'Name', rename: 'Rename', removeLabourer: 'Remove from this job',
+        noLabourers: 'Nobody has joined by QR yet.', renamePrompt: 'Correct name (also changed on their earlier scans):',
+        nameBad: 'Please type a name of 1 to 40 characters.',
+        removeAsk: 'Remove this person? Their handheld stops accepting new scans. What they scanned stays.'
     },
     ar: {
         none: 'لا توجد روابط QR بعد. أنشئ واحدًا أدناه.',
@@ -32,7 +36,11 @@ const QL_T = {
         copied: 'تم نسخ الرابط.', copyFail: 'تعذّر النسخ. حدّد الرابط وانسخه يدويًا.',
         failed: 'تعذّر تنفيذ ذلك. حاول مرة أخرى.',
         sheetLine: 'امسح بكاميرا الهاتف أو ماسح QR. يكفي اسمك فقط.',
-        enterprise: 'المؤسسة', admin: 'المسؤول', tool: 'الأداة', job: 'المهمة'
+        enterprise: 'المؤسسة', admin: 'المسؤول', tool: 'الأداة', job: 'المهمة',
+        labourer: 'عامل', name: 'الاسم', rename: 'تغيير الاسم', removeLabourer: 'إزالة من هذه المهمة',
+        noLabourers: 'لم ينضم أحد عبر QR بعد.', renamePrompt: 'الاسم الصحيح (يتغير أيضًا في عمليات المسح السابقة):',
+        nameBad: 'الرجاء كتابة اسم من 1 إلى 40 حرفًا.',
+        removeAsk: 'هل تريد إزالة هذا الشخص؟ سيتوقف جهازه عن قبول عمليات مسح جديدة. ما مسحه يبقى محفوظًا.'
     }
 };
 function qlT(key) {

@@ -338,7 +338,25 @@ select _ta_do('00000000-0000-0000-0000-0000000000f3', format($$select join_team_
 select _ta_do('00000000-0000-0000-0000-0000000000f3', $$insert into ys_scans(user_id,scan_uid,barcode,ptl_number) values ('00000000-0000-0000-0000-0000000000f3',gen_random_uuid(),'11','01')$$);
 select _t_eq('after joining by QR the same device can scan', (select count(*) from ys_scans where barcode='11' and operator_name='Zed'), 1);
 
+-- people list for the admin: labourers grouped by name (capitals and end spaces ignored), without e-mail
+insert into auth.users(id,email) values ('00000000-0000-0000-0000-0000000000f4', null), ('00000000-0000-0000-0000-0000000000f5', null);
+select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('boxScanner','Inbound 9')$$);
+select token as tok9 from team_links where job_name = 'Inbound 9' \gset
+select _ta_do('00000000-0000-0000-0000-0000000000f4', format($$select join_team_link(%L,'Ravi')$$, :'tok9'));
+select _ta_do('00000000-0000-0000-0000-0000000000f5', format($$select join_team_link(%L,'  ravi')$$, :'tok9'));
+select _ta_do('00000000-0000-0000-0000-0000000000f4', $$insert into scans(user_id,box_number,barcode,qty,box_status) values ('00000000-0000-0000-0000-0000000000f4','PB1','1',2,'Closed')$$);
+select _ta_do('00000000-0000-0000-0000-0000000000f5', $$insert into scans(user_id,box_number,barcode,qty,box_status) values ('00000000-0000-0000-0000-0000000000f5','PB2','2',3,'Closed')$$);
+select _t_eq('admin people list: the same labourer on two handhelds is ONE person', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from team_member_stats() where is_operator and person_key = 'o:ravi'$$), 1);
+select _t_eq('...with both boxes and all the quantity', _t_val('00000000-0000-0000-0000-0000000000e1', $$select boxes_closed * 100 + total_qty from team_member_stats() where person_key = 'o:ravi'$$), 205);
+select _t_eq('...knowing both handhelds and the job', _t_val('00000000-0000-0000-0000-0000000000e1', $$select cardinality(member_ids) * 10 + cardinality(operator_names) from team_member_stats() where person_key = 'o:ravi' and jobs = 'Inbound 9'$$), 22);
+select _t_eq('...and no labourer shows up as an ordinary account row', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from team_member_stats() where not is_operator and user_id in ('00000000-0000-0000-0000-0000000000f4','00000000-0000-0000-0000-0000000000f5')$$), 0);
+select _t_eq('a team member does not see labourers in the people list', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from team_member_stats() where is_operator$$), 0);
+select _t_eq('another team''s admin does not see them either', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from team_member_stats() where is_operator$$), 0);
+select _t_eq('search finds a labourer by name and shows the name', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from search_team_scans('rav', 50) where operator_name ilike 'ravi'$$), 2);
+select _t_eq('search finds scans by job name', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from search_team_scans('Inbound 9', 50)$$), 2);
+delete from scans where box_number in ('PB1','PB2');
+
 -- tidy up the people and links created here, so later checks see the same data as before
-delete from auth.users where id in ('00000000-0000-0000-0000-0000000000f1','00000000-0000-0000-0000-0000000000f2','00000000-0000-0000-0000-0000000000f3');
+delete from auth.users where id in ('00000000-0000-0000-0000-0000000000f1','00000000-0000-0000-0000-0000000000f2','00000000-0000-0000-0000-0000000000f3','00000000-0000-0000-0000-0000000000f4','00000000-0000-0000-0000-0000000000f5');
 delete from scans where box_number = 'FB';
 delete from team_links;

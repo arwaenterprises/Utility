@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=58"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=58"></script>
-    <script src="vendor/qrcode.min.js?v=58"></script>
-    <script src="vendor/html5-qrcode.min.js?v=58"></script>
-    <script src="vendor/supabase.js?v=58"></script>
+    <script src="vendor/xlsx.full.min.js?v=59"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=59"></script>
+    <script src="vendor/qrcode.min.js?v=59"></script>
+    <script src="vendor/html5-qrcode.min.js?v=59"></script>
+    <script src="vendor/supabase.js?v=59"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -81,6 +81,8 @@
                     </div>
                     <h4 style="margin: 10px 0 6px;">Team members</h4>
                     <div id="umMemberList"></div>
+                    <h4 style="margin: 10px 0 6px;" data-i18n="lab_h">Labourers (joined by QR)</h4>
+                    <div id="umLabourList"></div>
                 </div>
             </div>
         </div>
@@ -1058,7 +1060,7 @@
                     <div class="modal">
                         <h3 class="modal-title">Reset Session?</h3>
                         <div class="modal-body">
-                            <p>This will download your data and start a new session. All PTL states will be cleared.</p>
+                            <p>This will download your data, clear this device and start a new session. What was uploaded stays with your admin. All PTL states will be cleared.</p>
                         </div>
                         <div class="modal-buttons">
                             <button class="btn btn-primary" id="ysResetConfirmBtn">Reset</button>
@@ -1103,22 +1105,22 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=58"></script>
-    <script src="js/lang.js?v=58"></script>
-    <script src="js/supabaseClient.js?v=58"></script>
-    <script src="js/lists.js?v=58"></script>
-    <script src="js/usage.js?v=58"></script>
-    <script src="js/syncstatus.js?v=58"></script>
-    <script src="js/help.js?v=58"></script>
-    <script src="js/tooltip.js?v=58"></script>
-    <script src="js/operator.js?v=58"></script>
-    <script src="js/teamlinks.js?v=58"></script>
-    <script src="js/app.js?v=58"></script>
-    <script src="js/boxScanner.js?v=58"></script>
-    <script src="js/itemBarcode.js?v=58"></script>
-    <script src="js/boxCode.js?v=58"></script>
-    <script src="js/boxSegregate.js?v=58"></script>
-    <script src="js/priceCheck.js?v=58"></script>
-    <script src="js/yearSegregate.js?v=58"></script>
+    <script src="js/config.js?v=59"></script>
+    <script src="js/lang.js?v=59"></script>
+    <script src="js/supabaseClient.js?v=59"></script>
+    <script src="js/lists.js?v=59"></script>
+    <script src="js/usage.js?v=59"></script>
+    <script src="js/syncstatus.js?v=59"></script>
+    <script src="js/help.js?v=59"></script>
+    <script src="js/tooltip.js?v=59"></script>
+    <script src="js/operator.js?v=59"></script>
+    <script src="js/teamlinks.js?v=59"></script>
+    <script src="js/app.js?v=59"></script>
+    <script src="js/boxScanner.js?v=59"></script>
+    <script src="js/itemBarcode.js?v=59"></script>
+    <script src="js/boxCode.js?v=59"></script>
+    <script src="js/boxSegregate.js?v=59"></script>
+    <script src="js/priceCheck.js?v=59"></script>
+    <script src="js/yearSegregate.js?v=59"></script>
 </body>
 </html>

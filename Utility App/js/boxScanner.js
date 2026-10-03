@@ -25,7 +25,7 @@ const ScannerT = {
         thBarcode: "Barcode", thTime: "Time", thAction: "Del", lblDownload: "Download", lblReset: "Reset",
         lblCloseBoxTitle: "Close Box", lblQtyItems: "Quantity:", lblItems: "items",
         lblAreYouSure: "Are you sure you want to close this box?", lblScanToConfirm: "Scan box ID to confirm",
-        lblResetTitle: "Reset Session?", lblResetMsg: "This will download your data and start a new session.",
+        lblResetTitle: "Reset Session?", lblResetMsg: "This will download your data, clear this device and start a new session. What was uploaded stays with your admin.",
         lblDeleteTitle: "Delete Scan?", lblDeleteMsg: "Delete this scan?",
         boxIdPlaceholder: "Scan box ID...", barcodePlaceholder: "Scan barcode...",
         remarkPlaceholder: "e.g., Fall Winter 2023 stocks",
@@ -36,7 +36,6 @@ const ScannerT = {
         errModeLockedDuringBox: "Close the current box before changing Nu/AlNu mode",
         errDuplicateBarcode: "This barcode was already scanned in this box",
         errUniqueLockedDuringBox: "Close the current box before changing the No Dup setting",
-        errResetNeedsConnection: "Reset needs an internet connection so your server data is cleared too",
         errResetPendingSync: "Some closed boxes haven't uploaded to your admin yet. Connect to the internet and wait for the sync badge to show ✓, then reset",
         errSaveFailed: "Could not save scan, please try again",
         errLoadFailed: "Could not load your scans, please try again",
@@ -54,7 +53,7 @@ const ScannerT = {
         thBarcode: "الباركود", thTime: "الوقت", thAction: "حذف", lblDownload: "تحميل", lblReset: "إعادة",
         lblCloseBoxTitle: "إغلاق الصندوق", lblQtyItems: "الكمية:", lblItems: "قطعة",
         lblAreYouSure: "هل أنت متأكد من إغلاق هذا الصندوق؟", lblScanToConfirm: "امسح رقم الصندوق للتأكيد",
-        lblResetTitle: "إعادة تعيين؟", lblResetMsg: "سيتم تحميل البيانات وبدء جلسة جديدة.",
+        lblResetTitle: "إعادة تعيين؟", lblResetMsg: "سيتم تحميل البيانات ومسح هذا الجهاز وبدء جلسة جديدة. ما تم رفعه يبقى لدى المسؤول.",
         lblDeleteTitle: "حذف المسح؟", lblDeleteMsg: "حذف هذا المسح؟",
         boxIdPlaceholder: "امسح رقم الصندوق...", barcodePlaceholder: "امسح الباركود...",
         remarkPlaceholder: "مثال: مخزون خريف وشتاء 2023",
@@ -65,7 +64,6 @@ const ScannerT = {
         errModeLockedDuringBox: "أغلق الصندوق الحالي قبل تغيير وضع Nu/AlNu",
         errDuplicateBarcode: "تم مسح هذا الباركود مسبقًا في هذا الصندوق",
         errUniqueLockedDuringBox: "أغلق الصندوق الحالي قبل تغيير إعداد منع التكرار",
-        errResetNeedsConnection: "إعادة التعيين تحتاج إلى اتصال بالإنترنت لمسح بيانات الخادم أيضًا",
         errResetPendingSync: "بعض الصناديق المغلقة لم تُرفع إلى المسؤول بعد. اتصل بالإنترنت وانتظر حتى تظهر علامة ✓ ثم أعد التعيين",
         errSaveFailed: "تعذر حفظ المسح، حاول مرة أخرى",
         errLoadFailed: "تعذر تحميل المسح، حاول مرة أخرى",
@@ -197,53 +195,8 @@ async function runAutoSync() {
     }
 }
 
-// Pull the signed-in user's own rows that this device does not have yet (a new device,
-// cleared browser data, or scans from before offline support existed). Pulled rows are
-// marked synced. Own rows only: an enterprise admin's RLS also exposes team rows.
-async function fetchOwnServerScans() {
-    const rows = [];
-    const pageSize = 1000;
-    for (let from = 0; ; from += pageSize) {
-        const { data, error } = await supabaseClient
-            .from('scans').select('*')
-            .eq('user_id', AppState.user.id)
-            .order('scanned_at', { ascending: true })
-            .range(from, from + pageSize - 1);
-        if (error) throw error;
-        rows.push(...data);
-        if (data.length < pageSize) break;
-    }
-    return rows;
-}
-
-// Enterprise members only ever clear their own device on Reset; their rows stay in
-// Supabase until the enterprise admin resets them from the Team console. Individual
-// accounts own their data, so their Reset also clears the server copy.
-function isEnterpriseMember() {
-    return !!AppState.profile?.enterprise_id;
-}
-
-async function hydrateFromServer() {
-    // An enterprise member's device is the working copy; pulling server rows back in
-    // would undo their local Reset (the server keeps the data for the admin).
-    if (isEnterpriseMember()) return;
-    const serverRows = await fetchOwnServerScans();
-    const local = new Set((await getAllScans()).map(s => s.scan_uid));
-    for (const row of serverRows) {
-        if (local.has(row.scan_uid)) continue;
-        await addScan({
-            scan_uid: row.scan_uid, user_id: row.user_id, enterprise_id: row.enterprise_id,
-            remark: row.remark, box_number: row.box_number, barcode: row.barcode, qty: row.qty,
-            box_status: row.box_status, scanned_at: row.scanned_at, synced: true
-        });
-        if (row.box_status === 'Closed') ScannerState.completedBoxes.add(row.box_number);
-    }
-}
-
-async function clearServerScans() {
-    const { error } = await supabaseClient.from('scans').delete().eq('user_id', AppState.user.id);
-    if (error) throw error;
-}
+// Reset only ever clears THIS device. Everything that was uploaded stays on the server until the enterprise
+// admin deletes it in Data Management, so a device never pulls old rows back in either.
 
 // ============================================
 // BOX SCANNER - SESSION PERSISTENCE
@@ -799,47 +752,21 @@ async function showResetModal() {
 async function executeResetSession(confirmed) {
     document.getElementById('resetModal').classList.remove('active');
     if (confirmed) {
-        if (isEnterpriseMember()) {
-            // Admin's copy lives on the server: nothing closed may be lost before we clear the device.
-            if (AppState.isOnline) await autoSyncScans();
-            const pending = (await getAllScans()).filter(s => !s.synced && s.box_status === 'Closed');
-            if (pending.length > 0) {
-                await loadAndDisplayScans();
-                alert(scannerT('errResetPendingSync'));
-                return;
-            }
-            await downloadScannerExcel();
-            try {
-                await clearLocalScans();
-            } catch (err) {
-                console.error('Clear local scans failed:', err);
-                alert(scannerT('errSaveFailed'));
-                return;
-            }
-        } else {
-            if (!AppState.isOnline) {
-                alert(scannerT('errResetNeedsConnection'));
-                return;
-            }
-            try {
-                // Bring in anything on the server this device lacks, so the export holds
-                // every row that the reset is about to delete.
-                await hydrateFromServer();
-                await loadAndDisplayScans();
-            } catch (err) {
-                console.error('Pre-reset refresh failed:', err);
-                alert(scannerT('errLoadFailed'));
-                return;
-            }
-            await downloadScannerExcel();
-            try {
-                await clearServerScans();
-                await clearLocalScans();
-            } catch (err) {
-                console.error('Clear scans failed:', err);
-                alert(scannerT('errSaveFailed'));
-                return;
-            }
+        // Nothing closed may be lost before the device is cleared: wait until it has reached the server.
+        if (AppState.isOnline) await autoSyncScans();
+        const pending = (await getAllScans()).filter(s => !s.synced && s.box_status === 'Closed');
+        if (pending.length > 0) {
+            await loadAndDisplayScans();
+            alert(scannerT('errResetPendingSync'));
+            return;
+        }
+        await downloadScannerExcel();
+        try {
+            await clearLocalScans();
+        } catch (err) {
+            console.error('Clear local scans failed:', err);
+            alert(scannerT('errSaveFailed'));
+            return;
         }
         finishScannerReset();
     }
@@ -920,10 +847,6 @@ async function initBoxScanner() {
     }
     setupScannerEventListeners();
     const hasSession = loadScannerSession();
-    if (AppState.isOnline && !isEnterpriseMember()) {
-        try { await hydrateFromServer(); } catch (err) { console.log('Server refresh failed:', err); }
-        saveScannerSession();
-    }
     applyScannerTranslations();
 
     if (hasSession && ScannerState.remark) {

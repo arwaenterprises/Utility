@@ -216,7 +216,7 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     // individual reset
     YSState.huStates.forEach(h => h.status = 'Closed'); await ysAutoSync();
     await ysExecuteReset();
-    ok('YS individual reset: downloaded, device + server cleared', written.length === 2 && (await ysDbGetAll(YS_SCANS_STORE)).length === 0 && __db.ys_scans.length === 0, 'rows exported=' + written[1]?.rows.length);
+    ok('YS Reset: downloaded and the DEVICE cleared; the server copy stays for the admin', written.length === 2 && (await ysDbGetAll(YS_SCANS_STORE)).length === 0 && __db.ys_scans.length > 0, 'rows exported=' + written[1]?.rows.length);
     { // Year/Season: a session with zero scans closes at once
       const w0 = written.length; YSState.huStates.forEach(h => h.status = 'Closed');
       await ysShowResetModal();
@@ -224,6 +224,7 @@ const { start, openApp, report, stop } = require('./helpers/harness');
       ok('YS zero scans: no "Are you sure?" pop-up, no download, session closed with the Remark free again', !document.getElementById('ysResetModal').classList.contains('active') && written.length === w0 && document.getElementById('ysScanScreen').classList.contains('active') && !YSState.staffName && !document.getElementById('ysRemarkInput').readOnly && document.getElementById('ysRemarkInput').value === '');
     }
     // team membership changed while the phone was open: the old profile is refused once, then refreshed
+    __db.ys_scans = [];
     window.__enforceTeamRule = true; window.__rlsRejects = 0;
     AppState.profile = { display_name: 'M', enterprise_id: 'E1', tier: 'enterprise_member' };   // stale on the phone
     window.__me = { id: 'u1', enterprise_id: null, tier: 'individual', email: 'a@b.c' };          // the server already knows the person left
