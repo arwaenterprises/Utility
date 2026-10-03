@@ -25,6 +25,13 @@
     Permissions-Policy = "camera=(self), microphone=(), geolocation=(), payment=()"
     Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://pacqjqjigmepkycfjapa.supabase.co wss://pacqjqjigmepkycfjapa.supabase.co; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 
+# Team QR links: the QR code holds  https://utility.arwaenterprises.com/j/<token>  ; the app opens it as /?join=<token>.
+[[redirects]]
+  from = "/j/:token"
+  to = "/?join=:token"
+  status = 302
+  force = true
+
 [[headers]]
   for = "/index.html"
   [headers.values]

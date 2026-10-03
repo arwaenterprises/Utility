@@ -24,6 +24,8 @@ async function signOut() {
     await supabaseClient.auth.signOut();
     AppState.user = null;
     AppState.profile = null;
+    AppState.operator = null;
+    document.body.classList.remove('operator-mode');
     updateHeaderUser();
     showScreen('loginScreen');
 }
@@ -86,7 +88,12 @@ function updateHeaderUser() {
     const el = document.getElementById('headerUser');
     const signOutBtn = document.getElementById('signOutBtn');
     const accountBtn = document.getElementById('accountBtn');
-    if (AppState.user) {
+    if (AppState.user && AppState.operator) {          // a labourer: name and "leave this job" only
+        el.textContent = AppState.operator.name;
+        el.classList.add('show');
+        signOutBtn.classList.add('show');
+        accountBtn.classList.remove('show');
+    } else if (AppState.user) {
         el.textContent = AppState.profile?.display_name || AppState.user.email;
         el.classList.add('show');
         signOutBtn.classList.add('show');
@@ -893,6 +900,7 @@ function openApp(appId) {
 
 function updateBackButton() {
     const btn = document.getElementById('appBackBtn');
+    if (AppState.operator) return;                 // a labourer's device has no Home: the back button is hidden by CSS
     const app = APPS.find(a => a.id === AppState.currentApp);
     
     if (app && app.sessionRequired && AppState.hasActiveSession) {
@@ -906,6 +914,7 @@ function updateBackButton() {
 
 function goToHome() {
     const app = APPS.find(a => a.id === AppState.currentApp);
+    if (AppState.operator) return;                 // a labourer stays inside the one tool of the QR link
     if (app && app.sessionRequired && AppState.hasActiveSession) return;
     
     AppState.currentApp = null;
@@ -953,7 +962,10 @@ function initializeApp(appId) {
 // ============================================
 function setupEventListeners() {
     document.getElementById('googleSignInBtn').addEventListener('click', signInWithGoogle);
-    document.getElementById('signOutBtn').addEventListener('click', signOut);
+    document.getElementById('signOutBtn').addEventListener('click', () => { if (AppState.operator) operatorLeave(); else signOut(); });
+    document.getElementById('joinBtn').addEventListener('click', operatorSubmitJoin);
+    document.getElementById('joinNameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') operatorSubmitJoin(); });
+    document.getElementById('joinSignOutBtn').addEventListener('click', async () => { await signOut(); const t = operatorTokenFromUrl(); if (t) operatorShowJoin(t, null); });
     document.getElementById('appBackBtn').addEventListener('click', goToHome);
     document.getElementById('goToSessionBtn').addEventListener('click', () => { if (AppState.activeSessionApp) openApp(AppState.activeSessionApp); });
     document.getElementById('accountBtn').addEventListener('click', openAccountModal);
@@ -1172,7 +1184,12 @@ async function initApp() {
     scheduleUpdateChecks();
 
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session) {
+    const joinToken = operatorTokenFromUrl();
+    if (joinToken) {
+        await operatorShowJoin(joinToken, session);
+    } else if (isOperatorSession(session)) {
+        await operatorEnter(session);
+    } else if (session) {
         await enterAppAsSignedInUser(session);
     } else {
         showScreen('loginScreen');
@@ -1183,6 +1200,7 @@ async function initApp() {
 
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
+            if (isOperatorSession(session)) return;        // a labourer's anonymous sign-in: js/operator.js takes it from here
             // Supabase re-fires SIGNED_IN on token refresh (e.g. when the tab
             // regains focus after being idle), not just on a genuine new login.
             // Only navigate to home for an actual new sign-in - otherwise this

@@ -349,6 +349,7 @@ async function handleYsScan(e) {
     const raw = document.getElementById('ysBarcodeInput').value.trim();
     document.getElementById('ysBarcodeInput').value = '';
     if (!raw) return;
+    if (typeof operatorBlocked === 'function' && operatorBlocked()) { alert(opT('blocked')); return; }
 
     // The first scan begins the session - which needs the Remark.
     if (!YSState.staffName && !(await ysBeginSession())) return;
@@ -776,6 +777,7 @@ async function ysRunAutoSync() {
     } catch (e) {
         // Scans stay synced=false and are retried on the next tick; the status line says why.
         YSState.lastSyncError = (e && e.message) || String(e);
+        if (typeof operatorNoteScanRefused === 'function') operatorNoteScanRefused(YSState.lastSyncError);
         console.error('YS auto-sync error:', e);
     } finally {
         YSState.isSyncing = false;
@@ -1358,15 +1360,16 @@ async function ysPrepareData() {
 // scan field stays switched off until a Remark has been typed.
 function ysSetRemarkLocked(locked) {
     const input = document.getElementById('ysRemarkInput');
-    input.readOnly = locked;
-    input.classList.toggle('locked', locked);
-    if (locked) input.value = YSState.remark;
-    document.getElementById('ysRemarkCard').style.display = locked ? 'none' : '';
+    const jobRemark = typeof operatorRemark === 'function' ? operatorRemark() : '';     // a labourer's Remark is the job name from the QR link
+    input.readOnly = locked || !!jobRemark;
+    input.classList.toggle('locked', locked || !!jobRemark);
+    if (locked) input.value = YSState.remark; else if (jobRemark) input.value = jobRemark;
+    document.getElementById('ysRemarkCard').style.display = (locked || jobRemark) ? 'none' : '';
     ysUpdateScanFieldsEnabled();
 }
 
 function ysUpdateScanFieldsEnabled() {
-    const ready = !!(YSState.staffName || document.getElementById('ysRemarkInput').value.trim());
+    const ready = !!(YSState.staffName || document.getElementById('ysRemarkInput').value.trim()) && !(typeof operatorBlocked === 'function' && operatorBlocked());
     ['ysBarcodeInput', 'ysKbdBtn'].forEach(id => { document.getElementById(id).disabled = !ready; });
 }
 

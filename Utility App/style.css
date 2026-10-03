@@ -2382,3 +2382,21 @@ body.rtl .app-back-btn { transform: scaleX(-1); }
 .remark-card .ys-upload-row { margin: 8px 0 0; }
 .remark-card .ys-sync-status, .remark-card .error-msg { margin-top: 8px; }
 .remark-card .ref-progress { margin-top: 6px; }
+
+/* ---------- Team QR links: labourer join page and limited-tool mode ---------- */
+.join-info { margin-bottom: 12px; }
+.join-check { font-size: 14px; color: var(--ak-text-light); margin: 0 0 8px; }
+.join-facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0 0 12px; }
+.join-facts dt { font-weight: 700; color: var(--ak-text-light); font-size: 13px; }
+.join-facts dd { margin: 0; font-weight: 700; font-size: 16px; word-break: break-word; }
+.join-msg { display: none; padding: 10px 12px; border-radius: 8px; background: #eef3fb; font-size: 14px; margin-bottom: 12px; }
+.join-msg.show { display: block; }
+.join-msg.error { background: #fdecea; color: #8a1c10; }
+.join-label { display: block; font-weight: 700; margin-bottom: 6px; }
+.join-input { width: 100%; box-sizing: border-box; font-size: 18px; padding: 12px; border: 2px solid var(--ak-border, #cfd6e0); border-radius: 8px; }
+.join-note { font-size: 13px; color: var(--ak-text-light); margin: 8px 0 14px; }
+.operator-bar { padding: 8px 12px; background: #eef3fb; border-radius: 8px; margin-bottom: 10px; }
+.operator-bar .op-job { font-weight: 800; font-size: 16px; word-break: break-word; }
+.operator-bar .op-who { font-size: 12px; color: var(--ak-text-light); word-break: break-word; }
+.operator-bar .op-notice { margin-top: 6px; padding: 8px 10px; background: #fdecea; color: #8a1c10; border-radius: 6px; font-size: 13px; font-weight: 700; }
+body.operator-mode .app-back-btn, body.operator-mode #accountBtn { display: none !important; }

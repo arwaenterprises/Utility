@@ -32,6 +32,7 @@ function appIconHtml(app, cls) {
 const AppState = {
     user: null,
     profile: null,
+    operator: null,              // set when this device joined a job through a team QR link (see js/operator.js)
     pendingInvites: [],          // invitations waiting for this person (see checkForMyPendingInvite)
     currentApp: null,
     currentScreen: 'loginScreen',
@@ -40,7 +41,7 @@ const AppState = {
     isOnline: navigator.onLine,
     // Year/Season Sort identifies the operator by these two fields; both come from the
     // signed-in Google account.
-    get storeId() { return this.user?.email || ''; },
+    get storeId() { return this.operator ? this.operator.enterprise_name : (this.user?.email || ''); },
     get storeName() { return this.profile?.display_name || this.user?.email || ''; }
 };
 

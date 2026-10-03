@@ -53,6 +53,25 @@ window.__rpcCalls = [];
     return b;
   }
   const rpcs = {
+    // ---- Team QR links (labourers) ----
+    get_team_link_info: ({ p_token }) => {
+      const l = window.__teamLink;
+      return l && l.token === p_token ? [{ enterprise_name: 'Acme', admin_name: 'Akhtar', tool: l.tool, job_name: l.job_name, state: l.state }] : [];
+    },
+    join_team_link: ({ p_token, p_name }) => {
+      const l = window.__teamLink;
+      if (!l || l.token !== p_token) throw { message: 'This QR code is not valid.' };
+      if (l.state !== 'active') throw { message: 'This job has ended.' };
+      const s = JSON.parse(localStorage.getItem('mock_session') || 'null');
+      if (!s || !s.user.is_anonymous) throw { message: 'Only a labourer who scanned a team QR code can join.' };
+      window.__joined = { user: s.user.id, name: p_name };
+      localStorage.setItem('mock_operator', JSON.stringify({ name: p_name.trim(), link: l.id }));
+      return { operator_id: 'op1', link_id: l.id, enterprise_id: 'E1', tool: l.tool, job_name: l.job_name, name: p_name.trim() };
+    },
+    my_team_link: () => {
+      const l = window.__teamLink, o = JSON.parse(localStorage.getItem('mock_operator') || 'null');
+      return l && o ? [{ link_id: l.id, tool: l.tool, job_name: l.job_name, enterprise_name: 'Acme', admin_name: 'Akhtar', operator_name: o.name, state: l.state }] : [];
+    },
     remove_enterprise_member: ({ member_user_id }) => { window.__removedMember = member_user_id; return true; },
     my_pending_invites: () => window.__me.enterprise_id ? [] : db.enterprise_invites
       .filter(i => i.status === 'pending' && new Date(i.expires_at) > new Date() && String(i.invited_email).toLowerCase() === String(window.__me.email).toLowerCase())
@@ -111,7 +130,18 @@ window.__rpcCalls = [];
       : [{ user_id: window.__me.id, display_name: 'Ann', email: window.__me.email, boxes_closed: 1, total_qty: db.ys_scans.length }]
   };
   window.supabase = { createClient: () => ({
-    auth: { getSession: async () => ({ data: { session: null } }), onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; }, signOut: async () => {} },
+    auth: {
+      // the signed-in session is kept in localStorage like the real library does, so a reload keeps it
+      getSession: async () => ({ data: { session: JSON.parse(localStorage.getItem('mock_session') || 'null') } }),
+      onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; },
+      signOut: async () => { localStorage.removeItem('mock_session'); },
+      signInAnonymously: async () => {
+        window.__anonSignIns = (window.__anonSignIns || 0) + 1;
+        const session = { user: { id: 'anon' + window.__anonSignIns, is_anonymous: true } };
+        localStorage.setItem('mock_session', JSON.stringify(session));
+        return { data: { session, user: session.user }, error: null };
+      }
+    },
     from: builder,
     rpc: async (name, args) => { window.__rpcCalls.push(name); try { return { data: rpcs[name](args || {}), error: null }; } catch (e) { return { data: null, error: e }; } }
   }) };

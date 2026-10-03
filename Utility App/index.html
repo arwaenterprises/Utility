@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=56"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=56"></script>
-    <script src="vendor/qrcode.min.js?v=56"></script>
-    <script src="vendor/html5-qrcode.min.js?v=56"></script>
-    <script src="vendor/supabase.js?v=56"></script>
+    <script src="vendor/xlsx.full.min.js?v=57"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=57"></script>
+    <script src="vendor/qrcode.min.js?v=57"></script>
+    <script src="vendor/html5-qrcode.min.js?v=57"></script>
+    <script src="vendor/supabase.js?v=57"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -207,6 +207,8 @@
                 </div>
             </div>
 
+            <p class="login-teaser" data-i18n="labour_hint">Joining a team as a labourer? Scan your admin&rsquo;s QR code with the phone&rsquo;s camera or QR scanner &mdash; no sign-in needed.</p>
+
             <p class="login-teaser" data-i18n="teaser">Sign in to explore our warehouse tools &mdash; more are added over time.</p>
 
             <div class="card login-info">
@@ -223,6 +225,33 @@
                 <p><a href="mailto:connect.arwaenterprises@gmail.com">connect.arwaenterprises@gmail.com</a></p>
                 <p class="login-links"><a href="about.html" data-i18n="f_about">About &amp; Contact</a> &middot; <a href="privacy.html" data-i18n="f_privacy">Privacy</a> &middot; <a href="terms.html" data-i18n="f_terms">Terms</a> &middot; <a href="security.html" data-i18n="f_security">Security</a></p>
                 <p class="login-checked" data-i18n="foot_note">Badges with &#8599; open the public check, so you can verify them yourself.</p>
+            </div>
+        </div>
+
+        <!-- SCREEN: Join a team (opened from a team QR code: /j/<token>) -->
+        <div id="joinScreen" class="screen">
+            <div class="login-hero">
+                <img src="icons/icon-192.png" alt="Utility logo" width="72" height="72">
+                <h1 data-i18n="join_h">Join a team</h1>
+            </div>
+            <div class="card">
+                <div id="joinInfo" class="join-info" style="display:none;">
+                    <p class="join-check" data-i18n="join_check">Check that these names are right before you continue:</p>
+                    <dl class="join-facts">
+                        <dt data-i18n="join_ent">Enterprise</dt><dd id="joinEnterprise"></dd>
+                        <dt data-i18n="join_adm">Admin</dt><dd id="joinAdmin"></dd>
+                        <dt data-i18n="join_tool">Tool</dt><dd id="joinTool"></dd>
+                        <dt data-i18n="join_job">Job</dt><dd id="joinJob"></dd>
+                    </dl>
+                </div>
+                <div class="join-msg" id="joinMsg"></div>
+                <div id="joinForm" style="display:none;">
+                    <label class="join-label" for="joinNameInput" data-i18n="join_name">Your name</label>
+                    <input type="text" id="joinNameInput" maxlength="40" autocomplete="off" class="join-input">
+                    <p class="join-note" data-i18n="join_note">Only your name is needed. It tells your admin who scanned what.</p>
+                    <button class="btn btn-primary btn-block" id="joinBtn" type="button" data-i18n="join_btn">Join</button>
+                </div>
+                <button class="btn btn-block" id="joinSignOutBtn" type="button" style="display:none;" data-i18n="join_signout">Sign out of Google</button>
             </div>
         </div>
 
@@ -256,6 +285,11 @@
 
         <!-- SCREEN: App Container -->
         <div id="appScreen" class="screen">
+            <div class="operator-bar" id="operatorBar" style="display:none;">
+                <div class="op-job" id="opBarJob"></div>
+                <div class="op-who" id="opBarWho"></div>
+                <div class="op-notice" id="opBarNotice" style="display:none;"></div>
+            </div>
             <div class="app-header">
                 <button class="app-back-btn" id="appBackBtn" title="Back to Home">←</button>
                 <div class="app-title">
@@ -1035,20 +1069,21 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=56"></script>
-    <script src="js/lang.js?v=56"></script>
-    <script src="js/supabaseClient.js?v=56"></script>
-    <script src="js/lists.js?v=56"></script>
-    <script src="js/usage.js?v=56"></script>
-    <script src="js/syncstatus.js?v=56"></script>
-    <script src="js/help.js?v=56"></script>
-    <script src="js/tooltip.js?v=56"></script>
-    <script src="js/app.js?v=56"></script>
-    <script src="js/boxScanner.js?v=56"></script>
-    <script src="js/itemBarcode.js?v=56"></script>
-    <script src="js/boxCode.js?v=56"></script>
-    <script src="js/boxSegregate.js?v=56"></script>
-    <script src="js/priceCheck.js?v=56"></script>
-    <script src="js/yearSegregate.js?v=56"></script>
+    <script src="js/config.js?v=57"></script>
+    <script src="js/lang.js?v=57"></script>
+    <script src="js/supabaseClient.js?v=57"></script>
+    <script src="js/lists.js?v=57"></script>
+    <script src="js/usage.js?v=57"></script>
+    <script src="js/syncstatus.js?v=57"></script>
+    <script src="js/help.js?v=57"></script>
+    <script src="js/tooltip.js?v=57"></script>
+    <script src="js/operator.js?v=57"></script>
+    <script src="js/app.js?v=57"></script>
+    <script src="js/boxScanner.js?v=57"></script>
+    <script src="js/itemBarcode.js?v=57"></script>
+    <script src="js/boxCode.js?v=57"></script>
+    <script src="js/boxSegregate.js?v=57"></script>
+    <script src="js/priceCheck.js?v=57"></script>
+    <script src="js/yearSegregate.js?v=57"></script>
 </body>
 </html>

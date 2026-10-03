@@ -189,6 +189,7 @@ async function runAutoSync() {
     } catch (err) {
         // Scans stay synced=false and are retried on the next tick; the status line says why.
         ScannerState.lastSyncError = (err && err.message) || String(err);
+        if (typeof operatorNoteScanRefused === 'function') operatorNoteScanRefused(ScannerState.lastSyncError);
         console.log('Auto-sync failed:', err);
         updateScannerSyncLine();
     } finally {
@@ -386,15 +387,16 @@ function startScannerSession() {
 // scanning fields stay switched off until a Remark has been typed.
 function setScannerRemarkLocked(locked) {
     const input = document.getElementById('scannerRemarkInput');
-    input.readOnly = locked;
-    input.classList.toggle('locked', locked);
-    if (locked) input.value = ScannerState.remark;
-    document.getElementById('scannerRemarkCard').style.display = locked ? 'none' : '';
+    const jobRemark = typeof operatorRemark === 'function' ? operatorRemark() : '';     // a labourer's Remark is the job name from the QR link
+    input.readOnly = locked || !!jobRemark;
+    input.classList.toggle('locked', locked || !!jobRemark);
+    if (locked) input.value = ScannerState.remark; else if (jobRemark) input.value = jobRemark;
+    document.getElementById('scannerRemarkCard').style.display = (locked || jobRemark) ? 'none' : '';
     updateScannerScanFieldsEnabled();
 }
 
 function updateScannerScanFieldsEnabled() {
-    const ready = !!(ScannerState.remark || document.getElementById('scannerRemarkInput').value.trim());
+    const ready = !!(ScannerState.remark || document.getElementById('scannerRemarkInput').value.trim()) && !(typeof operatorBlocked === 'function' && operatorBlocked());
     ['boxIdInput', 'barcodeInput', 'scannerKbdBtn'].forEach(id => { document.getElementById(id).disabled = !ready; });
 }
 
@@ -405,6 +407,7 @@ function handleBoxIdScan(e) {
     if (e.key !== 'Enter') return;
     const boxId = document.getElementById('boxIdInput').value.trim();
     if (!boxId) return;
+    if (typeof operatorBlocked === 'function' && operatorBlocked()) { alert(opT('blocked')); document.getElementById('boxIdInput').value = ''; return; }
 
     // The first scan begins the session - which needs the Remark.
     if (!ScannerState.remark && !startScannerSession()) { document.getElementById('boxIdInput').value = ''; return; }
@@ -439,6 +442,7 @@ async function handleBarcodeScan(e) {
     if (e.key !== 'Enter') return;
     const barcode = document.getElementById('barcodeInput').value.trim();
     if (!barcode) return;
+    if (typeof operatorBlocked === 'function' && operatorBlocked()) { alert(opT('blocked')); document.getElementById('barcodeInput').value = ''; return; }
 
     if (ScannerState.inputMode === 'Nu' && !/^\d+$/.test(barcode)) {
         alert(scannerT('errNumericOnly') + ': ' + barcode);

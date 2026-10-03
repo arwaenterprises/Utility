@@ -43,7 +43,7 @@ async function start() {
 }
 
 // Opens the app with the mock backend. Returns { page, errors, close }.
-async function openApp(ctx, viewport) {
+async function openApp(ctx, viewport, urlPath) {
   const page = await ctx.browser.newPage({ viewport: viewport || { width: 420, height: 800 } });
   const errors = [];
   page.on('pageerror', e => errors.push('JS error: ' + e.message));
@@ -59,7 +59,7 @@ async function openApp(ctx, viewport) {
     window.__csp = [];
     document.addEventListener('securitypolicyviolation', e => window.__csp.push(e.violatedDirective + ' ' + e.blockedURI));
   });
-  await page.goto(`http://127.0.0.1:${ctx.port}/index.html`);
+  await page.goto(`http://127.0.0.1:${ctx.port}/${urlPath || 'index.html'}`);
   await page.waitForTimeout(400);
   return { page, errors };
 }
