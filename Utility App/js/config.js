@@ -33,7 +33,6 @@ const AppState = {
     user: null,
     profile: null,
     operator: null,              // set when this device joined a job through a team QR link (see js/operator.js)
-    pendingInvites: [],          // invitations waiting for this person (see checkForMyPendingInvite)
     currentApp: null,
     currentScreen: 'loginScreen',
     hasActiveSession: false,

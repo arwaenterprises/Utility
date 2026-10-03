@@ -72,9 +72,13 @@ function isPermissionError(err) {
 async function enterAppAsSignedInUser(session) {
     AppState.user = session.user;
     await loadUserProfile();
+    // Every Google sign-in is its own team: accounts made before that rule get theirs on the next sign-in.
+    if (AppState.profile?.tier === 'individual' && !AppState.profile?.enterprise_id && AppState.isOnline) {
+        const { error: teamError } = await supabaseClient.rpc('ensure_own_team');
+        if (!teamError) await loadUserProfile();
+    }
     updateHeaderUser();
     checkExistingSession();
-    await checkForMyPendingInvite();
     showScreen('homeScreen');
     renderAppGrid();
 }
@@ -121,14 +125,11 @@ async function openAccountModal() {
 
     const isIndividual = AppState.profile?.tier === 'individual';
     const isAdmin = AppState.profile?.tier === 'enterprise_admin';
-    document.getElementById('createEnterpriseSection').style.display = isIndividual ? 'block' : 'none';
     document.getElementById('enterpriseAdminSection').style.display = isAdmin ? 'block' : 'none';
-    setInviteOpen(false);
 
     document.getElementById('accountModal').classList.add('active');
     if (isAdmin) {
         document.getElementById('umMemberList').innerHTML = '<p style="font-size:13px; color: var(--ak-text-light);">Loading...</p>';
-        await loadPendingInvitesList();
         await loadTeamLinks();
         await loadLabourers();
         await loadUserMgmtMembers();
@@ -137,83 +138,6 @@ async function openAccountModal() {
 
 function closeAccountModal() {
     document.getElementById('accountModal').classList.remove('active');
-}
-
-async function createEnterprise() {
-    const name = document.getElementById('enterpriseNameInput').value.trim();
-    if (!name) return;
-    const { error } = await supabaseClient.rpc('create_enterprise', { enterprise_name: name });
-    if (error) {
-        alert(error.message);
-        return;
-    }
-    await loadUserProfile();
-    updateHeaderUser();
-    document.getElementById('enterpriseNameInput').value = '';
-    await openAccountModal();
-}
-
-async function sendInvite() {
-    const email = document.getElementById('inviteEmailInput').value.trim();
-    if (!email) return;
-    // The database checks that the person can really be invited (not already in a company, not a duplicate).
-    const { data, error } = await supabaseClient.rpc('send_enterprise_invite', { p_email: email });
-    if (error) {
-        alert(error.message);
-        return;
-    }
-    if (data === 'already_pending') alert('An invitation to this email is already waiting. It stays valid for 7 days.');
-    document.getElementById('inviteEmailInput').value = '';
-    await loadPendingInvitesList();
-}
-
-async function loadPendingInvitesList() {
-    const listEl = document.getElementById('pendingInvitesList');
-    const { data, error } = await supabaseClient
-        .from('enterprise_invites')
-        .select('id, invited_email, status, expires_at')
-        .eq('enterprise_id', AppState.profile.enterprise_id)
-        .order('created_at', { ascending: false });
-    if (error) {
-        listEl.textContent = '';
-        return;
-    }
-    // The database refuses an expired invite, but it keeps the row as 'pending'; show
-    // it as expired and let the admin re-send (a fresh 7-day invite) or remove it.
-    listEl.innerHTML = data.map(inv => {
-        const expired = inv.status === 'pending' && new Date(inv.expires_at) < new Date();
-        const label = expired ? 'expired' : inv.status;
-        // Every row can be cleared (an accepted invite is just history, e.g. of someone since removed).
-        const actions =
-            (expired ? `<button class="icon-btn" data-resend-invite="${inv.id}" data-email="${escapeHtml(inv.invited_email)}" title="Send a new invite">↻</button>` : '') +
-            `<button class="delete-scan-btn" data-cancel-invite="${inv.id}" title="Remove invite">✕</button>`;
-        return `
-        <div style="display:flex; justify-content:space-between; align-items:center; font-size: 13px; padding: 4px 0;${expired ? ' color: var(--ak-text-light);' : ''}">
-            <span>${escapeHtml(inv.invited_email)} — ${label}</span>
-            <span style="display:flex; gap:6px;">${actions}</span>
-        </div>`;
-    }).join('') || '<div style="font-size: 13px; color: var(--ak-text-light);">No invites yet</div>';
-}
-
-async function resendInvite(inviteId, email) {
-    const del = await supabaseClient.from('enterprise_invites').delete().eq('id', inviteId);
-    if (del.error) { alert(del.error.message); return; }
-    const { error } = await supabaseClient.from('enterprise_invites').insert({
-        enterprise_id: AppState.profile.enterprise_id,
-        invited_email: email,
-        invited_by: AppState.user.id
-    });
-    if (error) { alert(error.message); return; }
-    await loadPendingInvitesList();
-}
-
-async function cancelInvite(inviteId) {
-    const { error } = await supabaseClient.from('enterprise_invites').delete().eq('id', inviteId);
-    if (error) {
-        alert(error.message);
-        return;
-    }
-    await loadPendingInvitesList();
 }
 
 // ============================================
@@ -317,13 +241,6 @@ function exportScansToExcel(rows, filenamePrefix) {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Team Scans');
     XLSX.writeFile(wb, `${filenamePrefix}_${new Date().toISOString().slice(0,10)}.xlsx`);
-}
-
-// The invite form stays folded away until the admin asks for it.
-function setInviteOpen(open) {
-    document.getElementById('teamInviteSection').style.display = open ? 'block' : 'none';
-    document.getElementById('inviteToggleBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (open) document.getElementById('inviteEmailInput').focus();
 }
 
 // Two tabs: Box Scanner scans | Year/Season Sort scans (each has its own list, Select All, Download and Reset).
@@ -828,86 +745,10 @@ async function removeMember(memberId) {
         alert(error.message);
         return;
     }
-    // The person's old "accepted" invite would otherwise stay in the list for ever.
-    const removed = teamMemberStatsCache.find(m => m.user_id === memberId);
-    if (removed && removed.email) {
-        await supabaseClient.from('enterprise_invites').delete()
-            .eq('enterprise_id', AppState.profile.enterprise_id)
-            .eq('status', 'accepted')
-            .ilike('invited_email', removed.email);
-    }
     selectedMemberIds.delete(memberId);
     expandedMemberIds.delete(memberId);
     teamMemberBoxesCache.delete(memberId);
     await loadUserMgmtMembers();
-    await loadPendingInvitesList();
-}
-
-// ---- Invitations waiting for the signed-in person ----
-// The database returns them with the company name. One invitation: the banner says who invited you and has an
-// Accept button. Several: the banner says how many and opens a window to choose - you can join only one company,
-// and accepting one closes the others.
-function inviteText() {
-    const ar = (typeof AppLang !== 'undefined' && AppLang.get() === 'ar');
-    return ar
-        ? { title: 'تمت دعوتك', one: n => `دعتك ${n} للانضمام إليها`, many: k => `لديك ${k} دعوات`, accept: 'قبول', choose: 'اختيار', heading: 'دعواتك', hint: 'اختر الشركة التي تريد الانضمام إليها. يمكنك الانضمام إلى شركة واحدة فقط.', later: 'لاحقًا' }
-        : { title: "You've been invited", one: n => `${n} invited you to join`, many: k => `You have ${k} invitations`, accept: 'Accept', choose: 'Choose', heading: 'Your invitations', hint: 'Choose the company you want to join. You can join only one.', later: 'Later' };
-}
-
-function renderInviteBanner() {
-    const banner = document.getElementById('inviteBanner');
-    const list = AppState.pendingInvites || [];
-    if (!list.length) { banner.style.display = 'none'; return; }
-    const t = inviteText();
-    document.getElementById('inviteBannerTitle').textContent = t.title;
-    document.getElementById('inviteBannerInfo').textContent = list.length === 1 ? t.one(list[0].enterprise_name || '') : t.many(list.length);
-    document.getElementById('acceptInviteBtn').textContent = list.length === 1 ? t.accept : t.choose;
-    banner.style.display = 'flex';
-}
-
-async function checkForMyPendingInvite() {
-    AppState.pendingInvites = [];
-    if (AppState.profile?.tier !== 'individual') { renderInviteBanner(); return; }
-    const { data, error } = await supabaseClient.rpc('my_pending_invites');
-    if (!error && data) AppState.pendingInvites = data;
-    renderInviteBanner();
-}
-
-function openInviteChooser() {
-    const t = inviteText();
-    document.getElementById('inviteModalTitle').textContent = t.heading;
-    document.getElementById('inviteModalHint').textContent = t.hint;
-    document.getElementById('inviteModalCloseBtn').textContent = t.later;
-    const el = document.getElementById('inviteModalList');
-    el.setAttribute('dir', (typeof AppLang !== 'undefined' && AppLang.get() === 'ar') ? 'rtl' : 'ltr');
-    el.innerHTML = (AppState.pendingInvites || []).map(i => `
-        <div class="invite-choice">
-            <span><strong>${escapeHtml(i.enterprise_name || '')}</strong><br><small>${new Date(i.expires_at).toLocaleDateString()}</small></span>
-            <button class="btn btn-primary" type="button" data-accept-invite="${i.token}">${t.accept}</button>
-        </div>`).join('');
-    document.getElementById('inviteModal').classList.add('active');
-}
-
-async function acceptInviteToken(token) {
-    const { error } = await supabaseClient.rpc('accept_enterprise_invite', { invite_token: token });
-    if (error) {
-        alert(error.message);
-        await checkForMyPendingInvite();      // the list may have changed (expired or already closed)
-        return;
-    }
-    AppState.pendingInvites = [];
-    document.getElementById('inviteModal').classList.remove('active');
-    document.getElementById('inviteBanner').style.display = 'none';
-    await loadUserProfile();
-    updateHeaderUser();
-    renderAppGrid();
-}
-
-async function acceptMyInvite() {
-    const list = AppState.pendingInvites || [];
-    if (list.length === 0) return;
-    if (list.length === 1) return acceptInviteToken(list[0].token);
-    openInviteChooser();
 }
 
 // ============================================
@@ -1038,13 +879,8 @@ function setupEventListeners() {
     document.getElementById('updateBtn').addEventListener('click', onUpdateIconTap);
     document.getElementById('updateNowBtn').addEventListener('click', updateAppNow);
     document.getElementById('updateLaterBtn').addEventListener('click', () => { document.getElementById('updateModal').classList.remove('active'); });
-    document.getElementById('createEnterpriseBtn').addEventListener('click', createEnterprise);
-    document.getElementById('sendInviteBtn').addEventListener('click', sendInvite);
-    document.getElementById('acceptInviteBtn').addEventListener('click', acceptMyInvite);
-    document.getElementById('inviteModalCloseBtn').addEventListener('click', () => document.getElementById('inviteModal').classList.remove('active'));
-    document.getElementById('inviteModalList').addEventListener('click', (e) => { const t = e.target.dataset.acceptInvite; if (t) acceptInviteToken(t); });
-    if (typeof AppLang !== 'undefined') AppLang.onChange(() => { renderInviteBanner(); });
     document.getElementById('dataHelpBtn').addEventListener('click', () => helpShow('dataManagement'));
+    document.getElementById('qlHelpBtn').addEventListener('click', () => helpShow('teamLinks'));
     document.getElementById('umMemberList').addEventListener('click', (e) => {
         const removeId = e.target.dataset.removeMember;
         if (removeId) removeMember(removeId);
@@ -1055,19 +891,12 @@ function setupEventListeners() {
         if (rem) removeLabourer(rem);
     });
     document.getElementById('closeTeamBtn').addEventListener('click', closeTeamModal);
-    document.getElementById('inviteToggleBtn').addEventListener('click', () => setInviteOpen(document.getElementById('teamInviteSection').style.display === 'none'));
     document.querySelectorAll('[data-team-tab]').forEach(t => t.addEventListener('click', () => showTeamTab(t.dataset.teamTab)));
     document.getElementById('teamYsSelectAll').addEventListener('change', (e) => {
         document.querySelectorAll('.team-ys-checkbox').forEach(cb => {
             cb.checked = e.target.checked;
             if (e.target.checked) selectedYsMemberIds.add(cb.dataset.ysMember); else selectedYsMemberIds.delete(cb.dataset.ysMember);
         });
-    });
-    document.getElementById('pendingInvitesList').addEventListener('click', (e) => {
-        const id = e.target.dataset.cancelInvite;
-        if (id) cancelInvite(id);
-        const resendId = e.target.dataset.resendInvite;
-        if (resendId) resendInvite(resendId, e.target.dataset.email);
     });
 
     document.getElementById('teamSearchInput').addEventListener('input', (e) => runTeamSearch(e.target.value));

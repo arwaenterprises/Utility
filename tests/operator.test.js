@@ -191,6 +191,18 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   await page.click('[data-remove-labourer]'); await page.waitForTimeout(300);
   ok('the admin can remove a labourer', /Nobody has joined/.test(await page.textContent('#umLabourList')));
 
+  // --- 10. guides ---
+  await page.evaluate(() => { closeTeamModal(); return openAccountModal(); });
+  await page.waitForTimeout(300);
+  await page.click('#qlHelpBtn');
+  const g = await page.evaluate(() => ({ open: document.getElementById('helpModal').classList.contains('active'), title: document.getElementById('helpTitle').textContent, steps: document.querySelectorAll('#helpBody ol li').length }));
+  ok('the "?" next to Team QR links opens its guide (English)', g.open && /Team QR links/.test(g.title) && g.steps === 6, JSON.stringify(g));
+  await page.evaluate(() => { AppLang.set('ar'); helpShow('teamLinks'); });
+  const ga = await page.evaluate(() => ({ title: document.getElementById('helpTitle').textContent, rtl: document.getElementById('helpBody').dir, steps: document.querySelectorAll('#helpBody ol li').length }));
+  ok('...and in Arabic, right-to-left, with the same six steps', /[\u0600-\u06FF]/.test(ga.title) && ga.rtl === 'rtl' && ga.steps === 6, JSON.stringify(ga));
+  ok('both tool guides tell labourers the Remark is the job name', await page.evaluate(() => ['boxScanner', 'yearSegregate'].every(id => ['en', 'ar'].every(l => HELP[id][l].tips.some(x => /QR/.test(x))))));
+  await page.evaluate(() => { document.getElementById('helpCloseBtn').click(); AppLang.set('en'); });
+
   ok('no content-security-policy violations', (await page.evaluate(() => window.__csp.length)) === 0);
   const fails = report(log, errors);
   await stop(ctx);

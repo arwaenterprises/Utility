@@ -40,6 +40,9 @@ begin
   reset role;
 end $$;
 
+-- the app gives every Google sign-in its own team; these tests build accounts of every kind by hand, so it is switched off here
+set app.skip_auto_team = 'on';
+
 -- people: A = individual, E1 = admin of enterprise 1, B1 = member of enterprise 1, E2 = admin of enterprise 2
 insert into auth.users(id,email) values
   ('00000000-0000-0000-0000-00000000000a','indiv@x.com'),
@@ -355,6 +358,38 @@ select _t_eq('another team''s admin does not see them either', _t_val('00000000-
 select _t_eq('search finds a labourer by name and shows the name', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from search_team_scans('rav', 50) where operator_name ilike 'ravi'$$), 2);
 select _t_eq('search finds scans by job name', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from search_team_scans('Inbound 9', 50)$$), 2);
 delete from scans where box_number in ('PB1','PB2');
+
+-- ============ every Google sign-in is its own team ============
+reset app.skip_auto_team;
+insert into auth.users(id,email) values ('00000000-0000-0000-0000-0000000000a1','newbie@x.com');
+select _t_eq('a brand-new Google sign-in gets its own team and is its admin', (select count(*) from profiles p join enterprises e on e.id = p.enterprise_id where p.email='newbie@x.com' and p.tier='enterprise_admin' and e.admin_user_id = p.id), 1);
+select _t_do('00000000-0000-0000-0000-0000000000a1', $$select create_team_link('boxScanner','Solo job')$$);
+select _t_eq('...so a solo user can make Team QR links straight away', (select count(*) from team_links l join profiles p on p.enterprise_id = l.enterprise_id where p.email='newbie@x.com'), 1);
+select _t_eq('...and still sees none of the other teams', _t_val('00000000-0000-0000-0000-0000000000a1', $$select count(*) from list_team_operators()$$), 0);
+-- a labourer (anonymous, no e-mail) never gets a team of its own
+insert into auth.users(id,email) values ('00000000-0000-0000-0000-0000000000a2', null);
+select _t_eq('an anonymous labourer does not get a team', (select count(*) from profiles where id='00000000-0000-0000-0000-0000000000a2' and enterprise_id is null and tier='individual'), 1);
+-- an account from before this rule: its old rows move into the new team
+set app.skip_auto_team = 'on';
+insert into auth.users(id,email) values ('00000000-0000-0000-0000-0000000000a3','oldtimer@x.com');
+reset app.skip_auto_team;
+insert into scans(user_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000a3','OLD1','9');
+insert into ys_scans(user_id,scan_uid,barcode,ptl_number) values ('00000000-0000-0000-0000-0000000000a3',gen_random_uuid(),'8','01');
+select _t_eq('an old individual account has no team yet', (select count(*) from profiles where email='oldtimer@x.com' and enterprise_id is null), 1);
+select _t_do('00000000-0000-0000-0000-0000000000a3', $$select ensure_own_team()$$);
+select _t_eq('ensure_own_team() gives it a team', (select count(*) from profiles where email='oldtimer@x.com' and tier='enterprise_admin' and enterprise_id is not null), 1);
+select _t_eq('...and moves its old scans and Year/Season scans into that team', (select (select count(*) from scans where box_number='OLD1' and enterprise_id = p.enterprise_id) + (select count(*) from ys_scans where barcode='8' and enterprise_id = p.enterprise_id) from profiles p where p.email='oldtimer@x.com'), 2);
+select _t_do('00000000-0000-0000-0000-0000000000a3', $$select ensure_own_team()$$);
+select _t_eq('asking again does not make a second team', (select count(*) from enterprises e join profiles p on p.id = e.admin_user_id where p.email='oldtimer@x.com'), 1);
+select _t_eq('an anonymous device cannot ask for a team', _ta_val('00000000-0000-0000-0000-0000000000a2', $$select count(*) from (select ensure_own_team()) q where ensure_own_team is not null$$), 0);
+select _t_err('make_own_team() is not callable from the API', '00000000-0000-0000-0000-0000000000a3', $$select make_own_team('00000000-0000-0000-0000-0000000000a3')$$, 'permission denied');
+-- tidy up
+delete from team_links where job_name = 'Solo job';
+delete from scans where box_number = 'OLD1';
+delete from ys_scans where barcode = '8';
+delete from auth.users where id in ('00000000-0000-0000-0000-0000000000a1','00000000-0000-0000-0000-0000000000a2','00000000-0000-0000-0000-0000000000a3');
+delete from enterprises where name in ('newbie@x.com','oldtimer@x.com');
+set app.skip_auto_team = 'on';
 
 -- tidy up the people and links created here, so later checks see the same data as before
 delete from auth.users where id in ('00000000-0000-0000-0000-0000000000f1','00000000-0000-0000-0000-0000000000f2','00000000-0000-0000-0000-0000000000f3','00000000-0000-0000-0000-0000000000f4','00000000-0000-0000-0000-0000000000f5');

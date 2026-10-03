@@ -1053,6 +1053,56 @@ alter table public.profiles drop constraint if exists profiles_tier_check;
 alter table public.profiles add constraint profiles_tier_check
     check (tier in ('individual', 'enterprise_admin', 'enterprise_member', 'operator'));
 
+-- EVERY Google sign-in is its own team (enterprise level by default). A solo user is simply a team of one: they
+-- are the admin, can create Team QR links, and see only their own team's data. Labourers (anonymous, no e-mail)
+-- never get a team of their own - they join the admin's through a QR code.
+-- make_own_team(): internal (not callable from the API). Safe to call again: it does nothing for someone who
+-- already has a team. Rows the person stored before (scans, Year/Season scans, lists) carried no team; they are
+-- moved into the new one so nothing disappears from view.
+create or replace function public.make_own_team(p_user uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_p public.profiles%rowtype;
+    v_eid uuid;
+begin
+    select * into v_p from public.profiles where id = p_user for update;
+    if not found then return null; end if;
+    if v_p.enterprise_id is not null or v_p.tier <> 'individual' or coalesce(v_p.email, '') = '' then
+        return v_p.enterprise_id;
+    end if;
+    insert into public.enterprises (name, admin_user_id)
+    values (coalesce(nullif(btrim(v_p.display_name), ''), v_p.email), p_user)
+    returning id into v_eid;
+    update public.profiles set tier = 'enterprise_admin', enterprise_id = v_eid where id = p_user;
+    update public.scans set enterprise_id = v_eid where user_id = p_user and enterprise_id is null;
+    update public.ys_scans set enterprise_id = v_eid where user_id = p_user and enterprise_id is null;
+    update public.reference_chunks set enterprise_id = v_eid where user_id = p_user and enterprise_id is null;
+    return v_eid;
+end;
+$$;
+revoke execute on function public.make_own_team(uuid) from public, anon, authenticated;
+
+-- What the app calls right after a Google sign-in, for accounts created before this rule existed.
+create or replace function public.ensure_own_team()
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if auth.uid() is null or coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then
+        return null;
+    end if;
+    return public.make_own_team(auth.uid());
+end;
+$$;
+revoke execute on function public.ensure_own_team() from public, anon;
+grant execute on function public.ensure_own_team() to authenticated;
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -1062,6 +1112,10 @@ as $$
 begin
     insert into public.profiles (id, email, display_name)
     values (new.id, coalesce(new.email, ''), coalesce(new.raw_user_meta_data->>'full_name', new.email, ''));
+    -- (the test suite switches this off with  set app.skip_auto_team = 'on'  to build accounts of every kind)
+    if coalesce(new.email, '') <> '' and coalesce(current_setting('app.skip_auto_team', true), '') <> 'on' then
+        perform public.make_own_team(new.id);
+    end if;
     return new;
 end;
 $$;
@@ -1450,6 +1504,10 @@ drop policy if exists "block_unjoined_anon" on public.reference_chunks;
 create policy "block_unjoined_anon" on public.reference_chunks as restrictive for all to authenticated
     using (not (select public.is_unjoined_anon())) with check (not (select public.is_unjoined_anon()));
 
+
+-- Existing individual accounts become their own team (runs every time; does nothing once everybody has one).
+select public.make_own_team(id) from public.profiles
+where tier = 'individual' and enterprise_id is null and coalesce(email, '') <> '';
 
 -- ============================================
 -- ROLLED BACK: self-service account deletion

@@ -85,6 +85,7 @@ window.__rpcCalls = [];
     list_team_operators: () => (window.__labourers = window.__labourers || []).map(o => ({ ...o })),
     rename_team_operator: ({ p_operator_id, p_name }) => { window.__labourers.forEach(o => { if (o.id === p_operator_id) o.name = p_name; }); },
     remove_team_operator: ({ p_operator_id }) => { window.__labourers.forEach(o => { if (o.id === p_operator_id) o.removed_at = new Date().toISOString(); }); },
+    ensure_own_team: () => { window.__me.tier = 'enterprise_admin'; window.__me.enterprise_id = 'E1'; return 'E1'; },
     remove_enterprise_member: ({ member_user_id }) => { window.__removedMember = member_user_id; return true; },
     my_pending_invites: () => window.__me.enterprise_id ? [] : db.enterprise_invites
       .filter(i => i.status === 'pending' && new Date(i.expires_at) > new Date() && String(i.invited_email).toLowerCase() === String(window.__me.email).toLowerCase())

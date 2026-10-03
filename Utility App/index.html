@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=59"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=59"></script>
-    <script src="vendor/qrcode.min.js?v=59"></script>
-    <script src="vendor/html5-qrcode.min.js?v=59"></script>
-    <script src="vendor/supabase.js?v=59"></script>
+    <script src="vendor/xlsx.full.min.js?v=60"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=60"></script>
+    <script src="vendor/qrcode.min.js?v=60"></script>
+    <script src="vendor/html5-qrcode.min.js?v=60"></script>
+    <script src="vendor/supabase.js?v=60"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -41,8 +41,8 @@
         <div class="online-status online" id="onlineStatus">Online</div>
     </header>
 
-    <!-- USER MANAGEMENT (the user icon in the top bar): account details, create an enterprise, and - for the
-         enterprise admin - rename, invite, members. The scans / downloads / resets live in Data Management. -->
+    <!-- USER MANAGEMENT (the user icon in the top bar): account details and - for the
+         enterprise admin - rename, Team QR links, members, labourers. The scans / downloads / resets live in Data Management. -->
     <div class="modal-overlay" id="accountModal">
         <div class="modal" style="max-width: 640px;">
             <h3 class="modal-title team-title"><img class="title-icon" src="icons/ui-users.png" alt=""> <span>User management</span>
@@ -53,18 +53,11 @@
                     <p id="accountTierDisp" style="color: var(--ak-text-light); font-size: 13px;"></p>
                 </div>
 
-                <div class="settings-section" id="createEnterpriseSection" style="display:none;">
-                    <h4>Create an Enterprise</h4>
-                    <p style="font-size: 13px; color: var(--ak-text-light); margin-bottom: 10px;">Manage a team and see their scans.</p>
-                    <input type="text" id="enterpriseNameInput" class="form-input" placeholder="Enterprise name" style="margin-bottom: 10px;">
-                    <button class="btn btn-primary btn-block" id="createEnterpriseBtn">Create</button>
-                </div>
-
                 <div id="enterpriseAdminSection" style="display:none;">
                     <div class="um-enterprise"><strong id="umEnterprise">Team</strong>
                         <button class="icon-btn" id="renameEnterpriseBtn" title="Rename enterprise" aria-label="Rename enterprise" style="font-size:14px;">✏️</button></div>
                     <div class="settings-section" id="qrLinksSection">
-                        <h4 data-i18n="ql_h">Team QR links</h4>
+                        <h4><span data-i18n="ql_h">Team QR links</span> <button class="icon-btn" id="qlHelpBtn" type="button" title="How to use this tool" aria-label="How to use this tool">?</button></h4>
                         <p class="ql-hint" data-i18n="ql_p">Labourers join with a QR code &mdash; no Google account. Each link is for one tool and one job. A new link for the same tool replaces the old one.</p>
                         <div id="qrLinkList"></div>
                         <div class="ql-new">
@@ -72,12 +65,6 @@
                             <input type="text" id="qrJobInput" class="form-input" maxlength="60" autocomplete="off">
                             <button class="btn btn-primary btn-block" id="qrCreateBtn" type="button" data-i18n="ql_create">Create QR link</button>
                         </div>
-                    </div>
-                    <button class="btn btn-secondary team-invite-toggle" id="inviteToggleBtn" type="button" aria-expanded="false">✉️ Invite a teammate</button>
-                    <div class="settings-section" id="teamInviteSection" style="display:none;">
-                        <input type="email" id="inviteEmailInput" class="form-input" placeholder="teammate@email.com" style="margin-bottom: 10px;">
-                        <button class="btn btn-primary btn-block" id="sendInviteBtn">Send Invite</button>
-                        <div id="pendingInvitesList" style="margin-top: 12px;"></div>
                     </div>
                     <h4 style="margin: 10px 0 6px;">Team members</h4>
                     <div id="umMemberList"></div>
@@ -174,20 +161,6 @@
         </div>
     </div>
 
-    <!-- INVITATIONS: shown when the person has more than one waiting invitation, so they choose which company to join -->
-    <div class="modal-overlay" id="inviteModal">
-        <div class="modal" style="max-width: 420px;">
-            <h3 class="modal-title" id="inviteModalTitle">Your invitations</h3>
-            <div class="modal-body" style="text-align: left;">
-                <p id="inviteModalHint" style="font-size: 13px; color: var(--ak-text-light); margin-bottom: 10px;">Choose the company you want to join. You can join only one.</p>
-                <div id="inviteModalList"></div>
-            </div>
-            <div class="modal-buttons">
-                <button class="btn btn-secondary btn-block" id="inviteModalCloseBtn" type="button">Later</button>
-            </div>
-        </div>
-    </div>
-
     <!-- HELP MODAL: step-by-step guide for the open tool (content in js/help.js) -->
     <div class="modal-overlay" id="helpModal">
         <div class="modal help-modal">
@@ -231,7 +204,7 @@
             <div class="card login-info data-promise">
                 <h3 data-i18n="dp_h">Your data, your control</h3>
                 <ul class="dp-list">
-                    <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b data-i18n="dp1_b">Only you see your data</b><small data-i18n="dp1_s">Your scans and lists are private to you. In a company team, only the team admin can also see the team&rsquo;s data.</small></div></li>
+                    <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b data-i18n="dp1_b">Only your team sees your data</b><small data-i18n="dp1_s">Your scans and lists are private from other teams. The team admin can see them, and the names of labourers who joined by QR.</small></div></li>
                     <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b data-i18n="dp2_b">Your data stays until you delete it</b><small data-i18n="dp2_s">Delete it yourself in the app when the work is done, or email us and we will remove it.</small></div></li>
                     <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b data-i18n="dp3_b">Never sold, no ads, no tracking</b><small data-i18n="dp3_s">We do not sell data or show ads. Usage statistics are plain counts, never your barcodes.</small></div></li>
                     <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b data-i18n="dp4_b">Camera stays on your device</b><small data-i18n="dp4_s">Barcode scanning happens in your browser. Nothing is recorded or uploaded.</small></div></li>
@@ -307,14 +280,6 @@
                 <button class="session-banner-btn" id="goToSessionBtn" data-i18n="sess_btn">Go to Scanner</button>
             </div>
 
-            <div class="session-banner" id="inviteBanner" style="display:none;">
-                <span class="session-banner-icon">✉️</span>
-                <div class="session-banner-text">
-                    <strong id="inviteBannerTitle">You've been invited</strong>
-                    <span id="inviteBannerInfo">Join an enterprise</span>
-                </div>
-                <button class="session-banner-btn" id="acceptInviteBtn">Accept</button>
-            </div>
 
             <div class="app-grid" id="appGrid"></div>
         </div>
@@ -1105,22 +1070,22 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=59"></script>
-    <script src="js/lang.js?v=59"></script>
-    <script src="js/supabaseClient.js?v=59"></script>
-    <script src="js/lists.js?v=59"></script>
-    <script src="js/usage.js?v=59"></script>
-    <script src="js/syncstatus.js?v=59"></script>
-    <script src="js/help.js?v=59"></script>
-    <script src="js/tooltip.js?v=59"></script>
-    <script src="js/operator.js?v=59"></script>
-    <script src="js/teamlinks.js?v=59"></script>
-    <script src="js/app.js?v=59"></script>
-    <script src="js/boxScanner.js?v=59"></script>
-    <script src="js/itemBarcode.js?v=59"></script>
-    <script src="js/boxCode.js?v=59"></script>
-    <script src="js/boxSegregate.js?v=59"></script>
-    <script src="js/priceCheck.js?v=59"></script>
-    <script src="js/yearSegregate.js?v=59"></script>
+    <script src="js/config.js?v=60"></script>
+    <script src="js/lang.js?v=60"></script>
+    <script src="js/supabaseClient.js?v=60"></script>
+    <script src="js/lists.js?v=60"></script>
+    <script src="js/usage.js?v=60"></script>
+    <script src="js/syncstatus.js?v=60"></script>
+    <script src="js/help.js?v=60"></script>
+    <script src="js/tooltip.js?v=60"></script>
+    <script src="js/operator.js?v=60"></script>
+    <script src="js/teamlinks.js?v=60"></script>
+    <script src="js/app.js?v=60"></script>
+    <script src="js/boxScanner.js?v=60"></script>
+    <script src="js/itemBarcode.js?v=60"></script>
+    <script src="js/boxCode.js?v=60"></script>
+    <script src="js/boxSegregate.js?v=60"></script>
+    <script src="js/priceCheck.js?v=60"></script>
+    <script src="js/yearSegregate.js?v=60"></script>
 </body>
 </html>

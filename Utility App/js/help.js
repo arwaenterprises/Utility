@@ -23,6 +23,7 @@ const HELP = {
             tips: [
                 '<b>Nu</b> accepts numbers only; <b>AlNu</b> accepts letters and numbers. You can change it only when no box is open.',
                 '<b>No Dup</b> stops the same barcode being scanned twice.',
+                'If you joined with a team QR code, the Remark is the <b>job name</b> from the QR &mdash; you do not type it, and your name is saved on every scan.',
                 'Works offline. The &#10003; badge shows your scans are saved to the server.',
                 'The &#9000;&#65039; button shows or hides the on-screen keyboard (handy with a handheld scanner).',
                 'To change the Remark, tap <b>Reset</b>. If nothing was scanned yet it closes at once, with no question and no download.'
@@ -41,6 +42,7 @@ const HELP = {
             tips: [
                 '<b>Nu</b> للأرقام فقط، و<b>AlNu</b> للأحرف والأرقام. لا يمكن تغييره إلا عندما لا يكون هناك صندوق مفتوح.',
                 '<b>بدون تكرار</b> يمنع مسح الباركود نفسه مرتين.',
+                'إذا انضممت عبر رمز QR للفريق فالملاحظة هي <b>اسم المهمة</b> من الرمز — لا تكتبها، ويُحفظ اسمك مع كل عملية مسح.',
                 'يعمل بدون إنترنت. علامة &#10003; تعني أن عمليات المسح حُفظت على الخادم.',
                 'زر &#9000;&#65039; يُظهر أو يُخفي لوحة المفاتيح على الشاشة (مفيد مع الماسح اليدوي).',
                 'لتغيير الملاحظة اضغط <b>إعادة</b>. إذا لم يتم مسح شيء بعد فيُغلق فورًا بدون سؤال وبدون تحميل.'
@@ -145,6 +147,44 @@ const HELP = {
             tips: ['يعمل بدون إنترنت بعد تحميل القائمة على هذا الجهاز.']
         }
     },
+    // Not a tool: opened by the "?" next to "Team QR links" in User management.
+    teamLinks: {
+        title: { en: 'Team QR links', ar: 'روابط QR للفريق' },
+        en: {
+            intro: 'Let labourers work on a handheld without a Google account: they scan a QR code and type only their name.',
+            before: 'You must be signed in with your Google account. Each link is for ONE tool and ONE job.',
+            steps: [
+                'Open <b>User management</b> (the people icon at the top).',
+                'Under <b>Team QR links</b> choose the tool, type a <b>job name</b> (it becomes the Remark on every scan) and tap <b>Create QR link</b>.',
+                'The QR sheet shows your enterprise, your name, the tool and the job. Tap <b>Print</b>, <b>Share</b> or <b>Copy link</b> and give it to the team.',
+                'Each labourer scans the QR with the phone&rsquo;s own camera or QR scanner, checks the names, types their name and taps <b>Join</b>. That handheld then shows only that one tool.',
+                'To start another job on the same tool, create a new link: it replaces the old one. Tap <b>Stop this link</b> to end a job.',
+                'Under <b>Labourers</b> you can correct a name or remove a person. In <b>Data Management</b> you see every labourer by name, with the job.'
+            ],
+            tips: [
+                'A link switches itself off after <b>3 days without scans</b>. The handheld then stops accepting new scans, but nothing is deleted.',
+                'Scans stay on the server until <b>you</b> delete them in Data Management. A labourer&rsquo;s <b>Reset</b> only clears their own handheld.',
+                'Anyone who gets the QR can join, so share it only with your team and stop it when the job is done.'
+            ]
+        },
+        ar: {
+            intro: 'دع العمال يعملون على الجهاز المحمول دون حساب Google: يمسحون رمز QR ويكتبون اسمهم فقط.',
+            before: 'يجب أن تكون مسجّل الدخول بحساب Google. كل رابط لأداة واحدة ومهمة واحدة.',
+            steps: [
+                'افتح <b>User management</b> (أيقونة الأشخاص في الأعلى).',
+                'تحت <b>روابط QR للفريق</b> اختر الأداة، واكتب <b>اسم المهمة</b> (يصبح الملاحظة في كل عملية مسح) ثم اضغط <b>إنشاء رابط QR</b>.',
+                'تعرض ورقة QR اسم مؤسستك واسمك والأداة والمهمة. اضغط <b>طباعة</b> أو <b>مشاركة</b> أو <b>نسخ الرابط</b> وسلّمها للفريق.',
+                'يمسح كل عامل الرمز بكاميرا الهاتف أو ماسح QR، ويتأكد من الأسماء، ويكتب اسمه ثم يضغط <b>انضمام</b>. بعدها يعرض الجهاز تلك الأداة فقط.',
+                'لبدء مهمة أخرى على الأداة نفسها أنشئ رابطًا جديدًا: يحلّ محل القديم. اضغط <b>إيقاف هذا الرابط</b> لإنهاء مهمة.',
+                'تحت <b>العمال</b> يمكنك تصحيح اسم أو إزالة شخص. وفي <b>Data Management</b> ترى كل عامل باسمه مع المهمة.'
+            ],
+            tips: [
+                'يتوقف الرابط تلقائيًا بعد <b>3 أيام دون مسح</b>. عندها يتوقف الجهاز عن قبول عمليات مسح جديدة، ولا يُحذف شيء.',
+                'تبقى عمليات المسح على الخادم حتى <b>تحذفها أنت</b> في Data Management. زر <b>Reset</b> عند العامل يمسح جهازه فقط.',
+                'يستطيع أي شخص يحصل على الرمز الانضمام، فشاركه مع فريقك فقط وأوقفه عند انتهاء المهمة.'
+            ]
+        }
+    },
     dataManagement: {
         en: {
             intro: 'See what you have scanned, download it as Excel, or clear it.',
@@ -187,7 +227,8 @@ const HELP = {
             tips: [
                 'You cannot change Nu/AlNu or Reset while a PTL box is still open.',
                 'The &#127760; button turns spoken prompts on or off and picks their language.',
-                'Tap a PTL in the list to see its details.'
+                'Tap a PTL in the list to see its details.',
+                'If you joined with a team QR code, the Remark is the <b>job name</b> from the QR &mdash; you do not type it, and your name is saved on every scan.'
             ]
         },
         ar: {
@@ -205,7 +246,8 @@ const HELP = {
             tips: [
                 'لا يمكنك تغيير Nu/AlNu أو عمل Reset وهناك صندوق PTL مفتوح.',
                 'زر &#127760; يشغّل التنبيهات الصوتية أو يوقفها ويختار لغتها.',
-                'اضغط على أي PTL في القائمة لعرض تفاصيله.'
+                'اضغط على أي PTL في القائمة لعرض تفاصيله.',
+                'إذا انضممت عبر رمز QR للفريق فالملاحظة هي <b>اسم المهمة</b> من الرمز — لا تكتبها، ويُحفظ اسمك مع كل عملية مسح.'
             ]
         }
     }
@@ -230,10 +272,10 @@ function helpPickLang() {
 function helpRender() {
     const h = HELP[helpAppId];
     const app = APPS.find(a => a.id === helpAppId);
-    if (!h || !app) return;
+    if (!h || !(app || h.title)) return;
     const t = HELP_UI[helpLang], c = h[helpLang];
     const list = (arr, tag) => '<' + tag + '>' + arr.map(x => '<li>' + x + '</li>').join('') + '</' + tag + '>';
-    document.getElementById('helpTitle').innerHTML = appIconHtml(app, 'title-icon') + ' ' + t.title + ' ' + app.name;
+    document.getElementById('helpTitle').innerHTML = app ? appIconHtml(app, 'title-icon') + ' ' + t.title + ' ' + app.name : t.title + ' ' + h.title[helpLang];
     document.getElementById('helpTitle').setAttribute('dir', helpLang === 'ar' ? 'rtl' : 'ltr');
     const body = document.getElementById('helpBody');
     body.setAttribute('dir', helpLang === 'ar' ? 'rtl' : 'ltr');
@@ -250,7 +292,7 @@ function helpRender() {
 }
 
 function helpShow(appId) {
-    if (!HELP[appId] || !APPS.find(a => a.id === appId)) return;
+    if (!HELP[appId] || !(HELP[appId].title || APPS.find(a => a.id === appId))) return;
     helpAppId = appId;
     helpLang = helpPickLang();
     helpRender();
