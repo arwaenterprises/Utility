@@ -128,22 +128,15 @@ select _t_eq('another enterprise admin never sees this enterprise', _t_val('0000
 select _t_eq('other enterprise admin cannot delete these', _t_val('00000000-0000-0000-0000-0000000000e2', $$with d as (delete from ys_scans returning 1) select count(*) from d$$), 0);
 select _t_eq('admin can delete team Year/Season scans', _t_val('00000000-0000-0000-0000-0000000000e1', $$with d as (delete from ys_scans where enterprise_id='11111111-1111-1111-1111-111111111111' returning 1) select count(*) from d$$), 3);
 
--- ============ enterprise rename & invites ============
+-- ============ enterprise rename ============
 select _t_err('member cannot rename the enterprise', '00000000-0000-0000-0000-0000000000b1', $$select rename_enterprise('Hacked')$$, 'Only the enterprise admin');
 select _t_err('empty enterprise name rejected', '00000000-0000-0000-0000-0000000000e1', $$select rename_enterprise('   ')$$, 'cannot be empty');
 select _t_do('00000000-0000-0000-0000-0000000000e1', $$select rename_enterprise('  New Name  ')$$);
 select _t_eq('admin rename trims and saves', (select count(*) from enterprises where name='New Name'), 1);
 
-insert into enterprise_invites(enterprise_id, invited_email, invited_by, token, expires_at) values
-  ('11111111-1111-1111-1111-111111111111','indiv@x.com','00000000-0000-0000-0000-0000000000e1','cccccccc-cccc-4ccc-8ccc-cccccccccccc', now() - interval '1 day');
-select _t_err('expired invite cannot be accepted', '00000000-0000-0000-0000-00000000000a', $$select accept_enterprise_invite('cccccccc-cccc-4ccc-8ccc-cccccccccccc')$$, 'expired');
-insert into enterprise_invites(enterprise_id, invited_email, invited_by, token) values
-  ('11111111-1111-1111-1111-111111111111','indiv@x.com','00000000-0000-0000-0000-0000000000e1','dddddddd-dddd-4ddd-8ddd-dddddddddddd');
-select _t_err('invite for another email cannot be accepted', '00000000-0000-0000-0000-00000000000c', $$select accept_enterprise_invite('dddddddd-dddd-4ddd-8ddd-dddddddddddd')$$, 'not found');
-
-select _t_err('someone already in an enterprise cannot accept another invite', '00000000-0000-0000-0000-0000000000e2', $$select accept_enterprise_invite('dddddddd-dddd-4ddd-8ddd-dddddddddddd')$$, 'already belong');
-select _t_do('00000000-0000-0000-0000-00000000000a', $$select accept_enterprise_invite('dddddddd-dddd-4ddd-8ddd-dddddddddddd')$$);
-select _t_eq('valid invite makes the person an enterprise member', (select count(*) from profiles where email='indiv@x.com' and tier='enterprise_member'), 1);
+-- the later checks need this person to be a member of enterprise 1 (they used to join by e-mail invitation)
+update profiles set tier='enterprise_member', enterprise_id='11111111-1111-1111-1111-111111111111' where email='indiv@x.com';
+select _t_eq('the person is a member of enterprise 1', (select count(*) from profiles where email='indiv@x.com' and tier='enterprise_member'), 1);
 
 -- ============ usage statistics ============
 select _t_do('00000000-0000-0000-0000-0000000000b1', $$select log_usage('box_scanner','box_closed',1,40); select log_usage('box_scanner','box_closed',2,25)$$);
@@ -170,30 +163,9 @@ select _t_eq('delete_my_account() does not exist (feature rolled back)', (select
 
 \echo All access-rule tests passed
 
--- ============ invitations ============
-insert into auth.users(id,email) values ('00000000-0000-0000-0000-0000000000d1','invitee@x.com');
-select _t_eq('admin can send an invitation', _t_val('00000000-0000-0000-0000-0000000000e1', $$select case when send_enterprise_invite('Invitee@X.com')='sent' then 1 else 0 end$$), 1);
-select _t_eq('a second invitation to the same email is ignored while one is waiting', _t_val('00000000-0000-0000-0000-0000000000e1', $$select case when send_enterprise_invite('invitee@x.com')='already_pending' then 1 else 0 end$$), 1);
-select _t_eq('...so only one invitation row exists', (select count(*) from enterprise_invites where lower(invited_email)='invitee@x.com' and enterprise_id='11111111-1111-1111-1111-111111111111'), 1);
-select _t_do('00000000-0000-0000-0000-0000000000e2', $$select send_enterprise_invite('invitee@x.com')$$);
-select _t_eq('another company can invite the same person (both invitations wait)', (select count(*) from enterprise_invites where lower(invited_email)='invitee@x.com' and status='pending'), 2);
-select _t_eq('the invited person sees both, with the company names', _t_val('00000000-0000-0000-0000-0000000000d1', $$select count(*) from my_pending_invites() where enterprise_name in ('New Name','E2')$$), 2);
-select _t_eq('someone else sees none of them', _t_val('00000000-0000-0000-0000-00000000000a', $$select count(*) from my_pending_invites()$$), 0);
-select _t_err('inviting a member of another company is refused at once', '00000000-0000-0000-0000-0000000000e2', $$select send_enterprise_invite('member1@x.com')$$, 'another company');
-select _t_err('inviting the admin of another company is refused at once', '00000000-0000-0000-0000-0000000000e1', $$select send_enterprise_invite('admin2@x.com')$$, 'another company');
-select _t_err('inviting your own team member is refused', '00000000-0000-0000-0000-0000000000e1', $$select send_enterprise_invite('member1@x.com')$$, 'already in your team');
-select _t_err('a bad email is refused', '00000000-0000-0000-0000-0000000000e1', $$select send_enterprise_invite('not-an-email')$$, 'valid email');
-select _t_err('a member cannot send invitations', '00000000-0000-0000-0000-0000000000b1', $$select send_enterprise_invite('x@y.com')$$, 'Only the enterprise admin');
-select _t_err('an individual cannot send invitations', '00000000-0000-0000-0000-00000000000a', $$select send_enterprise_invite('x@y.com')$$, 'Only the enterprise admin');
-select _t_do('00000000-0000-0000-0000-0000000000d1', $$select accept_enterprise_invite((select token from my_pending_invites() where enterprise_name='New Name'))$$);
-select _t_eq('accepting one closes the other waiting invitation (expired, not pending)', (select count(*) from enterprise_invites where lower(invited_email)='invitee@x.com' and status='expired'), 1);
-select _t_eq('the person no longer sees any waiting invitation', _t_val('00000000-0000-0000-0000-0000000000d1', $$select count(*) from my_pending_invites()$$), 0);
-select _t_err('the closed invitation can no longer be accepted', '00000000-0000-0000-0000-0000000000d1', $$select accept_enterprise_invite((select token from enterprise_invites where enterprise_id='22222222-2222-2222-2222-222222222222' and lower(invited_email)='invitee@x.com'))$$, 'already belong');
-
-
--- tidy up the person created for the invitation checks, so later checks see the same people as before
-delete from enterprise_invites where lower(invited_email) = 'invitee@x.com';
-delete from auth.users where id = '00000000-0000-0000-0000-0000000000d1';
+-- ============ e-mail invitations are gone (replaced by Team QR links) ============
+select _t_eq('the invitation functions no longer exist', (select count(*) from pg_proc where proname in ('send_enterprise_invite','accept_enterprise_invite','my_pending_invites','current_user_email')), 0);
+select _t_err('nobody can read the old invitation table through the API', '00000000-0000-0000-0000-0000000000e1', $$select count(*) from enterprise_invites$$, 'permission denied');
 
 -- ============ Team QR links (labourers without accounts) ============
 -- helpers that behave like an ANONYMOUS sign-in (the JWT says is_anonymous = true) or like the API's anon role
@@ -336,7 +308,6 @@ select _ta_err('...cannot start a list upload', '00000000-0000-0000-0000-0000000
 select _ta_err('...cannot log usage', '00000000-0000-0000-0000-0000000000f3', $$select log_usage('box_scanner','box_closed',1,1,current_date)$$, 'Join a team');
 select _ta_err('...cannot store scans', '00000000-0000-0000-0000-0000000000f3', $$insert into scans(user_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000f3','U1','1')$$, 'row-level security');
 select _ta_err('...cannot store Year/Season scans', '00000000-0000-0000-0000-0000000000f3', $$insert into ys_scans(user_id,scan_uid,barcode,ptl_number) values ('00000000-0000-0000-0000-0000000000f3',gen_random_uuid(),'1','01')$$, 'row-level security');
-select _ta_err('...cannot accept an invitation', '00000000-0000-0000-0000-0000000000f3', $$select accept_enterprise_invite(gen_random_uuid())$$, 'Join a team');
 select _ta_do('00000000-0000-0000-0000-0000000000f3', format($$select join_team_link(%L,'Zed')$$, :'tok3'));
 select _ta_do('00000000-0000-0000-0000-0000000000f3', $$insert into ys_scans(user_id,scan_uid,barcode,ptl_number) values ('00000000-0000-0000-0000-0000000000f3',gen_random_uuid(),'11','01')$$);
 select _t_eq('after joining by QR the same device can scan', (select count(*) from ys_scans where barcode='11' and operator_name='Zed'), 1);
@@ -390,6 +361,21 @@ delete from ys_scans where barcode = '8';
 delete from auth.users where id in ('00000000-0000-0000-0000-0000000000a1','00000000-0000-0000-0000-0000000000a2','00000000-0000-0000-0000-0000000000a3');
 delete from enterprises where name in ('newbie@x.com','oldtimer@x.com');
 set app.skip_auto_team = 'on';
+
+-- leaving a job takes the labourer off the link (their scans stay)
+insert into auth.users(id,email) values ('00000000-0000-0000-0000-0000000000a6', null);
+select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('boxScanner','Leave test')$$);
+select token as tokl from team_links where job_name = 'Leave test' \gset
+select _ta_do('00000000-0000-0000-0000-0000000000a6', format($$select join_team_link(%L,'Lea')$$, :'tokl'));
+select _ta_do('00000000-0000-0000-0000-0000000000a6', $$insert into scans(user_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000a6','LV1','1')$$);
+select _t_eq('before leaving the admin counts the labourer on the link', _t_val('00000000-0000-0000-0000-0000000000e1', $$select operators from list_team_links() where job_name='Leave test'$$), 1);
+select _ta_do('00000000-0000-0000-0000-0000000000a6', $$select leave_team_link()$$);
+select _t_eq('after leaving the link no longer counts them', _t_val('00000000-0000-0000-0000-0000000000e1', $$select operators from list_team_links() where job_name='Leave test'$$), 0);
+select _t_eq('...and the admin''s labourers list drops them', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from list_team_operators() where name='Lea' and removed_at is null$$), 0);
+select _t_eq('...but what they scanned stays', (select count(*) from scans where box_number='LV1' and operator_name='Lea'), 1);
+select _t_err('...and that old identity can no longer add scans', '00000000-0000-0000-0000-0000000000a6', $$insert into scans(user_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000a6','LV2','2')$$, 'has ended');
+delete from scans where box_number = 'LV1';
+delete from auth.users where id = '00000000-0000-0000-0000-0000000000a6';
 
 -- tidy up the people and links created here, so later checks see the same data as before
 delete from auth.users where id in ('00000000-0000-0000-0000-0000000000f1','00000000-0000-0000-0000-0000000000f2','00000000-0000-0000-0000-0000000000f3','00000000-0000-0000-0000-0000000000f4','00000000-0000-0000-0000-0000000000f5');

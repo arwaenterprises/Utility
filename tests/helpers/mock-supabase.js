@@ -1,5 +1,5 @@
 // In-memory Supabase mock injected before the app scripts.
-window.__db = { reference_chunks: [], ys_scans: [], scans: [], enterprises: [{ id: 'E1', name: 'Acme' }], enterprise_invites: [], usage_daily: [] };
+window.__db = { reference_chunks: [], ys_scans: [], scans: [], enterprises: [{ id: 'E1', name: 'Acme' }], usage_daily: [] };
 window.__me = { id: 'u1', enterprise_id: null, tier: 'individual', email: 'a@b.c' };
 window.__rpcCalls = [];
 (function () {
@@ -17,7 +17,6 @@ window.__rpcCalls = [];
       range(f, t) { st.range = [f, t]; return b; },
       upsert(rows, o) { st.op = 'upsert'; st.rows = rows; st.conflict = o && o.onConflict; return b; },
       delete() { st.op = 'delete'; return b; },
-      insert(row) { st.op = 'insert'; st.rows = [row]; return b; },
       maybeSingle() { st.single = true; return b; },
       single() { st.single = true; return b; },
       then(res, rej) { return Promise.resolve(run()).then(res, rej); }
@@ -25,7 +24,6 @@ window.__rpcCalls = [];
     function run() {
       let t = db[table];
       if (window.__fail && (st.op === 'upsert' || st.op === 'insert' || st.op === 'delete')) return { data: null, error: { message: 'network down (test)' } };
-      if (st.op === 'insert') { st.rows.forEach(r => t.push({ id: 'i' + Math.random(), status: 'pending', expires_at: new Date(Date.now() + 7 * 864e5).toISOString(), ...r })); return { data: null, error: null }; }
       if (table === 'profiles') return { data: { id: window.__me.id, display_name: 'Ann', email: window.__me.email, tier: window.__me.tier, enterprise_id: window.__me.enterprise_id }, error: null };
       // Same rule as the real database (scans_insert_own / ys_scans_insert_own): a scan may carry no team,
       // or the team the account belongs to RIGHT NOW. Only enforced when a test sets __enforceTeamRule.
@@ -86,28 +84,8 @@ window.__rpcCalls = [];
     rename_team_operator: ({ p_operator_id, p_name }) => { window.__labourers.forEach(o => { if (o.id === p_operator_id) o.name = p_name; }); },
     remove_team_operator: ({ p_operator_id }) => { window.__labourers.forEach(o => { if (o.id === p_operator_id) o.removed_at = new Date().toISOString(); }); },
     ensure_own_team: () => { window.__me.tier = 'enterprise_admin'; window.__me.enterprise_id = 'E1'; return 'E1'; },
+    leave_team_link: () => { window.__left = true; localStorage.removeItem('mock_operator'); },
     remove_enterprise_member: ({ member_user_id }) => { window.__removedMember = member_user_id; return true; },
-    my_pending_invites: () => window.__me.enterprise_id ? [] : db.enterprise_invites
-      .filter(i => i.status === 'pending' && new Date(i.expires_at) > new Date() && String(i.invited_email).toLowerCase() === String(window.__me.email).toLowerCase())
-      .map(i => ({ id: i.id, token: i.token || ('tok-' + i.id), enterprise_name: i.enterprise_name || 'Company ' + i.enterprise_id, expires_at: i.expires_at })),
-    accept_enterprise_invite: ({ invite_token }) => {
-      const inv = db.enterprise_invites.find(i => (i.token || ('tok-' + i.id)) === invite_token && i.status === 'pending');
-      if (window.__me.enterprise_id) throw { message: 'You already belong to an enterprise.' };
-      if (!inv) throw { message: 'Invite not found, already used, or expired.' };
-      inv.status = 'accepted';
-      db.enterprise_invites.forEach(i => { if (i !== inv && i.status === 'pending' && String(i.invited_email).toLowerCase() === String(inv.invited_email).toLowerCase()) i.status = 'expired'; });
-      window.__me = { ...window.__me, enterprise_id: inv.enterprise_id, tier: 'enterprise_member' };
-      return true;
-    },
-    send_enterprise_invite: ({ p_email }) => {
-      const email = String(p_email || '').trim().toLowerCase();
-      if (window.__me.tier !== 'enterprise_admin') throw { message: 'Only the enterprise admin can invite people.' };
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw { message: 'Please enter a valid email address.' };
-      if ((window.__alreadyInCompany || []).includes(email)) throw { message: 'This person already belongs to another company, so they cannot be invited.' };
-      if (db.enterprise_invites.some(i => i.enterprise_id === window.__me.enterprise_id && String(i.invited_email).toLowerCase() === email && i.status === 'pending' && new Date(i.expires_at) > new Date())) return 'already_pending';
-      db.enterprise_invites.push({ id: 'i' + Math.random(), enterprise_id: window.__me.enterprise_id, invited_email: email, status: 'pending', expires_at: new Date(Date.now() + 7 * 864e5).toISOString() });
-      return 'sent';
-    },
     begin_list_upload: ({ p_list_type }) => { db.reference_chunks = db.reference_chunks.filter(r => !(r.list_type === p_list_type && !r.is_active && owned(r))); },
     append_list_chunk: ({ p_list_type, p_seq, p_rows }) => {
       if (window.__failSeq === p_seq) throw { message: 'chunk failed (test)' };

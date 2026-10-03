@@ -11,15 +11,26 @@ const CONFIG = {
 // APP REGISTRY
 // ============================================
 const APPS = [
-    { id: 'boxScanner', name: 'Box-Item Scan', icon: '📦', description: 'Scan items into boxes', sessionRequired: true, containerId: 'boxScannerApp' },
-    { id: 'itemBarcode', name: 'Item Barcode Print', icon: '🏷️', description: 'Print item labels', sessionRequired: false, containerId: 'itemBarcodeApp' },
-    { id: 'boxCode', name: 'Box Code Print', icon: '🖨️', description: 'Generate box labels', sessionRequired: false, containerId: 'boxCodeApp' },
-    { id: 'boxSegregate', name: 'Box Segregate', icon: '🔍', description: 'Look up box details by barcode', sessionRequired: false, containerId: 'boxSegregateApp' },
-    { id: 'priceCheck', name: 'Price Check', icon: '💰', description: 'Check item price by barcode', sessionRequired: false, containerId: 'priceCheckApp' },
-    { id: 'yearSegregate', name: 'Year/Season Sort', icon: '🗂️', description: 'Sort items by year & season into PTL boxes', sessionRequired: true, containerId: 'yearSegregateApp' },
+    { id: 'boxScanner', name: 'Box-Item Scan', nameAr: 'مسح الصناديق والقطع', icon: '📦', description: 'Scan items into boxes', descAr: 'مسح القطع داخل الصناديق', sessionRequired: true, containerId: 'boxScannerApp' },
+    { id: 'itemBarcode', name: 'Item Barcode Print', nameAr: 'طباعة باركود القطع', icon: '🏷️', description: 'Print item labels', descAr: 'طباعة ملصقات القطع', sessionRequired: false, containerId: 'itemBarcodeApp' },
+    { id: 'boxCode', name: 'Box Code Print', nameAr: 'طباعة رمز الصندوق', icon: '🖨️', description: 'Generate box labels', descAr: 'إنشاء ملصقات الصناديق', sessionRequired: false, containerId: 'boxCodeApp' },
+    { id: 'boxSegregate', name: 'Box Segregate', nameAr: 'فرز الصناديق', icon: '🔍', description: 'Look up box details by barcode', descAr: 'البحث عن تفاصيل الصندوق بالباركود', sessionRequired: false, containerId: 'boxSegregateApp' },
+    { id: 'priceCheck', name: 'Price Check', nameAr: 'التحقق من السعر', icon: '💰', description: 'Check item price by barcode', descAr: 'معرفة سعر القطعة بالباركود', sessionRequired: false, containerId: 'priceCheckApp' },
+    { id: 'yearSegregate', name: 'Year/Season Sort', nameAr: 'الفرز حسب السنة والموسم', icon: '🗂️', description: 'Sort items by year & season into PTL boxes', descAr: 'فرز القطع حسب السنة والموسم في صناديق PTL', sessionRequired: true, containerId: 'yearSegregateApp' },
     // modal: true = opens a window (Data Management) instead of a tool screen
-    { id: 'dataManagement', name: 'Data Management', icon: '🗄️', iconImg: 'icons/ui-data.png', description: 'View, download or reset your scans', sessionRequired: false, modal: true }
+    { id: 'dataManagement', name: 'Data Management', nameAr: 'إدارة البيانات', icon: '🗄️', iconImg: 'icons/ui-data.png', description: 'View, download or reset your scans', descAr: 'عرض عمليات المسح أو تحميلها أو إعادة ضبطها', sessionRequired: false, modal: true }
 ];
+
+// A tool's name / one-line description in the app language (Arabic when the app is Arabic; see js/lang.js).
+// Pass 'ar' or 'en' to force a language (the guides use their own).
+function appName(app, lang) {
+    const l = lang || ((typeof AppLang !== 'undefined' && AppLang.get() === 'ar') ? 'ar' : 'en');
+    return l === 'ar' && app.nameAr ? app.nameAr : app.name;
+}
+function appDesc(app, lang) {
+    const l = lang || ((typeof AppLang !== 'undefined' && AppLang.get() === 'ar') ? 'ar' : 'en');
+    return l === 'ar' && app.descAr ? app.descAr : app.description;
+}
 
 // A tool's icon as HTML: its picture when it has one, otherwise its emoji.
 function appIconHtml(app, cls) {

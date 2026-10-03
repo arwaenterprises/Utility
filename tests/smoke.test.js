@@ -14,6 +14,18 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('tool names: Box-Item Scan, Item Barcode Print, Box Code Print', [...document.querySelectorAll('.app-tile .app-tile-name')].map(e => e.textContent).slice(0, 3).join('|') === 'Box-Item Scan|Item Barcode Print|Box Code Print', [...document.querySelectorAll('.app-tile .app-tile-name')].map(e => e.textContent).join('|'));
     ok('Data Management tab is called Box-Item Scan', /Box-Item Scan/.test(document.getElementById('teamTabBs').textContent));
     ok('the 7th tile uses its picture icon', !!document.querySelector('.app-tile[data-app-id="dataManagement"] img.app-tile-img[src="icons/ui-data.png"]'));
+    // Arabic tool names and descriptions
+    ok('every tool has an Arabic name and description', APPS.every(a => /[\u0600-\u06FF]/.test(a.nameAr) && /[\u0600-\u06FF]/.test(a.descAr)));
+    AppLang.set('ar'); renderAppGrid();
+    const arNames = [...document.querySelectorAll('.app-tile .app-tile-name')].map(e => e.textContent);
+    ok('Arabic app language: the home tiles show the Arabic tool names', arNames.length === 7 && arNames.every(n => /[\u0600-\u06FF]/.test(n)) && arNames[0] === 'مسح الصناديق والقطع', arNames.join('|'));
+    openApp('priceCheck');
+    ok('...the open tool\'s title bar too', /التحقق من السعر/.test(document.getElementById('appTitleText').textContent) && /[\u0600-\u06FF]/.test(document.getElementById('appSubtitleText').textContent));
+    document.getElementById('helpCloseBtn').click();
+    AppLang.set('en');
+    ok('...switching back to English restores the English title (no reload)', /Price Check/.test(document.getElementById('appTitleText').textContent) && document.getElementById('appSubtitleText').textContent === 'Check item price by barcode');
+    AppLang.set('ar'); showScreen('homeScreen'); AppLang.set('en');
+    ok('English names come back on the home screen', [...document.querySelectorAll('.app-tile .app-tile-name')][0].textContent === 'Box-Item Scan');
     for (const id of APPS.filter(a => !a.modal).map(a => a.id)) {
       let err = '';
       try { await initializeApp(id); await new Promise(r => setTimeout(r, 150)); } catch (e) { err = e.message; }

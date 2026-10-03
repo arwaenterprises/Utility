@@ -12,6 +12,8 @@ what is pending.
 | `Utility App/` | The website itself (this is the only folder Netlify publishes) |
 | `supabase/schema.sql` | The whole database: tables, access rules, functions. Safe to re-run in the Supabase SQL editor |
 | `supabase/usage_queries.sql` | Ready-made queries to see who used the app and how much (run in the Supabase SQL editor) |
+| `supabase/maintenance.sql` | Hand-run clean-up of old anonymous (QR labourer) identities - look first, then delete |
+| `docs/` | Notes and prompts: security checks record, the app-update prompt for other apps, the AdSense plan for the main website |
 | `tests/` | Automated tests (never published) |
 
 ## Tests
@@ -24,9 +26,9 @@ npm test                          # everything
 
 `npm test` runs: static checks (syntax, script / cache wiring, leftovers, secrets, security headers),
 browser tests of the real app against an in-memory fake Supabase (list upload / replace / template, sync,
-both Box Segregate modes, Price Check, Year/Season Sort, Box Scanner offline sync and Reset, Team console,
-Content-Security-Policy enforced), and database tests on a throw-away Postgres (schema runs twice cleanly,
-and 36 checks on who may read / write / delete what). The database tests are skipped when no Postgres is
+both Box Segregate modes, Price Check, Year/Season Sort, Box Scanner offline sync and Reset, Data Management,
+Team QR links for admins and labourers, Content-Security-Policy enforced), and database tests on a throw-away
+Postgres (schema runs twice cleanly, and about 150 checks on who may read / write / delete what). The database tests are skipped when no Postgres is
 reachable; run them with `PGHOST=... PGUSER=... npm run test:sql`.
 
 GitHub runs the same tests on every push (`.github/workflows/test.yml`). A red check means something that

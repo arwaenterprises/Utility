@@ -123,7 +123,6 @@ async function openAccountModal() {
     document.getElementById('accountEmailDisp').textContent = AppState.user?.email || '';
     document.getElementById('accountTierDisp').textContent = tierDisplayText(AppState.profile);
 
-    const isIndividual = AppState.profile?.tier === 'individual';
     const isAdmin = AppState.profile?.tier === 'enterprise_admin';
     document.getElementById('enterpriseAdminSection').style.display = isAdmin ? 'block' : 'none';
 
@@ -289,12 +288,14 @@ async function refreshTeamTitle() {
 
 // Data Management: the window title says whose data is shown.
 async function setDataTitle() {
-    let suffix = ' — my data';
+    const ar = typeof AppLang !== 'undefined' && AppLang.get() === 'ar';
+    let suffix = ar ? ' — بياناتي' : ' — my data';
     if (AppState.profile?.tier === 'enterprise_admin') {
         const { data } = await supabaseClient.from('enterprises').select('name').eq('id', AppState.profile.enterprise_id).maybeSingle();
-        suffix = ' — ' + ((data && data.name) || 'Team') + ' (all users)';
+        suffix = ' — ' + ((data && data.name) || 'Team') + (ar ? ' (جميع المستخدمين)' : ' (all users)');
     }
-    document.getElementById('teamModalTitle').innerHTML = '<img class="title-icon" src="icons/ui-data.png" alt=""> Data Management' + escapeHtml(suffix);
+    const dm = APPS.find(a => a.id === 'dataManagement');
+    document.getElementById('teamModalTitle').innerHTML = '<img class="title-icon" src="icons/ui-data.png" alt=""> ' + escapeHtml(appName(dm)) + escapeHtml(suffix);
 }
 
 // Scans / Year-Season queries are limited to the signed-in account's own enterprise - or, for an individual
@@ -768,7 +769,7 @@ function renderAppGrid() {
         
         tile.innerHTML = `
             <span class="app-tile-icon">${appIconHtml(app, 'app-tile-img')}</span>
-            <span class="app-tile-name">${app.name}</span>
+            <span class="app-tile-name">${appName(app)}</span>
             <span class="app-tile-lock">🔒</span>
         `;
         
@@ -787,13 +788,30 @@ function updateSessionBanner() {
 // ============================================
 // APP NAVIGATION
 // ============================================
+// The title bar of an open tool, in the app language.
+function setAppTitle(app) {
+    document.getElementById('appTitleText').innerHTML = `${appIconHtml(app, 'title-icon')} ${appName(app)}`;
+    document.getElementById('appSubtitleText').textContent = appDesc(app);
+}
+
+// Tool names follow the app language everywhere they are shown.
+function refreshToolNames() {
+    if (document.getElementById('homeScreen').classList.contains('active')) renderAppGrid();
+    const open = APPS.find(a => a.id === AppState.currentApp);
+    if (open && document.getElementById('appScreen').classList.contains('active')) setAppTitle(open);
+    const bs = APPS.find(a => a.id === 'boxScanner'), ys = APPS.find(a => a.id === 'yearSegregate');
+    document.getElementById('teamTabBs').textContent = '📦 ' + appName(bs);
+    document.getElementById('teamTabYs').textContent = '🗂️ ' + appName(ys);
+    const dm = document.getElementById('teamModalTitle');
+    if (dm && document.getElementById('teamModal').classList.contains('active')) setDataTitle();
+}
+
 function openApp(appId) {
     const app = APPS.find(a => a.id === appId);
     if (!app) return;
     
     AppState.currentApp = appId;
-    document.getElementById('appTitleText').innerHTML = `${appIconHtml(app, 'title-icon')} ${app.name}`;
-    document.getElementById('appSubtitleText').textContent = app.description;
+    setAppTitle(app);
     
     document.querySelectorAll('.app-module').forEach(m => m.classList.remove('active'));
     document.getElementById(app.containerId).classList.add('active');
@@ -1079,6 +1097,8 @@ function registerServiceWorker() {
 async function initApp() {
     updateOnlineStatus();
     setupEventListeners();
+    if (typeof AppLang !== 'undefined') AppLang.onChange(refreshToolNames);
+    refreshToolNames();
     registerServiceWorker();
     scheduleUpdateChecks();
 

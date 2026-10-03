@@ -530,12 +530,6 @@ body.rtl { direction: rtl; }
 /* ============================================
    BOX SCANNER MODULE - CSS
    ============================================ */
-.lang-toggle {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-    margin-bottom: 20px;
-}
 
 .lang-btn {
     padding: 10px 20px;
@@ -923,22 +917,8 @@ body.rtl { direction: rtl; }
     font-size: 14px;
 }
 
-.settings-link {
-    text-align: center;
-    margin-top: 8px;
-}
 
-.settings-link a {
-    color: var(--ak-text-light);
-    text-decoration: none;
-    font-size: 13px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    transition: color var(--transition-fast);
-}
 
-.settings-link a:hover { color: var(--ak-maroon); }
 
 .modal-overlay {
     display: none;
@@ -2142,7 +2122,6 @@ body.rtl .scans-table td { text-align: right; }
 .scans-table-header { margin-bottom: 6px; }
 .scans-table th { padding: 6px 8px; }
 .scans-table td { padding: 6px 8px; }
-.lang-toggle { margin-bottom: 8px; }
 
 /* Box Segregate / Price Check */
 .bs-wrap { gap: 8px; }
@@ -2315,7 +2294,6 @@ a.trust-badge:hover { box-shadow: var(--shadow-md); }
 /* help guide: Arabic reads right-to-left */
 .help-body[dir="rtl"] ol, .help-body[dir="rtl"] ul { margin: 0 20px 0 0; }
 .help-body[dir="rtl"] .help-before { border-left: none; border-right: 4px solid var(--ak-warning); }
-.help-modal .lang-toggle { margin-bottom: 8px; }
 
 /* long-press hint bubble + no phone callout menu on icon buttons */
 .longpress-tip { position: fixed; z-index: 10000; max-width: 240px; padding: 8px 12px; border-radius: 10px; background: rgba(33, 33, 33, 0.94); color: #fff; font-size: 13px; line-height: 1.35; box-shadow: var(--shadow-md); pointer-events: none; animation: fadeIn 0.12s ease; }
@@ -2329,7 +2307,6 @@ body.rtl .app-back-btn { transform: scaleX(-1); }
 .team-title { display: flex; align-items: center; justify-content: center; gap: 8px; position: relative; padding: 0 36px; }
 .team-close-x { position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--ak-gray-300); background: var(--ak-white); color: var(--ak-text-light); font-size: 16px; cursor: pointer; }
 .team-close-x:hover { background: var(--ak-gray-100); color: var(--ak-text); }
-.team-invite-toggle { width: 100%; margin-bottom: 10px; }
 .team-tabs { display: flex; gap: 6px; margin: 4px 0 12px; border-bottom: 2px solid var(--ak-gray-200); }
 .team-tab { flex: 1; padding: 10px 8px; border: none; background: none; font-size: 14px; font-weight: 600; color: var(--ak-text-light); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }
 .team-tab.active { color: var(--ak-maroon); border-bottom-color: var(--ak-maroon); }
@@ -2370,9 +2347,6 @@ body.rtl .app-back-btn { transform: scaleX(-1); }
 
 .help-ico { width: 18px; height: 18px; vertical-align: -4px; }
 
-.invite-choice { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--ak-gray-200); }
-.invite-choice:last-child { border-bottom: none; }
-.invite-choice small { color: var(--ak-text-light); font-size: 11px; }
 
 /* the Remark card on the scan screens (the only thing asked to begin a session) */
 .remark-card { background: var(--ak-white); border: 1px solid var(--ak-gray-200); border-radius: 12px; padding: 8px 10px; margin-bottom: 8px; }

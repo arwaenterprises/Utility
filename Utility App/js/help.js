@@ -275,7 +275,7 @@ function helpRender() {
     if (!h || !(app || h.title)) return;
     const t = HELP_UI[helpLang], c = h[helpLang];
     const list = (arr, tag) => '<' + tag + '>' + arr.map(x => '<li>' + x + '</li>').join('') + '</' + tag + '>';
-    document.getElementById('helpTitle').innerHTML = app ? appIconHtml(app, 'title-icon') + ' ' + t.title + ' ' + app.name : t.title + ' ' + h.title[helpLang];
+    document.getElementById('helpTitle').innerHTML = app ? appIconHtml(app, 'title-icon') + ' ' + t.title + ' ' + appName(app, helpLang) : t.title + ' ' + h.title[helpLang];
     document.getElementById('helpTitle').setAttribute('dir', helpLang === 'ar' ? 'rtl' : 'ltr');
     const body = document.getElementById('helpBody');
     body.setAttribute('dir', helpLang === 'ar' ? 'rtl' : 'ltr');

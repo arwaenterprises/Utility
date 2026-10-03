@@ -271,10 +271,7 @@ function applyScannerTranslations() {
     document.getElementById('uniqueToggleWrap').classList.toggle('locked', ScannerState.boxScanning);
 }
 
-// The language is chosen once for the whole app (see js/lang.js); the toggles in this tool just set it.
-function setScannerLanguage(lang) {
-    AppLang.set(lang);
-}
+// The language is chosen once for the whole app (see js/lang.js).
 AppLang.onChange((lang) => {
     ScannerState.language = lang;
     applyScannerTranslations();

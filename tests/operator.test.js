@@ -86,6 +86,15 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   await page.click('#signOutBtn');
   ok('leaving with scans on the device is refused', (await page.evaluate(() => (window.__alerts || []).length)) === 1 && (await page.evaluate(() => !!AppState.operator)));
 
+  // leaving: online it tells the server, then the device forgets the job and the sign-in
+  await page.evaluate(() => { AppState.hasActiveSession = false; AppState.isOnline = false; window.__alerts = []; });
+  await page.click('#signOutBtn');
+  ok('leaving while offline is refused (the admin must see it)', (await page.evaluate(() => window.__alerts.length)) === 1 && (await page.evaluate(() => !!AppState.operator)) && !(await page.evaluate(() => window.__left)));
+  await page.evaluate(() => { AppState.isOnline = true; });
+  await page.click('#signOutBtn'); await page.waitForTimeout(400);
+  const lv = await page.evaluate(() => ({ left: window.__left, op: AppState.operator, sess: localStorage.getItem('mock_session'), saved: localStorage.getItem('aku_operator'), screen: AppState.currentScreen }));
+  ok('leaving removes the labourer from the link, then signs the handheld out', lv.left === true && lv.op === null && lv.sess === null && lv.saved === null && lv.screen === 'loginScreen', JSON.stringify(lv));
+
   // --- 7. Arabic and stopped links on the join page ---
   const b = await openApp(ctx, null, 'index.html');
   errors.push(...b.errors);
@@ -200,6 +209,11 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   await page.evaluate(() => { AppLang.set('ar'); helpShow('teamLinks'); });
   const ga = await page.evaluate(() => ({ title: document.getElementById('helpTitle').textContent, rtl: document.getElementById('helpBody').dir, steps: document.querySelectorAll('#helpBody ol li').length }));
   ok('...and in Arabic, right-to-left, with the same six steps', /[\u0600-\u06FF]/.test(ga.title) && ga.rtl === 'rtl' && ga.steps === 6, JSON.stringify(ga));
+  await page.evaluate(() => AppLang.set('ar'));
+  ok('Arabic: tool names in the QR window and Data Management tabs are Arabic', await page.evaluate(() => [...document.querySelectorAll('#qrToolSelect option')].slice(1).every(o => /[\u0600-\u06FF]/.test(o.textContent)) && /مسح الصناديق/.test(document.getElementById('teamTabBs').textContent) && /[\u0600-\u06FF]/.test(opToolName('boxScanner'))));
+  await page.evaluate(() => { AppLang.set('en'); helpShow('boxScanner'); });
+  ok('the guide title names the tool in the guide language', /Box-Item Scan/.test(await page.textContent('#helpTitle')));
+  await page.evaluate(() => { document.getElementById('helpCloseBtn').click(); });
   ok('both tool guides tell labourers the Remark is the job name', await page.evaluate(() => ['boxScanner', 'yearSegregate'].every(id => ['en', 'ar'].every(l => HELP[id][l].tips.some(x => /QR/.test(x))))));
   await page.evaluate(() => { document.getElementById('helpCloseBtn').click(); AppLang.set('en'); });
 

@@ -59,7 +59,7 @@ function qlApplyTexts() {
     if (!sel) return;
     const keep = sel.value;
     sel.innerHTML = '<option value="">' + escapeHtml(qlT('pickTool')) + '</option>' +
-        APPS.filter(a => !a.modal).map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+        APPS.filter(a => !a.modal).map(a => `<option value="${a.id}">${escapeHtml(appName(a))}</option>`).join('');
     sel.value = keep;
     document.getElementById('qrJobInput').placeholder = qlT('jobPlaceholder');
     qlRenderList();

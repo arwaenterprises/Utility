@@ -24,6 +24,7 @@ const OP_T = {
         nameRequired: 'Please type your name.',
         joinFailed: 'Could not join. Please try again.',
         leaveBusy: 'Reset your scans first (this downloads them), then you can leave this job.',
+        leaveOnline: 'Connect to the internet to leave this job, so your admin sees that you have left.',
         leaveAsk: 'Leave this job on this device? To work again you will need to scan the QR code.',
         banner: { stopped: 'This job has been stopped by your admin. New scanning is switched off.',
                   inactive: 'This job was switched off after 3 days without scanning. New scanning is switched off.',
@@ -43,6 +44,7 @@ const OP_T = {
         nameRequired: 'الرجاء كتابة اسمك.',
         joinFailed: 'تعذّر الانضمام. حاول مرة أخرى.',
         leaveBusy: 'أعد ضبط عمليات المسح أولًا (تنزّل الملف)، ثم يمكنك مغادرة هذه المهمة.',
+        leaveOnline: 'اتصل بالإنترنت لمغادرة هذه المهمة، ليرى المسؤول أنك غادرت.',
         leaveAsk: 'هل تريد مغادرة هذه المهمة على هذا الجهاز؟ للعمل مرة أخرى ستحتاج إلى مسح رمز QR.',
         banner: { stopped: 'أوقف المسؤول هذه المهمة. تم إيقاف المسح الجديد.',
                   inactive: 'تم إيقاف هذه المهمة بعد 3 أيام دون مسح. تم إيقاف المسح الجديد.',
@@ -57,7 +59,7 @@ function opT(key) {
 }
 function opToolName(toolId) {
     const app = APPS.find(a => a.id === toolId);
-    return app ? app.name : toolId;
+    return app ? appName(app) : toolId;
 }
 
 // ---- the token in the address ----
@@ -270,7 +272,11 @@ function operatorNoteScanRefused(message) {
 
 async function operatorLeave() {
     if (AppState.hasActiveSession) { alert(opT('leaveBusy')); return; }
+    if (!AppState.isOnline) { alert(opT('leaveOnline')); return; }
     if (!confirm(opT('leaveAsk'))) return;
+    // Take this person off the link first, so the admin's list and counts are right.
+    const { error } = await supabaseClient.rpc('leave_team_link');
+    if (error) { alert(opT('joinFailed')); return; }
     Storage.remove(OP_STORAGE_KEY);
     AppState.operator = null;
     document.body.classList.remove('operator-mode');

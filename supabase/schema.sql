@@ -139,17 +139,6 @@ as $$
     select coalesce((select tier = 'enterprise_admin' from public.profiles where id = auth.uid()), false);
 $$;
 
-create or replace function public.current_user_email()
-returns text
-language sql
-security definer
-set search_path = public
-stable
-as $$
-    select email from auth.users where id = auth.uid();
-$$;
-
-grant execute on function public.current_user_email() to authenticated;
 
 -- ============================================
 -- CONTROLLED TIER/ENTERPRISE TRANSITIONS
@@ -187,117 +176,11 @@ begin
 end;
 $$;
 
-create or replace function public.accept_enterprise_invite(invite_token uuid)
-returns boolean
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-    matched_invite record;
-    caller_email text;
-    caller_enterprise_id uuid;
-begin
-    if public.is_unjoined_anon() then raise exception 'Join a team with its QR code first.'; end if;
-    select email into caller_email from auth.users where id = auth.uid();
-    select enterprise_id into caller_enterprise_id from public.profiles where id = auth.uid();
-
-    if caller_enterprise_id is not null then
-        raise exception 'You already belong to an enterprise.';
-    end if;
-
-    select * into matched_invite
-    from public.enterprise_invites
-    where token = invite_token
-      and status = 'pending'
-      and expires_at > now()
-      and lower(invited_email) = lower(caller_email);
-
-    if matched_invite is null then
-        raise exception 'Invite not found, already used, or expired.';
-    end if;
-
-    update public.profiles
-    set tier = 'enterprise_member', enterprise_id = matched_invite.enterprise_id
-    where id = auth.uid();
-
-    update public.enterprise_invites
-    set status = 'accepted'
-    where id = matched_invite.id;
-
-    -- The person now belongs to a company: their other waiting invitations (from other admins, or
-    -- duplicates) can never be accepted, so close them instead of leaving them "pending".
-    update public.enterprise_invites
-    set status = 'expired'
-    where lower(invited_email) = lower(caller_email)
-      and status = 'pending'
-      and id <> matched_invite.id;
-
-    return true;
-end;
-$$;
-
--- The invitations waiting for the signed-in person, with the company name (an invited person cannot read
--- the enterprises table, so this runs with the function's rights). Nothing is returned to someone who
--- already belongs to a company.
-create or replace function public.my_pending_invites()
-returns table (id uuid, token uuid, enterprise_name text, expires_at timestamptz)
-language sql
-security definer
-set search_path = public
-stable
-as $$
-    select i.id, i.token, e.name, i.expires_at
-    from public.enterprise_invites i
-    join public.enterprises e on e.id = i.enterprise_id
-    where i.status = 'pending'
-      and i.expires_at > now()
-      and lower(i.invited_email) = lower(public.current_user_email())
-      and public.current_user_enterprise_id() is null
-    order by i.created_at desc;
-$$;
-
--- Sending an invitation, with the checks the admin needs: only the admin, a sensible email, nobody who already
--- belongs to a company (this one or another - such a person could never accept), and no duplicate while an
--- earlier invitation to the same email is still waiting. Returns 'sent' or 'already_pending'.
-create or replace function public.send_enterprise_invite(p_email text)
-returns text
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-    v_email text := lower(trim(coalesce(p_email, '')));
-    v_eid uuid := public.current_user_enterprise_id();
-    v_theirs uuid;
-begin
-    if public.is_unjoined_anon() then raise exception 'Join a team with its QR code first.'; end if;
-    if not public.current_user_is_enterprise_admin() then
-        raise exception 'Only the enterprise admin can invite people.';
-    end if;
-    if v_email !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' then
-        raise exception 'Please enter a valid email address.';
-    end if;
-
-    select p.enterprise_id into v_theirs from public.profiles p where lower(p.email) = v_email limit 1;
-    if v_theirs is not null then
-        if v_theirs = v_eid then
-            raise exception 'This person is already in your team.';
-        end if;
-        raise exception 'This person already belongs to another company, so they cannot be invited.';
-    end if;
-
-    if exists (select 1 from public.enterprise_invites
-               where enterprise_id = v_eid and lower(invited_email) = v_email
-                 and status = 'pending' and expires_at > now()) then
-        return 'already_pending';
-    end if;
-
-    insert into public.enterprise_invites (enterprise_id, invited_email, invited_by)
-    values (v_eid, v_email, auth.uid());
-    return 'sent';
-end;
-$$;
+-- E-mail invitations were replaced by Team QR links. These three functions are removed (safe if they never existed).
+-- The table enterprise_invites is kept only as history; nothing can read or write it any more.
+drop function if exists public.accept_enterprise_invite(uuid);
+drop function if exists public.my_pending_invites();
+drop function if exists public.send_enterprise_invite(text);
 
 create or replace function public.remove_enterprise_member(member_user_id uuid)
 returns boolean
@@ -329,9 +212,6 @@ end;
 $$;
 
 grant execute on function public.create_enterprise(text) to authenticated;
-grant execute on function public.accept_enterprise_invite(uuid) to authenticated;
-grant execute on function public.my_pending_invites() to authenticated;
-grant execute on function public.send_enterprise_invite(text) to authenticated;
 grant execute on function public.remove_enterprise_member(uuid) to authenticated;
 
 -- ============================================
@@ -488,7 +368,7 @@ create policy "profiles_update_own" on public.profiles for update
 -- own tier to 'enterprise_admin' and enterprise_id to ANY existing enterprise's id,
 -- instantly gaining access to that enterprise's scan data. Column-level grants close
 -- that: tier/enterprise_id can only ever change via the SECURITY DEFINER functions
--- below (create_enterprise / accept_enterprise_invite), which contain their own checks.
+-- below (create_enterprise / make_own_team), which contain their own checks.
 revoke update on public.profiles from authenticated;
 grant update (display_name) on public.profiles to authenticated;
 
@@ -511,24 +391,12 @@ drop policy if exists "enterprises_update_admin" on public.enterprises;
 create policy "enterprises_update_admin" on public.enterprises for update
     using (admin_user_id = auth.uid());
 
--- enterprise_invites — only the enterprise's own admin can manage invites
+-- enterprise_invites: no policies any more (e-mail invitations were replaced by Team QR links), so the API
+-- cannot read or write the old rows.
 drop policy if exists "invites_all_admin" on public.enterprise_invites;
-create policy "invites_all_admin" on public.enterprise_invites for all
-    using (
-        enterprise_id = public.current_user_enterprise_id()
-        and public.current_user_is_enterprise_admin()
-    )
-    with check (
-        enterprise_id = public.current_user_enterprise_id()
-        and public.current_user_is_enterprise_admin()
-        and invited_by = auth.uid()
-    );
-
--- An invited (not-yet-member) user needs to be able to see their own pending
--- invite to accept it - the policy above only covers the inviting admin.
 drop policy if exists "invites_select_invitee" on public.enterprise_invites;
-create policy "invites_select_invitee" on public.enterprise_invites for select
-    using (lower(invited_email) = lower(public.current_user_email()));
+drop function if exists public.current_user_email();
+revoke all on public.enterprise_invites from anon, authenticated;
 
 -- scans — own rows always visible/writable; enterprise admin also gets their team's rows
 drop policy if exists "scans_select_own" on public.scans;
@@ -1469,6 +1337,20 @@ as $$
     order by o.joined_at desc
     limit 1;
 $$;
+
+-- A labourer who leaves a job on their handheld ("Leave this job") is taken off the link: they stop counting as
+-- someone who joined and drop out of the admin's list. What they scanned stays. Only their own place.
+create or replace function public.leave_team_link()
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+    update public.team_operators set removed_at = now()
+    where user_id = auth.uid() and removed_at is null;
+$$;
+revoke execute on function public.leave_team_link() from public, anon;
+grant execute on function public.leave_team_link() to authenticated;
 
 revoke execute on function public.create_team_link(text, text) from public, anon;
 revoke execute on function public.stop_team_link(uuid) from public, anon;
