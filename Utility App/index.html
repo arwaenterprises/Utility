@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=61"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=61"></script>
-    <script src="vendor/qrcode.min.js?v=61"></script>
-    <script src="vendor/html5-qrcode.min.js?v=61"></script>
-    <script src="vendor/supabase.js?v=61"></script>
+    <script src="vendor/xlsx.full.min.js?v=62"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=62"></script>
+    <script src="vendor/qrcode.min.js?v=62"></script>
+    <script src="vendor/html5-qrcode.min.js?v=62"></script>
+    <script src="vendor/supabase.js?v=62"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -664,7 +664,10 @@
                     </div>
                     <div id="pcCamOverlay" class="bs-cam-overlay" style="display:none;">
                         <div id="pcQrReader"></div>
-                        <button class="bs-cam-close" onclick="stopPcCamera()">✕ Close Camera</button>
+                        <div class="bs-cam-bar">
+                            <button class="bs-cam-torch" id="pcTorchBtn" type="button" style="display:none;" title="Torch" aria-label="Torch">🔦</button>
+                            <button class="bs-cam-close" onclick="stopPcCamera()" data-i18n="cam_close">✕ Close Camera</button>
+                        </div>
                     </div>
                     <div id="pcResultCard" class="pc-result" style="display:none;"></div>
                     <div id="pcNotFound" class="bs-notfound" style="display:none;"></div>
@@ -693,7 +696,10 @@
                     <!-- Camera overlay -->
                     <div id="bsCamOverlay" class="bs-cam-overlay" style="display:none;">
                         <div id="bsQrReader"></div>
-                        <button class="bs-cam-close" onclick="stopBsCamera()">✕ Close Camera</button>
+                        <div class="bs-cam-bar">
+                            <button class="bs-cam-torch" id="bsTorchBtn" type="button" style="display:none;" title="Torch" aria-label="Torch">🔦</button>
+                            <button class="bs-cam-close" onclick="stopBsCamera()" data-i18n="cam_close">✕ Close Camera</button>
+                        </div>
                     </div>
                     <div id="bsNotFound" class="bs-notfound" style="display:none;"></div>
                     <div id="bsNormalWrap">
@@ -1070,22 +1076,23 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=61"></script>
-    <script src="js/lang.js?v=61"></script>
-    <script src="js/supabaseClient.js?v=61"></script>
-    <script src="js/lists.js?v=61"></script>
-    <script src="js/usage.js?v=61"></script>
-    <script src="js/syncstatus.js?v=61"></script>
-    <script src="js/help.js?v=61"></script>
-    <script src="js/tooltip.js?v=61"></script>
-    <script src="js/operator.js?v=61"></script>
-    <script src="js/teamlinks.js?v=61"></script>
-    <script src="js/app.js?v=61"></script>
-    <script src="js/boxScanner.js?v=61"></script>
-    <script src="js/itemBarcode.js?v=61"></script>
-    <script src="js/boxCode.js?v=61"></script>
-    <script src="js/boxSegregate.js?v=61"></script>
-    <script src="js/priceCheck.js?v=61"></script>
-    <script src="js/yearSegregate.js?v=61"></script>
+    <script src="js/config.js?v=62"></script>
+    <script src="js/lang.js?v=62"></script>
+    <script src="js/supabaseClient.js?v=62"></script>
+    <script src="js/camera.js?v=62"></script>
+    <script src="js/lists.js?v=62"></script>
+    <script src="js/usage.js?v=62"></script>
+    <script src="js/syncstatus.js?v=62"></script>
+    <script src="js/help.js?v=62"></script>
+    <script src="js/tooltip.js?v=62"></script>
+    <script src="js/operator.js?v=62"></script>
+    <script src="js/teamlinks.js?v=62"></script>
+    <script src="js/app.js?v=62"></script>
+    <script src="js/boxScanner.js?v=62"></script>
+    <script src="js/itemBarcode.js?v=62"></script>
+    <script src="js/boxCode.js?v=62"></script>
+    <script src="js/boxSegregate.js?v=62"></script>
+    <script src="js/priceCheck.js?v=62"></script>
+    <script src="js/yearSegregate.js?v=62"></script>
 </body>
 </html>

@@ -21,6 +21,7 @@ async function signInWithGoogle() {
 }
 
 async function signOut() {
+    Camera.stopAll();
     await supabaseClient.auth.signOut();
     AppState.user = null;
     AppState.profile = null;
@@ -837,6 +838,7 @@ function updateBackButton() {
 }
 
 function goToHome() {
+    Camera.stopAll();                              // never leave a camera running behind another screen
     const app = APPS.find(a => a.id === AppState.currentApp);
     if (AppState.operator) return;                 // a labourer stays inside the one tool of the QR link
     if (app && app.sessionRequired && AppState.hasActiveSession) return;

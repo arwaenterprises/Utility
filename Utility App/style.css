@@ -1459,20 +1459,20 @@ body.rtl .scans-table td { text-align: right; }
     overflow: hidden;
     background: #000;
 }
-#bsQrReader {
-    width: 100%;
-}
-#bsQrReader video {
-    width: 100% !important;
-    border-radius: 12px 12px 0 0;
-}
-#bsQrReader img { display: none !important; }
-#bsQrReader__dashboard_section_csr span,
-#bsQrReader__dashboard_section_swaplink { display: none !important; }
+/* Compact camera: only a narrow strip of the picture is shown, with an aiming line; the result is under it. */
+#bsQrReader, #pcQrReader { width: 100%; height: 130px; overflow: hidden; position: relative; background: #000; }
+#bsQrReader video, #pcQrReader video { width: 100% !important; height: 130px !important; object-fit: cover; border-radius: 12px 12px 0 0; display: block; }
+#bsQrReader::after, #pcQrReader::after { content: ''; position: absolute; left: 8%; right: 8%; top: 50%; height: 2px; background: rgba(255, 60, 60, 0.85); box-shadow: 0 0 6px rgba(255, 60, 60, 0.9); pointer-events: none; }
+#bsQrReader img, #pcQrReader img { display: none !important; }
+#bsQrReader__dashboard_section_csr span, #bsQrReader__dashboard_section_swaplink,
+#pcQrReader__dashboard_section_csr span, #pcQrReader__dashboard_section_swaplink { display: none !important; }
+.bs-cam-bar { display: flex; background: #222; border-radius: 0 0 12px 12px; overflow: hidden; }
+.bs-cam-torch { flex: 0 0 56px; background: #222; color: #fff; border: none; border-right: 1px solid #444; font-size: 20px; cursor: pointer; }
+.bs-cam-torch.on { background: #f5c518; color: #000; }
 .bs-cam-close {
     display: block;
-    width: 100%;
-    padding: 12px;
+    flex: 1 1 auto;
+    padding: 10px;
     background: #222;
     color: #fff;
     border: none;
@@ -1480,7 +1480,6 @@ body.rtl .scans-table td { text-align: right; }
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
-    border-radius: 0 0 12px 12px;
 }
 .bs-cam-close:hover { background: #333; }
 

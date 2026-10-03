@@ -12,6 +12,7 @@ const TIP_AR = {
     'Type manually': 'الكتابة يدويًا',
     'Sync data': 'مزامنة البيانات',
     'Scan with camera': 'المسح بالكاميرا',
+    'Torch': 'الكشّاف (الإضاءة)',
     'Download template': 'تحميل النموذج',
     'Voice language': 'لغة الصوت',
     'Upload item master': 'رفع قائمة القطع (Item Master)',

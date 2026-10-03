@@ -11,6 +11,7 @@ const steps = [
   ['App: every tool opens', 'node', ['tests/smoke.test.js']],
   ['App: Item Barcode (shorter bars, Add text)', 'node', ['tests/itembarcode.test.js']],
   ['App: Team QR links (labourer join, single tool, switched-off job)', 'node', ['tests/operator.test.js']],
+  ['App: camera scanner (stays open, torch, vibration)', 'node', ['tests/camera.test.js']],
   ['Sync status wording', 'node', ['tests/syncstatus.test.js']],
 ];
 

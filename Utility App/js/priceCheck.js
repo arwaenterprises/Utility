@@ -7,8 +7,6 @@ const PC_STORE     = 'prices';
 let pcDb = null;
 let pcDbName = null;
 let pcListenerAdded = false;
-let pcHtml5Qr = null;
-let pcCameraActive = false;
 
 // ============================================
 // INDEXEDDB
@@ -120,45 +118,13 @@ function resetPcKeyboard() {
 // ============================================
 // CAMERA
 // ============================================
-async function togglePcCamera() {
-    if (pcCameraActive) { stopPcCamera(); return; }
-    if (typeof Html5Qrcode === 'undefined') {
-        alert('Scanner library not loaded yet — please wait a moment and try again.');
-        return;
-    }
-    const camBtn = document.getElementById('pcCamBtn');
-    camBtn.classList.add('active');
-    camBtn.textContent = '✕';
-    document.getElementById('pcCamOverlay').style.display = 'block';
-    pcCameraActive = true;
-
-    try {
-        pcHtml5Qr = new Html5Qrcode('pcQrReader');
-        await pcHtml5Qr.start(
-            { facingMode: 'environment' },
-            { fps: 10, qrbox: { width: 240, height: 120 } },
-            function(decodedText) {
-                document.getElementById('pcBarcodeInput').value = decodedText;
-                stopPcCamera();
-                lookupPriceCheck();
-            }
-        );
-    } catch (err) {
-        alert('Camera error: ' + err);
-        stopPcCamera();
-    }
-}
-
-async function stopPcCamera() {
-    if (pcHtml5Qr) {
-        try { await pcHtml5Qr.stop(); pcHtml5Qr.clear(); } catch(e) {}
-        pcHtml5Qr = null;
-    }
-    pcCameraActive = false;
-    document.getElementById('pcCamOverlay').style.display = 'none';
-    const camBtn = document.getElementById('pcCamBtn');
-    if (camBtn) { camBtn.classList.remove('active'); camBtn.textContent = '📷'; }
-}
+// The camera stays open and keeps scanning (js/camera.js); each new code is looked up and shown under the camera.
+const pcCamera = Camera.create({
+    btnId: 'pcCamBtn', overlayId: 'pcCamOverlay', readerId: 'pcQrReader', torchBtnId: 'pcTorchBtn',
+    onCode: (text) => { document.getElementById('pcBarcodeInput').value = text; lookupPriceCheck(); }
+});
+function togglePcCamera() { return pcCamera.toggle(); }
+function stopPcCamera() { return pcCamera.stop(); }
 
 // ============================================
 // LOOKUP

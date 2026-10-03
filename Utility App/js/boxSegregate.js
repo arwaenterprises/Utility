@@ -13,8 +13,6 @@ let bsMap = new Map();        // box_list: box number (lowercase) -> record
 let bsDocMap = new Map();     // doc_boxes: box number (lowercase) -> {document_number, box_number, store_name}
 let bsDocScans = [];          // Pallet-mode scans on this device: {box_number, document_number, store_name, scanned_at}
 let bsListenerAdded = false;
-let bsHtml5Qr = null;
-let bsCameraActive = false;
 let bsIsLooking = false;
 let bsPalletMode = false;
 let bsSummaryOpen = false;           // the box list under the scan result is collapsed until the user expands it
@@ -101,45 +99,13 @@ function resetBsKeyboard() {
     if (btn) btn.classList.remove('active');
 }
 
-async function toggleBsCamera() {
-    if (bsCameraActive) { stopBsCamera(); return; }
-    if (typeof Html5Qrcode === 'undefined') {
-        alert('Scanner library not loaded yet — please wait a moment and try again.');
-        return;
-    }
-    const camBtn = document.getElementById('bsCamBtn');
-    camBtn.classList.add('active');
-    camBtn.textContent = '✕';
-    document.getElementById('bsCamOverlay').style.display = 'block';
-    bsCameraActive = true;
-
-    try {
-        bsHtml5Qr = new Html5Qrcode('bsQrReader');
-        await bsHtml5Qr.start(
-            { facingMode: 'environment' },
-            { fps: 10, qrbox: { width: 240, height: 120 } },
-            function(decodedText) {
-                document.getElementById('bsBarcodeInput').value = decodedText;
-                stopBsCamera();
-                lookupSegregateBox();
-            }
-        );
-    } catch (err) {
-        alert('Camera error: ' + err);
-        stopBsCamera();
-    }
-}
-
-async function stopBsCamera() {
-    if (bsHtml5Qr) {
-        try { await bsHtml5Qr.stop(); bsHtml5Qr.clear(); } catch(e) {}
-        bsHtml5Qr = null;
-    }
-    bsCameraActive = false;
-    document.getElementById('bsCamOverlay').style.display = 'none';
-    const camBtn = document.getElementById('bsCamBtn');
-    if (camBtn) { camBtn.classList.remove('active'); camBtn.textContent = '📷'; }
-}
+// The camera stays open and keeps scanning (js/camera.js); each new code is looked up and shown under the camera.
+const bsCamera = Camera.create({
+    btnId: 'bsCamBtn', overlayId: 'bsCamOverlay', readerId: 'bsQrReader', torchBtnId: 'bsTorchBtn',
+    onCode: (text) => { document.getElementById('bsBarcodeInput').value = text; lookupSegregateBox(); }
+});
+function toggleBsCamera() { return bsCamera.toggle(); }
+function stopBsCamera() { return bsCamera.stop(); }
 
 function buildBsMap(rows) {
     bsMap = new Map();

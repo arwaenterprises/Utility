@@ -5,7 +5,7 @@
   "scripts": {
     "test": "node tests/run.js",
     "test:static": "node tests/static-checks.js",
-    "test:app": "node tests/app.test.js && node tests/scanner.test.js && node tests/smoke.test.js && node tests/itembarcode.test.js && node tests/operator.test.js && node tests/syncstatus.test.js",
+    "test:app": "node tests/app.test.js && node tests/scanner.test.js && node tests/smoke.test.js && node tests/itembarcode.test.js && node tests/operator.test.js && node tests/camera.test.js && node tests/syncstatus.test.js",
     "test:sql": "bash tests/sql/run.sh"
   },
   "devDependencies": {
