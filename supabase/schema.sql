@@ -112,6 +112,21 @@ as $$
     select enterprise_id from public.profiles where id = auth.uid();
 $$;
 
+-- Anonymous sign-in (labourers, see TEAM QR LINKS below) gives the API's "authenticated" role to ANYONE who
+-- holds the public key. An anonymous identity that has not joined a team through a QR code (profile tier is not
+-- 'operator') must not be able to store data or create anything: it is an unjoined device.
+create or replace function public.is_unjoined_anon()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false)
+           and not exists (select 1 from public.profiles where id = auth.uid() and tier = 'operator');
+$$;
+grant execute on function public.is_unjoined_anon() to authenticated;
+
 create or replace function public.current_user_is_enterprise_admin()
 returns boolean
 language sql
@@ -152,6 +167,7 @@ declare
     new_enterprise_id uuid;
     caller_enterprise_id uuid;
 begin
+    if public.is_unjoined_anon() then raise exception 'Join a team with its QR code first.'; end if;
     select enterprise_id into caller_enterprise_id from public.profiles where id = auth.uid();
     if caller_enterprise_id is not null then
         raise exception 'You already belong to an enterprise.';
@@ -180,6 +196,7 @@ declare
     caller_email text;
     caller_enterprise_id uuid;
 begin
+    if public.is_unjoined_anon() then raise exception 'Join a team with its QR code first.'; end if;
     select email into caller_email from auth.users where id = auth.uid();
     select enterprise_id into caller_enterprise_id from public.profiles where id = auth.uid();
 
@@ -252,6 +269,7 @@ declare
     v_eid uuid := public.current_user_enterprise_id();
     v_theirs uuid;
 begin
+    if public.is_unjoined_anon() then raise exception 'Join a team with its QR code first.'; end if;
     if not public.current_user_is_enterprise_admin() then
         raise exception 'Only the enterprise admin can invite people.';
     end if;
@@ -597,6 +615,7 @@ as $$
 declare
     v_eid uuid := public.current_user_enterprise_id();
 begin
+    if public.is_unjoined_anon() then raise exception 'Join a team with its QR code first.'; end if;
     if not public.can_upload_reference_list() then
         raise exception 'Only an enterprise admin or an individual account can upload lists';
     end if;
@@ -616,6 +635,7 @@ as $$
 declare
     v_eid uuid := public.current_user_enterprise_id();
 begin
+    if public.is_unjoined_anon() then raise exception 'Join a team with its QR code first.'; end if;
     if not public.can_upload_reference_list() then
         raise exception 'Only an enterprise admin or an individual account can upload lists';
     end if;
@@ -643,6 +663,7 @@ declare
     v_eid uuid := public.current_user_enterprise_id();
     v_objs jsonb;
 begin
+    if public.is_unjoined_anon() then raise exception 'Join a team with its QR code first.'; end if;
     if not public.can_upload_reference_list() then
         raise exception 'Only an enterprise admin or an individual account can upload lists';
     end if;
@@ -678,6 +699,7 @@ declare
     v_staged integer;
     v_total integer;
 begin
+    if public.is_unjoined_anon() then raise exception 'Join a team with its QR code first.'; end if;
     if not public.can_upload_reference_list() then
         raise exception 'Only an enterprise admin or an individual account can upload lists';
     end if;
@@ -884,6 +906,7 @@ as $$
 declare
     v_day date := coalesce(p_day, current_date);
 begin
+    if public.is_unjoined_anon() then raise exception 'Join a team with its QR code first.'; end if;
     if auth.uid() is null then
         raise exception 'Not signed in';
     end if;
@@ -1326,6 +1349,22 @@ grant execute on function public.remove_team_operator(uuid) to authenticated;
 grant execute on function public.join_team_link(text, text) to authenticated;
 grant execute on function public.my_team_link() to authenticated;
 grant execute on function public.get_team_link_info(text) to anon, authenticated;
+
+
+-- Restrictive policies (they are ANDed with the permissive ones above): an unjoined anonymous device can
+-- neither read nor write these tables.
+drop policy if exists "block_unjoined_anon" on public.scans;
+create policy "block_unjoined_anon" on public.scans as restrictive for all to authenticated
+    using (not (select public.is_unjoined_anon())) with check (not (select public.is_unjoined_anon()));
+drop policy if exists "block_unjoined_anon" on public.ys_scans;
+create policy "block_unjoined_anon" on public.ys_scans as restrictive for all to authenticated
+    using (not (select public.is_unjoined_anon())) with check (not (select public.is_unjoined_anon()));
+drop policy if exists "block_unjoined_anon" on public.enterprises;
+create policy "block_unjoined_anon" on public.enterprises as restrictive for all to authenticated
+    using (not (select public.is_unjoined_anon())) with check (not (select public.is_unjoined_anon()));
+drop policy if exists "block_unjoined_anon" on public.reference_chunks;
+create policy "block_unjoined_anon" on public.reference_chunks as restrictive for all to authenticated
+    using (not (select public.is_unjoined_anon())) with check (not (select public.is_unjoined_anon()));
 
 
 -- ============================================

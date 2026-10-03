@@ -326,7 +326,19 @@ select _t_eq('a removed person''s device is told so', _ta_val('00000000-0000-000
 select _ta_err('a removed person cannot scan', '00000000-0000-0000-0000-0000000000f2', $$insert into ys_scans(user_id,scan_uid,barcode,ptl_number) values ('00000000-0000-0000-0000-0000000000f2',gen_random_uuid(),'10','01')$$, 'has ended');
 select _ta_err('a removed person cannot rejoin the same job', '00000000-0000-0000-0000-0000000000f2', format($$select join_team_link(%L,'Sana')$$, :'tok3'), 'removed');
 
+-- an anonymous device that has NOT joined a team (anyone with the public key can create one) can do nothing
+insert into auth.users(id,email) values ('00000000-0000-0000-0000-0000000000f3', null);
+select _ta_err('unjoined anonymous device cannot create an enterprise', '00000000-0000-0000-0000-0000000000f3', $$select create_enterprise('Free storage Ltd')$$, 'Join a team');
+select _ta_err('...cannot start a list upload', '00000000-0000-0000-0000-0000000000f3', $$select begin_list_upload('box_list')$$, 'Join a team');
+select _ta_err('...cannot log usage', '00000000-0000-0000-0000-0000000000f3', $$select log_usage('box_scanner','box_closed',1,1,current_date)$$, 'Join a team');
+select _ta_err('...cannot store scans', '00000000-0000-0000-0000-0000000000f3', $$insert into scans(user_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000f3','U1','1')$$, 'row-level security');
+select _ta_err('...cannot store Year/Season scans', '00000000-0000-0000-0000-0000000000f3', $$insert into ys_scans(user_id,scan_uid,barcode,ptl_number) values ('00000000-0000-0000-0000-0000000000f3',gen_random_uuid(),'1','01')$$, 'row-level security');
+select _ta_err('...cannot accept an invitation', '00000000-0000-0000-0000-0000000000f3', $$select accept_enterprise_invite(gen_random_uuid())$$, 'Join a team');
+select _ta_do('00000000-0000-0000-0000-0000000000f3', format($$select join_team_link(%L,'Zed')$$, :'tok3'));
+select _ta_do('00000000-0000-0000-0000-0000000000f3', $$insert into ys_scans(user_id,scan_uid,barcode,ptl_number) values ('00000000-0000-0000-0000-0000000000f3',gen_random_uuid(),'11','01')$$);
+select _t_eq('after joining by QR the same device can scan', (select count(*) from ys_scans where barcode='11' and operator_name='Zed'), 1);
+
 -- tidy up the people and links created here, so later checks see the same data as before
-delete from auth.users where id in ('00000000-0000-0000-0000-0000000000f1','00000000-0000-0000-0000-0000000000f2');
+delete from auth.users where id in ('00000000-0000-0000-0000-0000000000f1','00000000-0000-0000-0000-0000000000f2','00000000-0000-0000-0000-0000000000f3');
 delete from scans where box_number = 'FB';
 delete from team_links;
