@@ -278,20 +278,20 @@ select _ta_do('00000000-0000-0000-0000-0000000000f1', $$insert into scans(user_i
 select _t_eq('...but a scan made BEFORE the stop (unsent on an offline device) is still accepted', (select count(*) from scans where box_number='OB5'), 1);
 select _ta_err('a stopped link cannot be joined', '00000000-0000-0000-0000-0000000000f2', format($$select join_team_link(%L,'Sana')$$, :'tok2'), 'has ended');
 
--- 3 days without scanning switches a link off
+-- links never expire: a long quiet time does NOT switch a link off
 select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('yearSegregate','Sort run A')$$);
 select token as tok3 from team_links where job_name = 'Sort run A' \gset
 select _ta_do('00000000-0000-0000-0000-0000000000f2', format($$select join_team_link(%L,'Sana')$$, :'tok3'));
 select _ta_do('00000000-0000-0000-0000-0000000000f2', $$insert into ys_scans(user_id,scan_uid,barcode,ptl_number) values ('00000000-0000-0000-0000-0000000000f2',gen_random_uuid(),'7','01')$$);
 select _t_eq('a Year/Season operator''s scan carries the job and name too', (select count(*) from ys_scans where barcode='7' and remark='Sort run A' and operator_name='Sana' and enterprise_id='11111111-1111-1111-1111-111111111111'), 1);
 update team_links set last_scan_at = now() - interval '4 days', created_at = now() - interval '5 days' where job_name = 'Sort run A';
-select _t_eq('after 4 quiet days the link reads "inactive"', _tn_val(format($$select count(*) from get_team_link_info(%L) where state='inactive'$$, :'tok3')), 1);
-select _t_eq('...and the device sees its screen is no longer active', _ta_val('00000000-0000-0000-0000-0000000000f2', $$select count(*) from my_team_link() where state='inactive'$$), 1);
-select _ta_err('...a NEW scan on it is refused', '00000000-0000-0000-0000-0000000000f2', $$insert into ys_scans(user_id,scan_uid,barcode,ptl_number) values ('00000000-0000-0000-0000-0000000000f2',gen_random_uuid(),'8','01')$$, '3 days');
-select _ta_do('00000000-0000-0000-0000-0000000000f2', $$insert into ys_scans(user_id,scan_uid,barcode,ptl_number,scanned_at) values ('00000000-0000-0000-0000-0000000000f2',gen_random_uuid(),'9','01',now() - interval '3 days 12 hours')$$);
-select _t_eq('...but a scan made inside the window, sent late, is accepted', (select count(*) from ys_scans where barcode='9'), 1);
-select _ta_err('nobody new can join an inactive link', '00000000-0000-0000-0000-0000000000f1', format($$select join_team_link(%L,'Ravi')$$, :'tok3'), '3 days');
-select _t_eq('the data of an inactive link stays (nothing is deleted)', (select count(*) from ys_scans where barcode in ('7','9')), 2);
+select _t_eq('after 4 quiet days the link still reads "active"', _tn_val(format($$select count(*) from get_team_link_info(%L) where state='active'$$, :'tok3')), 1);
+select _t_eq('...and the device still sees its screen as active', _ta_val('00000000-0000-0000-0000-0000000000f2', $$select count(*) from my_team_link() where state='active'$$), 1);
+select _ta_do('00000000-0000-0000-0000-0000000000f2', $$insert into ys_scans(user_id,scan_uid,barcode,ptl_number) values ('00000000-0000-0000-0000-0000000000f2',gen_random_uuid(),'8','01')$$);
+select _t_eq('...and a NEW scan on it is still accepted', (select count(*) from ys_scans where barcode='8'), 1);
+select _ta_do('00000000-0000-0000-0000-0000000000f1', format($$select join_team_link(%L,'Ravi')$$, :'tok3'));
+select _t_eq('a quiet link can still be joined', (select count(*) from team_operators o join team_links l on l.id=o.link_id where l.job_name='Sort run A' and o.name='Ravi'), 1);
+select _t_eq('all scans of the quiet link are kept', (select count(*) from ys_scans where barcode in ('7','8')), 2);
 
 -- removing a person
 select id as op_sana from team_operators where name = 'Sana' and link_id = (select id from team_links where job_name='Sort run A') \gset

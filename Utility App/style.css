@@ -1374,6 +1374,10 @@ body.rtl .scans-table td { text-align: right; }
         width: 100%;
     }
     .print-label:last-child { page-break-after: avoid; }
+    /* Item Barcode: while the labels print, the rest of the app is taken out of the layout (visibility:hidden
+       alone still lays it out on every page, which made big jobs - e.g. 100 labels - hang before the print window) */
+    body.printing-labels > *:not(#printContainer) { display: none !important; }
+    .print-label svg { shape-rendering: crispEdges; }
     .print-label svg,
     .print-label canvas,
     .print-label img {

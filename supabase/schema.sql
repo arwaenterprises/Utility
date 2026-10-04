@@ -911,8 +911,8 @@ revoke all on public.usage_report from anon, authenticated;
 -- functions: the two tables are closed to the API.
 --
 --  * one active link per tool: creating a new link for the same tool stops the old one (new job = new link)
---  * a link stops accepting NEW work when the admin stops it, or after 3 days without any scan (judged by the
---    time the scan was made, so scans recorded earlier on an offline device are still accepted when they arrive)
+--  * a link stops accepting NEW work only when the admin stops it (it never expires by itself; scans recorded
+--    before the stop on an offline device are still accepted when they arrive)
 --  * the job name becomes the Remark of every scan, and the operator's name is stamped on every scan
 --  * an operator can only scan (insert) for the tool of their link; they cannot delete, and cannot upload lists
 
@@ -1024,7 +1024,7 @@ alter table public.scans add column if not exists link_id uuid references public
 alter table public.ys_scans add column if not exists operator_name text;
 alter table public.ys_scans add column if not exists link_id uuid references public.team_links(id) on delete set null;
 
--- A link's state as one word. 'inactive' = no scan for 3 days (counted from creation if nobody has scanned yet).
+-- A link's state as one word: 'stopped' (the admin stopped it) or 'active'. There is no expiry. ('inactive' is no longer produced.)
 create or replace function public.team_link_state(p_stopped_at timestamptz, p_last_scan_at timestamptz, p_created_at timestamptz)
 returns text
 language sql
@@ -1032,7 +1032,6 @@ immutable
 as $$
     select case
         when p_stopped_at is not null then 'stopped'
-        when now() > coalesce(p_last_scan_at, p_created_at) + interval '3 days' then 'inactive'
         else 'active'
     end;
 $$;
@@ -1072,9 +1071,6 @@ begin
 
     if lk.stopped_at is not null and v_at > lk.stopped_at then
         raise exception 'This job has ended. Ask your admin for the new QR code.';
-    end if;
-    if v_at > coalesce(lk.last_scan_at, lk.created_at) + interval '3 days' then
-        raise exception 'This job was switched off after 3 days without scanning. Ask your admin for a new QR code.';
     end if;
 
     new.enterprise_id := lk.enterprise_id;
@@ -1294,9 +1290,6 @@ begin
     end if;
     if public.team_link_state(lk.stopped_at, lk.last_scan_at, lk.created_at) = 'stopped' then
         raise exception 'This job has ended. Ask your admin for the new QR code.';
-    end if;
-    if public.team_link_state(lk.stopped_at, lk.last_scan_at, lk.created_at) = 'inactive' then
-        raise exception 'This job was switched off after 3 days without scanning. Ask your admin for a new QR code.';
     end if;
 
     select * into op from public.team_operators where link_id = lk.id and user_id = auth.uid();

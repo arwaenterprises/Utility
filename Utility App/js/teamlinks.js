@@ -3,8 +3,8 @@
 // ============================================
 // The admin picks a tool, types a job name (it becomes the Remark of every scan) and gets a QR code. Labourers
 // scan it with the phone's own scanner - see js/operator.js for what happens on their device.
-// One active link per tool: creating a new one stops the old one. A link also switches itself off after 3 days
-// without scans (the server decides - supabase/schema.sql); data is never deleted by this.
+// One active link per tool: creating a new one stops the old one. A link never expires by itself: it works until
+// the admin stops it (the server decides - supabase/schema.sql); data is never deleted by this.
 const QL_T = {
     en: {
         none: 'No QR links yet. Create one below.',

@@ -162,7 +162,7 @@ const HELP = {
                 'Under <b>Labourers</b> you can correct a name or remove a person. In <b>Data Management</b> you see every labourer by name, with the job.'
             ],
             tips: [
-                'A link switches itself off after <b>3 days without scans</b>. The handheld then stops accepting new scans, but nothing is deleted.',
+                'A link <b>never expires by itself</b>. It works until you tap <b>Stop this link</b> (or create a new link for the same tool).',
                 'Scans stay on the server until <b>you</b> delete them in Data Management. A labourer&rsquo;s <b>Reset</b> only clears their own handheld.',
                 'Anyone who gets the QR can join, so share it only with your team and stop it when the job is done.'
             ]
@@ -179,7 +179,7 @@ const HELP = {
                 'تحت <b>العمال</b> يمكنك تصحيح اسم أو إزالة شخص. وفي <b>Data Management</b> ترى كل عامل باسمه مع المهمة.'
             ],
             tips: [
-                'يتوقف الرابط تلقائيًا بعد <b>3 أيام دون مسح</b>. عندها يتوقف الجهاز عن قبول عمليات مسح جديدة، ولا يُحذف شيء.',
+                'لا تنتهي صلاحية الرابط تلقائيًا. يبقى يعمل حتى تضغط <b>إيقاف هذا الرابط</b> (أو تنشئ رابطًا جديدًا لنفس الأداة).',
                 'تبقى عمليات المسح على الخادم حتى <b>تحذفها أنت</b> في Data Management. زر <b>Reset</b> عند العامل يمسح جهازه فقط.',
                 'يستطيع أي شخص يحصل على الرمز الانضمام، فشاركه مع فريقك فقط وأوقفه عند انتهاء المهمة.'
             ]

@@ -35,7 +35,7 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     // ---------- toggle on: text above the bars ----------
     const on = draw('on', 'Apparel');
     const t = on.querySelector('.item-label-text');
-    ok('toggle on: the text is drawn above the barcode, bold, left-aligned with the bars', !!t && t.textContent === 'Apparel' && t.getAttribute('font-weight') === '700' && Number(t.getAttribute('x')) === 5, t && t.outerHTML);
+    ok('toggle on: the text is drawn above the barcode, bold, left-aligned with the bars', !!t && t.textContent === 'Apparel' && t.getAttribute('font-weight') === '700' && Number(t.getAttribute('x')) === ITEM_QUIET_ZONE, t && t.outerHTML);
     ok('toggle on: the number is still printed under the bars', /300100010265/.test(on.textContent));
     ok('toggle on: the text above is the same size as the number (22)', t.getAttribute('font-size') === '22' && numFont(on) === '22');
     ok('toggle on: the label grew by the header height only; bars unchanged (70)', parseFloat(on.getAttribute('height')) > parseFloat(off.getAttribute('height')) && Math.max(...barHeights(on)) === 70);
@@ -74,6 +74,20 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     document.getElementById('itemBarcodeInput').value = '300100010265'; setItemPrintMode('single'); prints = 0;
     await printItemLabel(); await sleep(400);
     ok('print with the toggle off: the plain label, no text', prints === 1 && document.querySelectorAll('#printContainer .item-label-text').length === 0 && document.querySelectorAll('#printContainer .print-label').length === 1);
+    // pasted comma-separated values: one label per barcode, printed straight from the Print Label button
+    toggle.checked = false; toggle.dispatchEvent(new Event('change')); setItemPrintMode('single');
+    document.getElementById('itemBarcodeInput').value = '1,2,3,4,5,6'; prints = 0;
+    await printItemLabel(); await sleep(500);
+    const sixLabels = [...document.querySelectorAll('#printContainer .print-label')];
+    ok('Print Label with comma-separated values: 6 separate labels, none holding commas', prints === 1 && sixLabels.length === 6 && sixLabels.every((l, i) => l.textContent.trim() === String(i + 1)), sixLabels.map(l => l.textContent).join('|'));
+    ok('...and the input is cleared afterwards', document.getElementById('itemBarcodeInput').value === '');
+    ok('while labels print the page switches to print layout, then back', !document.body.classList.contains('printing-labels'));
+    // 100 rows (the Excel/CSV case that used to hang)
+    let big = 'Barcode,Qty,Text\n'; for (let i = 0; i < 100; i++) big += (300100010000 + i) + ',1,\n';
+    parseCSV(big); prints = 0; const t0 = performance.now(); await printFromCSV(); await sleep(300);
+    ok('100 CSV rows: 100 labels and the print window opens quickly', prints === 1 && document.querySelectorAll('#printContainer .print-label').length === 100 && performance.now() - t0 < 5000, Math.round(performance.now() - t0) + ' ms');
+    ok('bars have a 20px quiet zone each side', (() => { const s = document.querySelector('#printContainer svg'); const first = [...s.querySelectorAll('rect')].filter(r => Number(r.getAttribute('width')) < 20 && /^\d+$/.test(r.getAttribute('width')))[0]; return Number(first.getAttribute('x')) >= 20 || /translate\(20/.test(first.parentNode.getAttribute('transform') || '') || Number(first.getAttribute('x')) >= 20; })());
+    toggle.checked = true; toggle.dispatchEvent(new Event('change'));
     // CSV upload path
     toggle.checked = true; toggle.dispatchEvent(new Event('change')); box.value = 'Footwear'; box.dispatchEvent(new Event('input'));
     PrintState.csvData = [{ barcode: '111', qty: 2 }, { barcode: '222', qty: 1 }]; prints = 0;

@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=63"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=63"></script>
-    <script src="vendor/qrcode.min.js?v=63"></script>
-    <script src="vendor/html5-qrcode.min.js?v=63"></script>
-    <script src="vendor/supabase.js?v=63"></script>
+    <script src="vendor/xlsx.full.min.js?v=64"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=64"></script>
+    <script src="vendor/qrcode.min.js?v=64"></script>
+    <script src="vendor/html5-qrcode.min.js?v=64"></script>
+    <script src="vendor/supabase.js?v=64"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -486,11 +486,11 @@
                             <div class="upload-buttons">
                                 <button class="btn-small btn-small-outline" id="downloadTemplateBtn"><img class="btn-img" src="icons/ui-download.png" alt=""> Template</button>
                                 <button class="btn-small btn-small-filled" id="uploadCsvBtn"><img class="btn-img" src="icons/ui-upload.png" alt=""> Upload</button>
-                                <input type="file" id="csvFileInput" class="hidden-input" accept=".csv">
+                                <input type="file" id="csvFileInput" class="hidden-input" accept=".csv,.xlsx,.xls">
                             </div>
                         </div>
                         <input type="text" id="itemBarcodeInput" class="form-input" placeholder="Scan barcode, paste comma-separated, or upload CSV..." autocomplete="off">
-                        <p class="help-text">Supports: single barcode, comma-separated (e.g., 123,456,789), or CSV upload (columns: Barcode, Qty, and optionally Text - printed above that barcode when "Add text" is on)</p>
+                        <p class="help-text">Supports: single barcode, comma-separated (e.g., 123,456,789), or CSV / Excel upload (columns: Barcode, Qty, and optionally Text - printed above that barcode when "Add text" is on)</p>
                         <div class="item-text-row">
                             <div class="unique-toggle" title="Print a line of text above the barcode"><label><input type="checkbox" id="itemTextToggle"> <span>Add text</span></label></div>
                             <input type="text" id="itemLabelText" class="form-input" maxlength="40" autocomplete="off" placeholder="Text above the barcode (e.g. Apparel)" style="display:none;">
@@ -1076,23 +1076,23 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=63"></script>
-    <script src="js/lang.js?v=63"></script>
-    <script src="js/supabaseClient.js?v=63"></script>
-    <script src="js/camera.js?v=63"></script>
-    <script src="js/lists.js?v=63"></script>
-    <script src="js/usage.js?v=63"></script>
-    <script src="js/syncstatus.js?v=63"></script>
-    <script src="js/help.js?v=63"></script>
-    <script src="js/tooltip.js?v=63"></script>
-    <script src="js/operator.js?v=63"></script>
-    <script src="js/teamlinks.js?v=63"></script>
-    <script src="js/app.js?v=63"></script>
-    <script src="js/boxScanner.js?v=63"></script>
-    <script src="js/itemBarcode.js?v=63"></script>
-    <script src="js/boxCode.js?v=63"></script>
-    <script src="js/boxSegregate.js?v=63"></script>
-    <script src="js/priceCheck.js?v=63"></script>
-    <script src="js/yearSegregate.js?v=63"></script>
+    <script src="js/config.js?v=64"></script>
+    <script src="js/lang.js?v=64"></script>
+    <script src="js/supabaseClient.js?v=64"></script>
+    <script src="js/camera.js?v=64"></script>
+    <script src="js/lists.js?v=64"></script>
+    <script src="js/usage.js?v=64"></script>
+    <script src="js/syncstatus.js?v=64"></script>
+    <script src="js/help.js?v=64"></script>
+    <script src="js/tooltip.js?v=64"></script>
+    <script src="js/operator.js?v=64"></script>
+    <script src="js/teamlinks.js?v=64"></script>
+    <script src="js/app.js?v=64"></script>
+    <script src="js/boxScanner.js?v=64"></script>
+    <script src="js/itemBarcode.js?v=64"></script>
+    <script src="js/boxCode.js?v=64"></script>
+    <script src="js/boxSegregate.js?v=64"></script>
+    <script src="js/priceCheck.js?v=64"></script>
+    <script src="js/yearSegregate.js?v=64"></script>
 </body>
 </html>

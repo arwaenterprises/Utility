@@ -32,6 +32,9 @@ const ITEM_BAR_HEIGHT = 70;
 const ITEM_PREVIEW_BAR_HEIGHT = 52;
 // The number under the bars (was 16) and the optional text above them are the same, larger size.
 const ITEM_NUMBER_FONT = 22;
+// Code 128 needs a blank "quiet zone" of at least 10 bar-widths (20px at width 2) left and right of the bars,
+// otherwise a scanner can fail to find where the barcode starts.
+const ITEM_QUIET_ZONE = 20;
 const ITEM_PREVIEW_NUMBER_FONT = 19;
 
 // The text to print above the barcode, or '' when "Add text" is off.
@@ -70,7 +73,7 @@ function addTextAboveBarcode(svg, text, size) {
     const NS = 'http://www.w3.org/2000/svg';
     const width = parseFloat(svg.getAttribute('width')) || 200;
     const height = parseFloat(svg.getAttribute('height')) || 100;
-    const margin = 5;
+    const margin = ITEM_QUIET_ZONE;
     let fontSize = size || ITEM_NUMBER_FONT;
     // shrink long text so it never runs past the end of the bars
     const approxWidth = (size) => text.length * size * 0.6;
@@ -99,6 +102,7 @@ function addTextAboveBarcode(svg, text, size) {
     svg.appendChild(bg);
     svg.appendChild(body);
     svg.appendChild(label);
+    svg.setAttribute('shape-rendering', 'crispEdges');
     svg.setAttribute('height', (height + headerHeight) + 'px');
     svg.setAttribute('viewBox', `0 0 ${width} ${height + headerHeight}`);
 }
@@ -106,11 +110,12 @@ function addTextAboveBarcode(svg, text, size) {
 // Draws the barcode for `value` into the <svg id=svgId> that is already in the page, with the optional text on top.
 function drawItemBarcode(svgId, value, opts) {
     const o = { height: ITEM_BAR_HEIGHT, fontSize: ITEM_NUMBER_FONT, margin: 5, ...(opts || {}) };
+    const bars = { width: 2, height: o.height, displayValue: true, fontSize: o.fontSize, margin: o.margin, marginLeft: ITEM_QUIET_ZONE, marginRight: ITEM_QUIET_ZONE };
     try {
         const format = PrintState.settings.barcodeType === 'numeric' ? 'CODE128C' : 'CODE128B';
-        JsBarcode('#' + svgId, value, { format: format, width: 2, height: o.height, displayValue: true, fontSize: o.fontSize, margin: o.margin });
+        JsBarcode('#' + svgId, value, { format: format, ...bars });
     } catch (e) {
-        JsBarcode('#' + svgId, value, { format: 'CODE128', width: 2, height: o.height, displayValue: true, fontSize: o.fontSize, margin: o.margin });
+        JsBarcode('#' + svgId, value, { format: 'CODE128', ...bars });
     }
     // o.text lets a CSV row bring its own text; otherwise the text box (or nothing when "Add text" is off)
     const text = o.text !== undefined ? o.text : itemLabelText();
@@ -221,8 +226,8 @@ function handleItemBarcodeEnter() {
     const input = document.getElementById('itemBarcodeInput').value.trim();
     if (!input) return;
     
-    if (input.includes(',')) {
-        const barcodes = input.split(',').map(b => b.trim()).filter(b => b);
+    {
+        const barcodes = splitItemBarcodes(input);
         if (barcodes.length > 0) {
             PrintState.csvData = barcodes.map(barcode => ({ barcode, qty: 1, text: '' }));
             showCSVPreview();
@@ -273,6 +278,28 @@ function updateItemPreview() {
 // ============================================
 // ITEM BARCODE - PRINT FUNCTIONS
 // ============================================
+// Opens the print dialog for the labels in #printContainer. While it is open everything else in the page is
+// removed from the layout (class printing-labels, see style.css): with only visibility:hidden the browser still
+// laid out the whole app on every one of the (e.g. 100) pages and the print window never appeared.
+async function printLabelContainer() {
+    document.body.classList.add('printing-labels');
+    const done = () => { document.body.classList.remove('printing-labels'); window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    try {
+        await sleep(100);
+        window.print();
+    } finally {
+        // some browsers never fire afterprint; print() has returned by now, so the page can come back
+        setTimeout(done, 500);
+    }
+}
+
+// "111, 222, 333" -> ['111','222','333']; a single barcode -> []
+function splitItemBarcodes(input) {
+    if (!input.includes(',')) return [];
+    return input.split(',').map(b => b.trim()).filter(b => b);
+}
+
 async function printItemLabel() {
     if (PrintState.isProcessing) return;
     
@@ -282,6 +309,21 @@ async function printItemLabel() {
         return;
     }
     if (itemTextMissing()) return;
+
+    // Pasted comma-separated values are separate barcodes: one label each (never one barcode holding the commas)
+    const many = splitItemBarcodes(barcode);
+    if (many.length) {
+        let q = PrintState.printMode === 'bulk' ? parseInt(document.getElementById('itemQtyInput').value) || 1 : 1;
+        q = Math.min(Math.max(q, 1), 200);
+        PrintState.csvData = many.map(b => ({ barcode: b, qty: q, text: '' }));
+        const ok = await printFromCSV();
+        if (ok) {
+            document.getElementById('itemBarcodeInput').value = '';
+            document.getElementById('itemQtyInput').value = '1';
+            updateItemPreview();
+        }
+        return;
+    }
     
     let qty = PrintState.printMode === 'bulk' ? parseInt(document.getElementById('itemQtyInput').value) || 1 : 1;
     if (qty < 1) qty = 1;
@@ -313,8 +355,7 @@ async function printItemLabel() {
             }
         }
         
-        await sleep(100);
-        window.print();
+        await printLabelContainer();
         Usage.log('item_barcode', 'print_job', 1, qty);
         
         showItemStatus('success', `✓ ${qty} label(s) sent to printer`);
@@ -354,8 +395,22 @@ function handleFileUpload(event) {
         return;
     }
     const reader = new FileReader();
-    reader.onload = (e) => parseCSV(e.target.result);
-    reader.readAsText(file);
+    if (/\.xlsx?$/i.test(file.name) && typeof XLSX !== 'undefined') {
+        // Excel file: the first sheet becomes CSV text, so it goes through the same parser as a .csv file
+        reader.onload = (e) => {
+            try {
+                const wb = XLSX.read(e.target.result, { type: 'array' });
+                parseCSV(XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]));
+            } catch (err) {
+                showItemStatus('error', 'Could not read this Excel file');
+                setTimeout(() => hideItemStatus(), 3000);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    } else {
+        reader.onload = (e) => parseCSV(e.target.result);
+        reader.readAsText(file);
+    }
     event.target.value = '';
 }
 
@@ -428,8 +483,8 @@ function cancelCSV() {
 }
 
 async function printFromCSV() {
-    if (PrintState.isProcessing || PrintState.csvData.length === 0) return;
-    if (itemTextMissing(PrintState.csvData)) return;
+    if (PrintState.isProcessing || PrintState.csvData.length === 0) return false;
+    if (itemTextMissing(PrintState.csvData)) return false;
     PrintState.isProcessing = true;
     document.getElementById('itemCsvPreview').classList.remove('show');
     const totalLabels = PrintState.csvData.reduce((sum, item) => sum + item.qty, 0);
@@ -459,18 +514,20 @@ async function printFromCSV() {
                     printContainer.appendChild(labelDiv);
                 }
                 labelCount++;
+                if (labelCount % 20 === 0) await sleep(0);   // let the "Generating..." message paint on big jobs
             }
         }
         
-        await sleep(100);
-        window.print();
+        await printLabelContainer();
         Usage.log('item_barcode', 'print_job', 1, totalLabels);
         showItemStatus('success', `✓ ${totalLabels} labels sent to printer`);
         PrintState.csvData = [];
         setTimeout(() => hideItemStatus(), 2000);
+        return true;
     } catch (error) {
         showItemStatus('error', `Error: ${error.message}`);
         setTimeout(() => hideItemStatus(), 3000);
+        return false;
     } finally {
         PrintState.isProcessing = false;
     }
