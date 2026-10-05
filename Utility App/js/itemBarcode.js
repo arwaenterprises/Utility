@@ -7,6 +7,7 @@ const PrintState = {
         barcodeType: 'numeric',
         boxPrefix: 'RTO',
         boxOutputFormat: 'barcode',
+        boxPerLabel: 2,           // Box Code: codes on each 4x6 label
         labelTextOn: false,       // Item Barcode: print a line of text above the barcode
         labelText: '',
         boxLabelTextOn: false,    // Box Code: print a line of text above each code (barcode or QR)

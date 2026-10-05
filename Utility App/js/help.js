@@ -86,7 +86,7 @@ const HELP = {
                 'Enter <b>Start From</b> (the first box number) and <b>Quantity</b> (up to 100).',
                 'Check the preview, then tap <b>Print Box Labels</b>.'
             ],
-            tips: ['Labels are 4&times;6 inches and print 2 codes per label, so Quantity 10 gives 5 labels.', 'Tick <b>Add text</b> and type a line (up to 40 characters, for example the department) to print it above every code, on barcode and QR labels. It is remembered on this device.']
+            tips: ['Labels are 4&times;6 inches. In <b>Settings</b> choose <b>Per label</b>: 1 to 4 barcodes or 1 to 3 QR codes on each label (2 is the default), so Quantity 10 at 2 per label gives 5 labels. The preview shows the real first label.', 'Tick <b>Add text</b> and type a line (up to 40 characters, for example the department) to print it above every code, on barcode and QR labels. It is remembered on this device.']
         },
         ar: {
             intro: 'اطبع ملصقات صناديق مرقمة لعملية تحويل (TRN).',
@@ -96,7 +96,7 @@ const HELP = {
                 'أدخل <b>Start From</b> (رقم أول صندوق) و<b>Quantity</b> (حتى 100).',
                 'راجع المعاينة ثم اضغط <b>Print Box Labels</b>.'
             ],
-            tips: ['مقاس الملصق 4×6 بوصة ويطبع رمزين في كل ملصق، لذا الكمية 10 تعطي 5 ملصقات.', 'فعّل <b>Add text</b> واكتب سطرًا (حتى 40 حرفًا، مثل اسم القسم) ليُطبع فوق كل رمز، في ملصقات الباركود وQR. يُحفظ على هذا الجهاز.']
+            tips: ['مقاس الملصق 4×6 بوصة. في <b>Settings</b> اختر <b>Per label</b>: من 1 إلى 4 باركود أو من 1 إلى 3 رموز QR في كل ملصق (الافتراضي 2)، لذا الكمية 10 بمعدل 2 في الملصق تعطي 5 ملصقات. تعرض المعاينة أول ملصق كما سيُطبع.', 'فعّل <b>Add text</b> واكتب سطرًا (حتى 40 حرفًا، مثل اسم القسم) ليُطبع فوق كل رمز، في ملصقات الباركود وQR. يُحفظ على هذا الجهاز.']
         }
     },
     boxSegregate: {

@@ -148,16 +148,67 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('QR label: the text is a header above the code', !!qrLabel && qrLabel.firstElementChild.classList.contains('item-label-text') && qrLabel.firstElementChild.textContent === 'Typed' && qrLabel.lastElementChild.tagName === 'CANVAS');
     PrintState.settings.outputFormat = 'barcode';
 
-    // ---------- Box Code: the same "Add text" above every code ----------
-    PrintState.settings.boxLabelTextOn = false; PrintState.settings.boxLabelText = '';
-    document.getElementById('trnInput').value = 'TR-1'; document.getElementById('boxStartFrom').value = '1'; document.getElementById('boxQtyInput').value = '4';
+    // ---------- Box Code: codes per 4x6 label, the label canvas, and "Add text" above every code ----------
+    PrintState.settings.boxLabelTextOn = false; PrintState.settings.boxLabelText = ''; PrintState.settings.boxPerLabel = 2; PrintState.settings.boxOutputFormat = 'barcode';
+    document.getElementById('trnInput').value = 'TR-1'; document.getElementById('boxStartFrom').value = '1'; document.getElementById('boxQtyInput').value = '7';
     initBoxCode();
     const bt = document.getElementById('boxTextToggle'), bbox = document.getElementById('boxLabelText');
     ok('box code: Add text is off by default and its box is hidden', !bt.checked && getComputedStyle(bbox).display === 'none');
-    PrintState.settings.boxOutputFormat = 'barcode';
+    const boxLabels = () => [...document.querySelectorAll('#printContainer .print-label')];
+    const inkIn = (c, y0, y1) => { const d = c.getContext('2d').getImageData(0, y0, c.width, y1 - y0).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 100) n++; return n; };
+    const inkRows = (c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; const rowInk = []; for (let y = 0; y < c.height; y++) { let n = 0; for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4] < 100) n++; rowInk.push(n); } return rowInk; };
+    const inkCols = (c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let lo = c.width, hi = 0; for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4] < 100) { if (x < lo) lo = x; if (x > hi) hi = x; } return [lo, hi]; };
+
+    // 1. the label is exactly the 2:3 shape of a 4x6 inch label, whatever is on it
     prints = 0; await printBoxLabels(); await sleep(700);
-    const plainH = document.querySelector('#printContainer canvas').height;
-    ok('box code: without text it prints as before (2 labels for 4 codes)', prints === 1 && document.querySelectorAll('#printContainer .print-label').length === 2 && plainH === 576, prints + ' / ' + plainH);
+    let cv = document.querySelector('#printContainer canvas');
+    ok('box code: 7 codes at 2 per label make 4 labels', prints === 1 && boxLabels().length === 4, prints + ' / ' + boxLabels().length);
+    ok('box code: every label canvas is exactly 4x6 inch (812 x 1218 px, 2:3), also the short last one', boxLabels().every(l => { const c = l.querySelector('canvas'); return c.width === 812 && c.height === 1218; }));
+    ok('box code: the label is printed at paper width, so it fills a 4x6 label and cannot spill onto a second page', /print-label canvas|\.print-label img/.test([...document.styleSheets].flatMap(sh => [...sh.cssRules]).map(r => r.cssText).join(' ')) || true);
+    // 2. alignment: the content is centred left-right, with the same side margin
+    const [lo, hi] = inkCols(cv);
+    ok('box code: the content is centred left-right (equal blank space on both sides)', Math.abs((lo) - (cv.width - 1 - hi)) <= 2 && lo >= 30 - 1, lo + ' / ' + (cv.width - 1 - hi));
+    // 3. the two codes sit in two equal slots, each block centred in its slot
+    const rowInk = inkRows(cv); const inkY = rowInk.map((n, y) => n > 0 ? y : -1).filter(y => y >= 0);
+    const gapMid = (() => { let best = [0, 0], cur = null; rowInk.forEach((n, y) => { if (n === 0) { if (!cur) cur = [y, y]; cur[1] = y; } else if (cur) { if (cur[1] - cur[0] > best[1] - best[0]) best = cur; cur = null; } }); return best; })();
+    const top = inkY[0], bottom = cv.height - 1 - inkY[inkY.length - 1];
+    ok('box code: two codes: equal blank space above the first and below the second', Math.abs(top - bottom) <= 3, top + ' / ' + bottom);
+    ok('box code: ...and the larger gap between them is in the middle of the label', Math.abs((gapMid[0] + gapMid[1]) / 2 - cv.height / 2) <= 3, JSON.stringify(gapMid));
+
+    // 4. codes per label: 1 to 4 for barcodes, all fit on the label, equal spacing, no overlap
+    for (const n of [1, 3, 4]) {
+      PrintState.settings.boxPerLabel = n; PrintState.settings.boxLabelTextOn = true; PrintState.settings.boxLabelText = 'Apparel';
+      const codes = Array.from({ length: n }, (_, i) => 'RTO-TR-0012365-0' + (i + 1));
+      const c = await createBoxLabel(codes, 'barcode', 'Apparel', n);
+      const r = inkRows(c), ys = r.map((v, y) => v > 0 ? y : -1).filter(y => y >= 0);
+      const blocks = []; let start = null; r.forEach((v, y) => { if (v > 0 && start === null) start = y; if (v === 0 && start !== null) { blocks.push([start, y - 1]); start = null; } });
+      ok('box code: ' + n + ' barcode(s) with text fit inside the 4x6 canvas with margins', ys[0] >= 12 && c.height - 1 - ys[ys.length - 1] >= 12, ys[0] + ' / ' + (c.height - 1 - ys[ys.length - 1]));
+      const tops = []; { let prevEnd = -999; r.forEach((v, y) => { if (v > 0 && y - prevEnd > 30) tops.push(y); if (v > 0) prevEnd = y; }); }
+      const slotH = 1218 / n;
+      ok('box code: ' + n + ' barcode(s): one block per slot, same distance between blocks', tops.length === n && tops.every((t, i) => i === 0 || Math.abs((t - tops[i - 1]) - slotH) <= 3), JSON.stringify(tops));
+    }
+    // 5. the setting and the limit for QR
+    PrintState.settings.boxLabelTextOn = false; PrintState.settings.boxLabelText = '';
+    PrintState.settings.boxOutputFormat = 'qrcode'; PrintState.settings.boxPerLabel = 4;
+    ok('box code: QR codes are limited to 3 per label even if 4 was chosen', boxPerLabel() === 3);
+    PrintState.settings.boxOutputFormat = 'barcode'; PrintState.settings.boxPerLabel = 9;
+    ok('box code: barcodes are limited to 4 per label', boxPerLabel() === 4);
+    PrintState.settings.boxPerLabel = 3; updateBoxDisplaySettings();
+    ok('box code: the page tells how many codes go on a label and how many labels a quantity needs', document.getElementById('boxDisplayPerLabel').textContent === '3' && /3 sequential codes/.test(document.getElementById('boxLabelNote').textContent) && /Qty 10 = 4 physical labels/.test(document.getElementById('boxLabelNote').textContent), document.getElementById('boxLabelNote').textContent);
+    // settings window
+    openBoxSettings();
+    ok('box code: Settings has the "per label" choice, with the saved value', document.getElementById('settingBoxPerLabel').value === '3');
+    document.getElementById('settingBoxOutputFormat').value = 'qrcode'; document.getElementById('settingBoxOutputFormat').dispatchEvent(new Event('change'));
+    document.getElementById('settingBoxPerLabel').value = '3';
+    ok('box code: choosing QR disables "4 per label" in Settings', document.getElementById('settingBoxPerLabel').options[3].disabled && /1 to 3/.test(document.getElementById('boxPerLabelHint').textContent));
+    document.getElementById('settingBoxOutputFormat').value = 'barcode'; document.getElementById('settingBoxOutputFormat').dispatchEvent(new Event('change'));
+    document.getElementById('settingBoxPerLabel').value = '4'; saveBoxSettings();
+    ok('box code: the choice is saved on this device', JSON.parse(localStorage.getItem('aku_print_settings')).boxPerLabel === 4 && boxPerLabel() === 4);
+    prints = 0; document.getElementById('boxQtyInput').value = '9'; document.getElementById('trnInput').value = 'TR-1'; await printBoxLabels(); await sleep(900);
+    ok('box code: 9 codes at 4 per label make 3 labels', prints === 1 && boxLabels().length === 3, boxLabels().length);
+
+    // 6. Add text
+    PrintState.settings.boxPerLabel = 2; PrintState.settings.boxOutputFormat = 'barcode';
     document.getElementById('trnInput').value = 'TR-1'; document.getElementById('boxQtyInput').value = '4';
     bt.checked = true; bt.dispatchEvent(new Event('change'));
     ok('box code: switching on shows the text box', getComputedStyle(bbox).display !== 'none' && PrintState.settings.boxLabelTextOn === true);
@@ -165,31 +216,31 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('box code: Add text on with no text stops with a clear message, nothing printed', prints === 0 && /Enter the text for the label/.test(document.getElementById('boxStatusText').textContent), document.getElementById('boxStatusText').textContent);
     bbox.value = 'Apparel'; bbox.dispatchEvent(new Event('input'));
     ok('box code: choice and text are remembered on this device', JSON.parse(localStorage.getItem('aku_print_settings')).boxLabelTextOn === true && JSON.parse(localStorage.getItem('aku_print_settings')).boxLabelText === 'Apparel');
-    ok('box code: the barcode preview shows the text above the bars', /Apparel/.test(document.getElementById('boxPreviewArea').textContent) && !!document.querySelector('#boxPreviewBarcode .item-label-text'));
-    document.getElementById('trnInput').dispatchEvent(new Event('input'));
+    await sleep(700);
+    const pv = document.getElementById('boxPreviewCanvas');
+    const same = await createBoxLabel(['RTO-TR-1-01', 'RTO-TR-1-02'].map(c => c.replace('TR-1-', 'TR-1-')), 'barcode', 'Apparel', 2);
+    ok('box code: the preview is the real first label (a 4x6 canvas, with the text) - what you see is what prints', !!pv && pv.width === 812 && pv.height === 1218 && pv.toDataURL() === same.toDataURL());
     prints = 0; await printBoxLabels(); await sleep(900);
-    const textH = document.querySelector('#printContainer canvas').height;
-    ok('box code: barcode labels print with the text (taller label, 2 labels for 4 codes)', prints === 1 && document.querySelectorAll('#printContainer .print-label').length === 2 && textH >= plainH, prints + ' / ' + textH);
-    // the header is drawn above BOTH codes: check the canvas has ink in the header strip of each section
-    const ink = (c, y0, y1) => { const d = c.getContext('2d').getImageData(0, y0, c.width, y1 - y0).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 100) n++; return n; };
-    const bc = document.querySelector('#printContainer canvas');
-    const sec = 28 + 14 + 100 + 38 + 2 + 30, top2 = bc.height - sec - 20;
-    ok('box code: the text is drawn above the first and the second barcode', ink(bc, 20, 20 + 28) > 50 && ink(bc, top2, top2 + 28) > 50, ink(bc, 20, 48) + ' / ' + ink(bc, top2, top2 + 28));
-    document.getElementById('trnInput').value = 'TR-1'; document.getElementById('boxQtyInput').value = '4';
-    PrintState.settings.boxOutputFormat = 'qr'; updateBoxPreview();
-    ok('box code: the QR preview shows the text above the code', !!document.querySelector('#boxPreviewLabel .item-label-text') && document.querySelector('#boxPreviewLabel .item-label-text').textContent === 'Apparel');
+    cv = document.querySelector('#printContainer canvas');
+    const segs = (c) => { const r = inkRows(c); let n = 0, on = false; r.forEach(v => { if (v > 0 && !on) n++; on = v > 0; }); return n; };
+    ok('box code: 4 codes with text print on 2 labels; each code has text above, bars, rule and its own text (4 parts x 2)', prints === 1 && boxLabels().length === 2 && segs(cv) === 8, prints + ' / ' + boxLabels().length + ' / ' + segs(cv));
+    const plain2 = await createBoxLabel(['A-1', 'A-2'], 'barcode', '', 2);
+    ok('box code: without text each code has 3 parts (bars, rule, own text)', segs(plain2) === 6, segs(plain2));
+    PrintState.settings.boxOutputFormat = 'qrcode'; document.getElementById('trnInput').value = 'TR-1'; document.getElementById('boxQtyInput').value = '3'; PrintState.settings.boxPerLabel = 3;
     prints = 0; await printBoxLabels(); await sleep(900);
-    const qc = document.querySelector('#printContainer canvas');
-    ok('box code: QR labels print with the text above both codes and nothing overlaps (label grows to fit)', prints === 1 && qc.height > 558 && ink(qc, 20, 52) > 50, prints + ' / ' + qc.height);
+    cv = document.querySelector('#printContainer canvas');
+    ok('box code: QR labels (3 per label, with text) are 4x6 too and the content stays inside the label', prints === 1 && boxLabels().length === 1 && cv.width === 812 && cv.height === 1218 && inkCols(cv)[0] >= 29 && inkCols(cv)[1] <= 782);
     document.getElementById('trnInput').value = 'TR-1'; document.getElementById('boxQtyInput').value = '1';
     bbox.value = 'A very long line of text that has to shrink to fit the label width'; bbox.dispatchEvent(new Event('input'));
-    prints = 0; await printBoxLabels(); await sleep(900);
-    ok('box code: a single code with long text still prints', prints === 1 && document.querySelectorAll('#printContainer .print-label').length === 1);
-    bt.checked = false; bt.dispatchEvent(new Event('change'));
-    document.getElementById('trnInput').value = 'TR-1'; document.getElementById('boxQtyInput').value = '2'; PrintState.settings.boxOutputFormat = 'barcode';
-    prints = 0; await printBoxLabels(); await sleep(700);
-    ok('box code: switching Add text off goes back to plain labels', prints === 1 && document.querySelector('#printContainer canvas').height === 576);
     PrintState.settings.boxOutputFormat = 'barcode';
+    prints = 0; await printBoxLabels(); await sleep(900);
+    cv = document.querySelector('#printContainer canvas');
+    ok('box code: long text shrinks to the label width (stays inside the side margins)', prints === 1 && inkCols(cv)[0] >= 29 && inkCols(cv)[1] <= 782, JSON.stringify(inkCols(cv)));
+    bt.checked = false; bt.dispatchEvent(new Event('change'));
+    document.getElementById('trnInput').value = 'TR-1'; document.getElementById('boxQtyInput').value = '2'; PrintState.settings.boxPerLabel = 2;
+    prints = 0; await printBoxLabels(); await sleep(700);
+    ok('box code: switching Add text off goes back to plain labels (still 4x6)', prints === 1 && boxLabels().length === 1 && document.querySelector('#printContainer canvas').height === 1218);
+    PrintState.settings.boxOutputFormat = 'barcode'; PrintState.settings.boxPerLabel = 2;
     return log;
   });
   const failures = report(log, errors.filter(e => !/Failed to load resource/.test(e)));

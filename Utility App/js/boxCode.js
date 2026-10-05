@@ -73,49 +73,50 @@ function setupBoxCodeListeners() {
     document.getElementById('openBoxSettingsBtn').addEventListener('click', openBoxSettings);
     document.getElementById('cancelBoxSettingsBtn').addEventListener('click', closeBoxSettings);
     document.getElementById('saveBoxSettingsBtn').addEventListener('click', saveBoxSettings);
+    document.getElementById('settingBoxOutputFormat').addEventListener('change', syncBoxPerLabelOptions);
 }
 
 function updateBoxDisplaySettings() {
     document.getElementById('boxDisplayPrefix').textContent = PrintState.settings.boxPrefix || 'RTO';
     document.getElementById('boxDisplayMode').textContent = PrintState.settings.boxOutputFormat === 'barcode' ? 'Barcode' : 'QR Code';
+    const n = boxPerLabel();
+    document.getElementById('boxDisplayPerLabel').textContent = String(n);
+    document.getElementById('boxLabelNote').textContent = n === 1
+        ? 'Prints 1 code on each 4×6 inch label. Example: Qty 10 = 10 physical labels.'
+        : `Prints ${n} sequential codes on each 4×6 inch label to save space. Example: Qty 10 = ${Math.ceil(10 / n)} physical labels.`;
 }
 
-function updateBoxPreview() {
+// The preview is the real first label (same drawing as the print), shown small, so the layout and the number of
+// codes per label can be checked before printing.
+let boxPreviewReq = 0;
+async function updateBoxPreview() {
     const trn = document.getElementById('trnInput').value.trim();
     const previewArea = document.getElementById('boxPreviewArea');
+    const req = ++boxPreviewReq;
     
     if (!trn) {
         previewArea.innerHTML = '<h4>First Label Preview</h4><p style="color: var(--ak-text-light);">Enter TRN to see preview</p>';
         return;
     }
     
-    const startFrom = parseInt(document.getElementById('boxStartFrom').value) || 1;
+    const startFrom = Math.max(parseInt(document.getElementById('boxStartFrom').value) || 1, 1);
+    const qty = Math.min(Math.max(parseInt(document.getElementById('boxQtyInput').value) || 1, 1), 100);
     const prefix = PrintState.settings.boxPrefix;
-    const code1 = prefix ? `${prefix}-${trn}-${String(startFrom).padStart(2, '0')}` : `${trn}-${String(startFrom).padStart(2, '0')}`;
-    
-    previewArea.innerHTML = '<h4>First Label Preview</h4><div class="preview-label" id="boxPreviewLabel"></div>';
-    
-    if (PrintState.settings.boxOutputFormat === 'barcode') {
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.id = 'boxPreviewBarcode';
-        document.getElementById('boxPreviewLabel').appendChild(svg);
-        try {
-            JsBarcode('#boxPreviewBarcode', code1, { format: 'CODE128', width: 2, height: 60, displayValue: true, fontSize: 12, margin: 5, marginLeft: ITEM_QUIET_ZONE, marginRight: ITEM_QUIET_ZONE });
-            if (boxLabelText()) addTextAboveBarcode(document.getElementById('boxPreviewBarcode'), boxLabelText(), 16);
-        } catch (e) {
-            console.error('Barcode error:', e);
-        }
-    } else {
-        const qrHeader = itemQrHeaderElement(boxLabelText());
-        if (qrHeader) document.getElementById('boxPreviewLabel').appendChild(qrHeader);
-        const qrDiv = document.createElement('div');
-        qrDiv.id = 'boxPreviewQR';
-        document.getElementById('boxPreviewLabel').appendChild(qrDiv);
-        new QRCode(qrDiv, { text: code1, width: 100, height: 100, colorDark: '#000000', colorLight: '#ffffff' });
-        const textDiv = document.createElement('div');
-        textDiv.className = 'barcode-text';
-        textDiv.textContent = code1;
-        document.getElementById('boxPreviewLabel').appendChild(textDiv);
+    const perLabel = boxPerLabel();
+    const codes = [];
+    for (let k = 0; k < Math.min(qty, perLabel); k++) {
+        const n = String(startFrom + k).padStart(2, '0');
+        codes.push(prefix ? `${prefix}-${trn}-${n}` : `${trn}-${n}`);
+    }
+    try {
+        const canvas = await createBoxLabel(codes, PrintState.settings.boxOutputFormat, boxLabelText(), perLabel);
+        if (req !== boxPreviewReq) return;                       // a newer preview has been asked for
+        canvas.id = 'boxPreviewCanvas';
+        canvas.style.cssText = 'display:block; margin:0 auto; width:100%; max-width:230px; border:1px solid var(--ak-gray-300); background:#fff;';
+        previewArea.innerHTML = '<h4>First Label Preview</h4><div class="preview-label" id="boxPreviewLabel"></div>';
+        document.getElementById('boxPreviewLabel').appendChild(canvas);
+    } catch (e) {
+        console.error('Preview error:', e);
     }
 }
 
@@ -147,7 +148,9 @@ async function printBoxLabels() {
     if (qty > 100) qty = 100;
     
     const prefix = PrintState.settings.boxPrefix;
-    const physicalLabels = Math.ceil(qty / 2);
+    const perLabel = boxPerLabel();
+    const physicalLabels = Math.ceil(qty / perLabel);
+    const codeFor = (n) => prefix ? `${prefix}-${trn}-${String(n).padStart(2, '0')}` : `${trn}-${String(n).padStart(2, '0')}`;
     
     PrintState.isProcessing = true;
     showBoxStatus('processing', `Generating ${qty} codes on ${physicalLabels} label(s)...`);
@@ -156,32 +159,18 @@ async function printBoxLabels() {
         const printContainer = document.getElementById('printContainer');
         printContainer.innerHTML = '';
         
-        for (let i = 0; i < qty; i += 2) {
-            const num1 = startFrom + i;
-            const code1 = prefix ? `${prefix}-${trn}-${String(num1).padStart(2, '0')}` : `${trn}-${String(num1).padStart(2, '0')}`;
-            let code2 = null;
-            if (i + 1 < qty) {
-                const num2 = startFrom + i + 1;
-                code2 = prefix ? `${prefix}-${trn}-${String(num2).padStart(2, '0')}` : `${trn}-${String(num2).padStart(2, '0')}`;
-            }
+        for (let i = 0; i < qty; i += perLabel) {
+            const codes = [];
+            for (let k = i; k < Math.min(i + perLabel, qty); k++) codes.push(codeFor(startFrom + k));
             
             const labelDiv = document.createElement('div');
             labelDiv.className = 'print-label';
-            
-            if (PrintState.settings.boxOutputFormat === 'barcode') {
-                const canvas = await createDoubleBoxBarcode(code1, code2, topText);
-                labelDiv.appendChild(canvas);
-            } else {
-                const canvas = await createDoubleBoxQR(code1, code2, 180, topText);
-                labelDiv.appendChild(canvas);
-            }
-            
+            labelDiv.appendChild(await createBoxLabel(codes, PrintState.settings.boxOutputFormat, topText, perLabel));
             printContainer.appendChild(labelDiv);
             await sleep(10);
         }
         
-        await sleep(100);
-        window.print();
+        await printLabelContainer();
         Usage.log('box_code', 'print_job', 1, qty);
         
         showBoxStatus('success', `✓ ${qty} codes on ${physicalLabels} label(s) sent to printer`);
@@ -203,218 +192,117 @@ async function printBoxLabels() {
 }
 
 // ============================================
-// BOX CODE - CANVAS FUNCTIONS (4x6 inch labels)
+// BOX CODE - THE 4x6 INCH LABEL (one canvas = one physical label)
 // ============================================
-function createDoubleBoxBarcode(text1, text2, topText) {
-    return new Promise((resolve) => {
-        const padding = 20;
-        const barcodeHeight = 100;
-        const fontSize = 28;
-        const textHeight = fontSize + 10;
-        const lineHeight = 2;
-        const headerHeight = topText ? fontSize + 14 : 0;           // the optional text above each code
-        const sectionHeight = headerHeight + barcodeHeight + textHeight + lineHeight + 30;
-        
-        const tempSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        tempSvg.id = 'tempBarcode';
-        tempSvg.style.position = 'absolute';
-        tempSvg.style.left = '-9999px';
-        document.body.appendChild(tempSvg);
-        
-        JsBarcode('#tempBarcode', text1, { format: 'CODE128', width: 3, height: barcodeHeight, displayValue: false, margin: 0 });
-        
-        const barcodeWidth = tempSvg.getBBox().width;
-        document.body.removeChild(tempSvg);
-        
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.font = `bold ${fontSize}px Arial`;
-        const textWidth1 = tempCtx.measureText(text1).width;
-        const textWidth2 = text2 ? tempCtx.measureText(text2).width : 0;
-        const maxTextWidth = Math.max(textWidth1, textWidth2);
-        
-        const canvasWidth = Math.max(barcodeWidth, maxTextWidth) + (padding * 2);
-        const labelHeight = Math.max(576, text2 && topText ? 2 * sectionHeight + 3 * padding : 0);
-        const canvasHeight = text2 ? labelHeight : sectionHeight + padding;
-        
-        const canvas = document.createElement('canvas');
-        canvas.width = canvasWidth;
-        canvas.height = canvasHeight;
-        canvas.style.display = 'block';
-        canvas.style.margin = '0 auto';
-        
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        const svg1 = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg1.id = 'barcode1';
-        svg1.style.position = 'absolute';
-        svg1.style.left = '-9999px';
-        document.body.appendChild(svg1);
-        
-        JsBarcode('#barcode1', text1, { format: 'CODE128', width: 3, height: barcodeHeight, displayValue: false, margin: 0 });
-        
-        const svgData1 = new XMLSerializer().serializeToString(svg1);
-        const img1 = new Image();
-        
-        img1.onload = function() {
-            const barcodeX = (canvasWidth - barcodeWidth) / 2;
-            if (topText) drawBoxHeaderText(ctx, topText, canvasWidth / 2, padding + fontSize, canvasWidth - padding * 2, fontSize);
-            ctx.drawImage(img1, barcodeX, padding + headerHeight);
-            
-            const line1Y = padding + headerHeight + barcodeHeight + 15;
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = lineHeight;
-            ctx.beginPath();
-            ctx.moveTo(padding, line1Y);
-            ctx.lineTo(canvasWidth - padding, line1Y);
-            ctx.stroke();
-            
-            const text1Y = line1Y + fontSize + 5;
-            ctx.fillStyle = '#000000';
-            ctx.font = `bold ${fontSize}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.fillText(text1, canvasWidth / 2, text1Y);
-            
-            document.body.removeChild(svg1);
-            
-            if (text2) {
-                const svg2 = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                svg2.id = 'barcode2';
-                svg2.style.position = 'absolute';
-                svg2.style.left = '-9999px';
-                document.body.appendChild(svg2);
-                
-                JsBarcode('#barcode2', text2, { format: 'CODE128', width: 3, height: barcodeHeight, displayValue: false, margin: 0 });
-                
-                const svgData2 = new XMLSerializer().serializeToString(svg2);
-                const img2 = new Image();
-                
-                img2.onload = function() {
-                    const section2Start = canvasHeight - sectionHeight - padding;
-                    if (topText) drawBoxHeaderText(ctx, topText, canvasWidth / 2, section2Start + fontSize, canvasWidth - padding * 2, fontSize);
-                    ctx.drawImage(img2, barcodeX, section2Start + headerHeight);
-                    
-                    const line2Y = section2Start + headerHeight + barcodeHeight + 15;
-                    ctx.beginPath();
-                    ctx.moveTo(padding, line2Y);
-                    ctx.lineTo(canvasWidth - padding, line2Y);
-                    ctx.stroke();
-                    
-                    const text2Y = line2Y + fontSize + 5;
-                    ctx.fillStyle = '#000000';
-                    ctx.font = `bold ${fontSize}px Arial`;
-                    ctx.textAlign = 'center';
-                    ctx.fillText(text2, canvasWidth / 2, text2Y);
-                    
-                    document.body.removeChild(svg2);
-                    resolve(canvas);
-                };
-                
-                img2.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData2)));
-            } else {
-                resolve(canvas);
+// The canvas has exactly the 2:3 shape of a 4x6 inch label, at the 203 dpi of a label printer (812 x 1218 px). It
+// is printed at the paper width, so it always fills the label and can never run onto a second page. The codes on
+// it share the height in equal slots (1 to 4 barcodes, 1 to 3 QR codes); inside a slot, the optional text, the code,
+// a rule and the code's own text are centred as one block, so every slot looks the same.
+const BOX_LABEL_W = 812;
+const BOX_LABEL_H = 1218;
+const BOX_SIDE_PAD = 30;              // blank paper left and right of the content
+const BOX_MAX_BARCODES = 4;
+const BOX_MAX_QR = 3;
+
+// How many codes go on one label: the setting, limited to what fits for the chosen format.
+function boxPerLabel() {
+    const max = PrintState.settings.boxOutputFormat === 'barcode' ? BOX_MAX_BARCODES : BOX_MAX_QR;
+    const n = parseInt(PrintState.settings.boxPerLabel) || 2;
+    return Math.min(Math.max(n, 1), max);
+}
+
+// A barcode as an image: the widest bars (up to 4 px) that still fit between the side margins.
+function boxBarcodeImage(text, height) {
+    return new Promise((resolve, reject) => {
+        const maxW = BOX_LABEL_W - BOX_SIDE_PAD * 2;
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.id = 'tempBoxBarcode';
+        svg.style.position = 'absolute';
+        svg.style.left = '-9999px';
+        document.body.appendChild(svg);
+        let width = 0;
+        try {
+            for (const bar of [4, 3, 2, 1]) {
+                JsBarcode('#tempBoxBarcode', text, { format: 'CODE128', width: bar, height: height, displayValue: false, margin: 0 });
+                width = parseFloat(svg.getAttribute('width'));
+                if (width <= maxW) break;
             }
-        };
-        
-        img1.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData1)));
+            svg.setAttribute('shape-rendering', 'crispEdges');
+            const data = new XMLSerializer().serializeToString(svg);
+            const img = new Image();
+            img.onload = () => resolve({ img, width: Math.min(width, maxW), height });
+            img.onerror = () => reject(new Error('Could not draw the barcode'));
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(data)));
+        } catch (e) {
+            reject(e);
+        } finally {
+            document.body.removeChild(svg);
+        }
     });
 }
 
-function createDoubleBoxQR(text1, text2, qrSize, topText) {
-    return new Promise((resolve) => {
-        const tempDiv1 = document.createElement('div');
-        tempDiv1.style.position = 'absolute';
-        tempDiv1.style.left = '-9999px';
-        document.body.appendChild(tempDiv1);
-        
-        const tempDiv2 = document.createElement('div');
-        tempDiv2.style.position = 'absolute';
-        tempDiv2.style.left = '-9999px';
-        document.body.appendChild(tempDiv2);
-        
-        new QRCode(tempDiv1, { text: text1, width: qrSize, height: qrSize, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
-        
-        if (text2) {
-            new QRCode(tempDiv2, { text: text2, width: qrSize, height: qrSize, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+// A QR code drawn with a whole number of pixels per square (so every square is exactly the same size and sharp),
+// as large as fits in maxSize.
+function boxQrCanvas(text, maxSize) {
+    const holder = document.createElement('div');
+    const qr = new QRCode(holder, { text: text, width: 10, height: 10, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+    const model = qr._oQRCode;                              // the library's matrix of squares
+    const count = model.getModuleCount();
+    const mod = Math.max(2, Math.floor(maxSize / count));
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = mod * count;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000000';
+    for (let r = 0; r < count; r++) for (let c = 0; c < count; c++) if (model.isDark(r, c)) ctx.fillRect(c * mod, r * mod, mod, mod);
+    return canvas;
+}
+
+// Builds one label with up to `perLabel` codes (codes.length <= perLabel). Unused slots stay empty, so a short last
+// label has its codes in the same places as a full one.
+async function createBoxLabel(codes, format, topText, perLabel) {
+    const W = BOX_LABEL_W, H = BOX_LABEL_H, pad = BOX_SIDE_PAD;
+    const isBarcode = format === 'barcode';
+    const slotH = H / perLabel;
+    const fs = perLabel <= 2 ? 36 : 30;                       // code text and top text size
+    const capH = Math.round(fs * 0.72);                       // height of a capital letter: text is placed by its visible top and bottom
+    const headerH = topText ? capH + 22 : 0;
+    const gapAboveRule = 16, ruleH = 2, textGap = 16;        // the rule under the code, then the code's own text
+    const textH = textGap + capH;
+    const slotMargin = 22;                                    // minimum blank above and below a block
+    const fixed = headerH + gapAboveRule + ruleH + textH + slotMargin * 2;
+    const maxCode = Math.max(60, slotH - fixed);
+    let codeSize = isBarcode ? Math.min(Math.max(maxCode, 80), 220) : Math.min(maxCode, W - pad * 2, 380);
+    const qrs = isBarcode ? null : codes.map(c => boxQrCanvas(c, Math.floor(codeSize)));
+    if (qrs) codeSize = Math.max(...qrs.map(q => q.height));          // the real size after whole-pixel squares
+
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    canvas.style.display = 'block';
+    canvas.style.margin = '0 auto';
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
+
+    const blockH = headerH + codeSize + gapAboveRule + ruleH + textH;
+    for (let i = 0; i < codes.length; i++) {
+        const y0 = Math.round(i * slotH + (slotH - blockH) / 2);          // top of this slot's block
+        if (topText) drawBoxHeaderText(ctx, topText, W / 2, y0 + capH, W - pad * 2, fs);
+        const codeY = y0 + headerH;
+        if (isBarcode) {
+            const bc = await boxBarcodeImage(codes[i], Math.round(codeSize));
+            ctx.drawImage(bc.img, Math.round((W - bc.width) / 2), codeY, bc.width, bc.height);
+        } else {
+            ctx.drawImage(qrs[i], Math.round((W - qrs[i].width) / 2), codeY + Math.round((codeSize - qrs[i].height) / 2));
         }
-        
-        setTimeout(() => {
-            const qrImg1 = tempDiv1.querySelector('img') || tempDiv1.querySelector('canvas');
-            const qrImg2 = text2 ? (tempDiv2.querySelector('img') || tempDiv2.querySelector('canvas')) : null;
-            
-            const fontSize = 32;
-            const padding = 20;
-            const lineHeight = 2;
-            const textHeight = fontSize + 15;
-            const headerHeight = topText ? fontSize + 14 : 0;           // the optional text above each code
-            const sectionHeight = headerHeight + qrSize + padding + lineHeight + textHeight;
-            
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.font = `bold ${fontSize}px Arial`;
-            const textWidth1 = tempCtx.measureText(text1).width;
-            const textWidth2 = text2 ? tempCtx.measureText(text2).width : 0;
-            const maxTextWidth = Math.max(textWidth1, textWidth2);
-            
-            const canvasWidth = Math.max(qrSize, maxTextWidth) + (padding * 2);
-            const labelHeight = Math.max(558, text2 && topText ? 2 * sectionHeight + 3 * padding : 0);
-            const canvasHeight = text2 ? labelHeight : sectionHeight + padding;
-            
-            const canvas = document.createElement('canvas');
-            canvas.width = canvasWidth;
-            canvas.height = canvasHeight;
-            canvas.style.display = 'block';
-            canvas.style.margin = '0 auto';
-            
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            const qrX = (canvasWidth - qrSize) / 2;
-            if (topText) drawBoxHeaderText(ctx, topText, canvasWidth / 2, padding + fontSize, canvasWidth - padding * 2, fontSize);
-            if (qrImg1) {
-                ctx.drawImage(qrImg1, qrX, padding + headerHeight, qrSize, qrSize);
-            }
-            
-            const line1Y = padding + headerHeight + qrSize + 10;
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = lineHeight;
-            ctx.beginPath();
-            ctx.moveTo(padding, line1Y);
-            ctx.lineTo(canvasWidth - padding, line1Y);
-            ctx.stroke();
-            
-            const text1Y = line1Y + fontSize + 10;
-            ctx.fillStyle = '#000000';
-            ctx.font = `bold ${fontSize}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.fillText(text1, canvasWidth / 2, text1Y);
-            
-            if (text2 && qrImg2) {
-                const section2Start = canvasHeight - sectionHeight - padding;
-                if (topText) drawBoxHeaderText(ctx, topText, canvasWidth / 2, section2Start + fontSize, canvasWidth - padding * 2, fontSize);
-                ctx.drawImage(qrImg2, qrX, section2Start + headerHeight, qrSize, qrSize);
-                
-                const line2Y = section2Start + headerHeight + qrSize + 10;
-                ctx.beginPath();
-                ctx.moveTo(padding, line2Y);
-                ctx.lineTo(canvasWidth - padding, line2Y);
-                ctx.stroke();
-                
-                const text2Y = line2Y + fontSize + 10;
-                ctx.fillStyle = '#000000';
-                ctx.font = `bold ${fontSize}px Arial`;
-                ctx.textAlign = 'center';
-                ctx.fillText(text2, canvasWidth / 2, text2Y);
-            }
-            
-            document.body.removeChild(tempDiv1);
-            document.body.removeChild(tempDiv2);
-            resolve(canvas);
-        }, 200);
-    });
+        const ruleY = codeY + Math.round(codeSize) + gapAboveRule;
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(pad, ruleY, W - pad * 2, ruleH);
+        drawBoxHeaderText(ctx, codes[i], W / 2, ruleY + ruleH + textGap + capH, W - pad * 2, fs);
+    }
+    return canvas;
 }
 
 // ============================================
@@ -423,7 +311,18 @@ function createDoubleBoxQR(text1, text2, qrSize, topText) {
 function openBoxSettings() {
     document.getElementById('settingBoxOutputFormat').value = PrintState.settings.boxOutputFormat;
     document.getElementById('settingBoxPrefix').value = PrintState.settings.boxPrefix;
+    document.getElementById('settingBoxPerLabel').value = String(PrintState.settings.boxPerLabel || 2);
+    syncBoxPerLabelOptions();
     document.getElementById('boxSettingsModal').classList.add('active');
+}
+
+// QR codes need more room than barcodes: only up to BOX_MAX_QR fit on a label.
+function syncBoxPerLabelOptions() {
+    const isBarcode = document.getElementById('settingBoxOutputFormat').value === 'barcode';
+    const sel = document.getElementById('settingBoxPerLabel');
+    [...sel.options].forEach(o => { o.disabled = !isBarcode && Number(o.value) > BOX_MAX_QR; });
+    if (sel.options[sel.selectedIndex].disabled) sel.value = String(BOX_MAX_QR);
+    document.getElementById('boxPerLabelHint').textContent = isBarcode ? 'Barcodes: 1 to 4 per label.' : 'QR codes: 1 to 3 per label.';
 }
 
 function closeBoxSettings() {
@@ -433,6 +332,7 @@ function closeBoxSettings() {
 function saveBoxSettings() {
     PrintState.settings.boxOutputFormat = document.getElementById('settingBoxOutputFormat').value;
     PrintState.settings.boxPrefix = document.getElementById('settingBoxPrefix').value.trim();
+    PrintState.settings.boxPerLabel = parseInt(document.getElementById('settingBoxPerLabel').value) || 2;
     savePrintSettings();
     updateBoxDisplaySettings();
     closeBoxSettings();

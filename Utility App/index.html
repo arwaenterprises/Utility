@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=67"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=67"></script>
-    <script src="vendor/qrcode.min.js?v=67"></script>
-    <script src="vendor/html5-qrcode.min.js?v=67"></script>
-    <script src="vendor/supabase.js?v=67"></script>
+    <script src="vendor/xlsx.full.min.js?v=68"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=68"></script>
+    <script src="vendor/qrcode.min.js?v=68"></script>
+    <script src="vendor/html5-qrcode.min.js?v=68"></script>
+    <script src="vendor/supabase.js?v=68"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -584,7 +584,7 @@
                 <div class="card">
                     <div class="info-note">
                         <strong>ℹ️ Label Size: 4×6 inches</strong>
-                        Prints 2 sequential codes per label to save space. Example: Qty 10 = 5 physical labels.
+                        <span id="boxLabelNote">Prints 2 sequential codes per label to save space. Example: Qty 10 = 5 physical labels.</span>
                     </div>
                     
                     <div class="print-settings-bar">
@@ -595,6 +595,10 @@
                         <div class="print-setting-item">
                             <span class="print-setting-label">Mode:</span>
                             <span class="print-setting-value" id="boxDisplayMode">Barcode</span>
+                        </div>
+                        <div class="print-setting-item">
+                            <span class="print-setting-label">Per label:</span>
+                            <span class="print-setting-value" id="boxDisplayPerLabel">2</span>
                         </div>
                         <button class="btn-small btn-small-outline" id="openBoxSettingsBtn">⚙️ Settings</button>
                     </div>
@@ -650,6 +654,19 @@
                                         <option value="qrcode">QR Code</option>
                                     </select>
                                 </div>
+                            </div>
+                            <div class="print-settings-section">
+                                <h4>Codes on each 4×6 label</h4>
+                                <div class="print-settings-row">
+                                    <label>Per label:</label>
+                                    <select id="settingBoxPerLabel">
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                        <option value="4">4</option>
+                                    </select>
+                                </div>
+                                <p class="help-text" id="boxPerLabelHint">Barcodes: 1 to 4 per label.</p>
                             </div>
                             <div class="print-settings-section">
                                 <h4>Print Label Prefix</h4>
@@ -1095,24 +1112,24 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=67"></script>
-    <script src="js/lang.js?v=67"></script>
-    <script src="js/supabaseClient.js?v=67"></script>
-    <script src="js/camera.js?v=67"></script>
-    <script src="js/lists.js?v=67"></script>
-    <script src="js/usage.js?v=67"></script>
-    <script src="js/syncstatus.js?v=67"></script>
-    <script src="js/help.js?v=67"></script>
-    <script src="js/tooltip.js?v=67"></script>
-    <script src="js/operator.js?v=67"></script>
-    <script src="js/teamlinks.js?v=67"></script>
-    <script src="js/workspace.js?v=67"></script>
-    <script src="js/app.js?v=67"></script>
-    <script src="js/boxScanner.js?v=67"></script>
-    <script src="js/itemBarcode.js?v=67"></script>
-    <script src="js/boxCode.js?v=67"></script>
-    <script src="js/boxSegregate.js?v=67"></script>
-    <script src="js/priceCheck.js?v=67"></script>
-    <script src="js/yearSegregate.js?v=67"></script>
+    <script src="js/config.js?v=68"></script>
+    <script src="js/lang.js?v=68"></script>
+    <script src="js/supabaseClient.js?v=68"></script>
+    <script src="js/camera.js?v=68"></script>
+    <script src="js/lists.js?v=68"></script>
+    <script src="js/usage.js?v=68"></script>
+    <script src="js/syncstatus.js?v=68"></script>
+    <script src="js/help.js?v=68"></script>
+    <script src="js/tooltip.js?v=68"></script>
+    <script src="js/operator.js?v=68"></script>
+    <script src="js/teamlinks.js?v=68"></script>
+    <script src="js/workspace.js?v=68"></script>
+    <script src="js/app.js?v=68"></script>
+    <script src="js/boxScanner.js?v=68"></script>
+    <script src="js/itemBarcode.js?v=68"></script>
+    <script src="js/boxCode.js?v=68"></script>
+    <script src="js/boxSegregate.js?v=68"></script>
+    <script src="js/priceCheck.js?v=68"></script>
+    <script src="js/yearSegregate.js?v=68"></script>
 </body>
 </html>
