@@ -36,34 +36,6 @@ function handleBoxTextInput(e) {
     updateBoxPreview();
 }
 
-// The label text as an inverted tag: white bold text on a black bar, centred at cx with its top at y0. The bar is at
-// least minWidth wide (the width of the code under it) and grows for long text, never wider than maxWidth. Returns
-// the bar height.
-function drawBoxTag(ctx, text, cx, y0, minWidth, maxWidth, size, capH, padY) {
-    const padX = 22;
-    let fs = size;
-    ctx.font = `bold ${fs}px Arial`;
-    while (fs > 12 && ctx.measureText(text).width + padX * 2 > maxWidth) { fs--; ctx.font = `bold ${fs}px Arial`; }
-    const w = Math.min(maxWidth, Math.max(minWidth, ctx.measureText(text).width + padX * 2));
-    const h = capH + padY * 2;
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(Math.round(cx - w / 2), y0, Math.round(w), h);
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'center';
-    ctx.fillText(text, cx, y0 + padY + Math.round(fs * 0.72));
-    ctx.fillStyle = '#000000';
-    return h;
-}
-
-// Draws bold text centred at x, shrinking it so it never runs wider than maxWidth (never below 12px).
-function drawBoxHeaderText(ctx, text, cx, baselineY, maxWidth, size) {
-    let fs = size;
-    ctx.font = `bold ${fs}px Arial`;
-    while (fs > 12 && ctx.measureText(text).width > maxWidth) { fs--; ctx.font = `bold ${fs}px Arial`; }
-    ctx.fillStyle = '#000000';
-    ctx.textAlign = 'center';
-    ctx.fillText(text, cx, baselineY);
-}
 
 function setupBoxCodeListeners() {
     document.getElementById('trnInput').addEventListener('input', updateBoxPreview);
@@ -128,12 +100,12 @@ async function updateBoxPreview() {
         codes.push(prefix ? `${prefix}-${trn}-${n}` : `${trn}-${n}`);
     }
     try {
-        const canvas = await createBoxLabel(codes, PrintState.settings.boxOutputFormat, boxLabelText(), perLabel);
+        const svg = createBoxLabel(codes, PrintState.settings.boxOutputFormat, boxLabelText(), perLabel);
         if (req !== boxPreviewReq) return;                       // a newer preview has been asked for
-        canvas.id = 'boxPreviewCanvas';
-        canvas.style.cssText = 'display:block; margin:0 auto; width:100%; max-width:230px; border:1px solid var(--ak-gray-300); background:#fff;';
+        svg.id = 'boxPreviewSvg';
+        svg.style.cssText = 'display:block; margin:0 auto; width:100%; max-width:230px; height:auto; border:1px solid var(--ak-gray-300); background:#fff;';
         previewArea.innerHTML = '<h4>First Label Preview</h4><div class="preview-label" id="boxPreviewLabel"></div>';
-        document.getElementById('boxPreviewLabel').appendChild(canvas);
+        document.getElementById('boxPreviewLabel').appendChild(svg);
     } catch (e) {
         console.error('Preview error:', e);
     }
@@ -183,8 +155,8 @@ async function printBoxLabels() {
             for (let k = i; k < Math.min(i + perLabel, qty); k++) codes.push(codeFor(startFrom + k));
             
             const labelDiv = document.createElement('div');
-            labelDiv.className = 'print-label';
-            labelDiv.appendChild(await createBoxLabel(codes, PrintState.settings.boxOutputFormat, topText, perLabel));
+            labelDiv.className = 'print-label box-label';
+            labelDiv.appendChild(createBoxLabel(codes, PrintState.settings.boxOutputFormat, topText, perLabel));
             printContainer.appendChild(labelDiv);
             await sleep(10);
         }
@@ -211,13 +183,14 @@ async function printBoxLabels() {
 }
 
 // ============================================
-// BOX CODE - THE 4x6 INCH LABEL (one canvas = one physical label)
+// BOX CODE - THE 4x6 INCH LABEL (one drawing = one physical label)
 // ============================================
-// The canvas has exactly the 2:3 shape of a 4x6 inch label, at the 203 dpi of a label printer (812 x 1218 px). It
-// is printed at the paper width, so it always fills the label and can never run onto a second page. The codes on
-// it share the height in equal slots (1 to 4 barcodes, 1 to 3 QR codes); inside a slot, the optional text (white on a
-// black bar), the code and the code's own text are centred as one block, so every slot looks the same. A dotted line
-// between two neighbouring slots shows where to cut.
+// Each label is one vector drawing (SVG) with exactly the 2:3 shape of a 4x6 inch label, 812 x 1218 units: one unit is
+// one dot of a 203 dpi label printer. It is printed at the full paper width with no padding, so on a 203 dpi printer
+// every bar and square is a whole number of dots, and text and lines stay sharp at any resolution (a bitmap label
+// was resampled and looked blocky). The codes share the height in equal slots (1 to 4 barcodes, 1 to 3 QR codes);
+// inside a slot, the optional text (white on a black bar), the code and the code's own text are centred as one
+// block, so every slot looks the same. A dotted line between two neighbouring slots shows where to cut.
 const BOX_LABEL_W = 812;
 const BOX_LABEL_H = 1218;
 const BOX_SIDE_PAD = 30;              // blank paper left and right of the content
@@ -231,57 +204,9 @@ function boxPerLabel() {
     return Math.min(Math.max(n, 1), max);
 }
 
-// A barcode as an image: the widest bars (up to 4 px) that still fit between the side margins.
-function boxBarcodeImage(text, height) {
-    return new Promise((resolve, reject) => {
-        const maxW = BOX_LABEL_W - BOX_SIDE_PAD * 2;
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.id = 'tempBoxBarcode';
-        svg.style.position = 'absolute';
-        svg.style.left = '-9999px';
-        document.body.appendChild(svg);
-        let width = 0;
-        try {
-            for (const bar of [4, 3, 2, 1]) {
-                JsBarcode('#tempBoxBarcode', text, { format: 'CODE128', width: bar, height: height, displayValue: false, margin: 0 });
-                width = parseFloat(svg.getAttribute('width'));
-                if (width <= maxW) break;
-            }
-            svg.setAttribute('shape-rendering', 'crispEdges');
-            const data = new XMLSerializer().serializeToString(svg);
-            const img = new Image();
-            img.onload = () => resolve({ img, width: Math.min(width, maxW), height });
-            img.onerror = () => reject(new Error('Could not draw the barcode'));
-            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(data)));
-        } catch (e) {
-            reject(e);
-        } finally {
-            document.body.removeChild(svg);
-        }
-    });
-}
-
-// A QR code drawn with a whole number of pixels per square (so every square is exactly the same size and sharp),
-// as large as fits in maxSize.
-function boxQrCanvas(text, maxSize) {
-    const holder = document.createElement('div');
-    const qr = new QRCode(holder, { text: text, width: 10, height: 10, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
-    const model = qr._oQRCode;                              // the library's matrix of squares
-    const count = model.getModuleCount();
-    const mod = Math.max(2, Math.floor(maxSize / count));
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = mod * count;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#000000';
-    for (let r = 0; r < count; r++) for (let c = 0; c < count; c++) if (model.isDark(r, c)) ctx.fillRect(c * mod, r * mod, mod, mod);
-    return canvas;
-}
-
-// Builds one label with up to `perLabel` codes (codes.length <= perLabel). Unused slots stay empty, so a short last
-// label has its codes in the same places as a full one.
-async function createBoxLabel(codes, format, topText, perLabel) {
+// Builds one label with up to `perLabel` codes (codes.length <= perLabel) and returns the <svg>. Unused slots stay
+// empty, so a short last label has its codes in the same places as a full one.
+function createBoxLabel(codes, format, topText, perLabel) {
     const W = BOX_LABEL_W, H = BOX_LABEL_H, pad = BOX_SIDE_PAD;
     const isBarcode = format === 'barcode';
     const slotH = H / perLabel;
@@ -295,51 +220,47 @@ async function createBoxLabel(codes, format, topText, perLabel) {
     const slotMargin = 22;                                    // minimum blank above and below a block (and from the cut line)
     const fixed = headerH + textH + slotMargin * 2;
     const maxCode = Math.max(60, slotH - fixed);
-    let codeSize = isBarcode ? Math.min(Math.max(maxCode, 80), 220) : Math.min(maxCode, W - pad * 2, 380);
-    const qrs = isBarcode ? null : codes.map(c => boxQrCanvas(c, Math.floor(codeSize)));
-    if (qrs) codeSize = Math.max(...qrs.map(q => q.height));          // the real size after whole-pixel squares
+    const maxW = W - pad * 2;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = W;
-    canvas.height = H;
-    canvas.style.display = 'block';
-    canvas.style.margin = '0 auto';
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, W, H);
+    // the codes, with whole-unit squares / bars
+    let codeSize = isBarcode ? Math.min(Math.max(maxCode, 80), 220) : Math.min(maxCode, maxW, 380);
+    const items = codes.map((text) => {
+        if (isBarcode) {
+            let bar = 4, bc = barcodePath(text, Math.round(codeSize), bar, 0, 0);
+            while (bc.width > maxW && bar > 1) { bar--; bc = barcodePath(text, Math.round(codeSize), bar, 0, 0); }
+            return { text, width: Math.min(bc.width, maxW), scale: bc.width > maxW ? maxW / bc.width : 1, build: (x, y) => barcodePath(text, Math.round(codeSize), bar, x, y).d, height: Math.round(codeSize) };
+        }
+        const m = qrMatrix(text), mod = Math.max(2, Math.floor(Math.floor(codeSize) / m.count));
+        return { text, width: m.count * mod, scale: 1, build: (x, y) => qrPath(m, mod, x, y), height: m.count * mod };
+    });
+    if (!isBarcode) codeSize = Math.max(...items.map(i => i.height));      // the real size after whole-unit squares
 
+    const svg = svgEl('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: 'box-label-svg' });
+    svgEl('rect', { x: 0, y: 0, width: W, height: H, fill: '#ffffff' }, svg);
     const blockH = headerH + codeSize + textH;
-    for (let i = 0; i < codes.length; i++) {
+    items.forEach((it, i) => {
         const y0 = Math.round(i * slotH + (slotH - blockH) / 2);          // top of this slot's block
         const codeY = y0 + headerH;
-        let codeW;
-        if (isBarcode) {
-            const bc = await boxBarcodeImage(codes[i], Math.round(codeSize));
-            codeW = bc.width;
-            ctx.drawImage(bc.img, Math.round((W - bc.width) / 2), codeY, bc.width, bc.height);
-        } else {
-            codeW = qrs[i].width;
-            ctx.drawImage(qrs[i], Math.round((W - qrs[i].width) / 2), codeY + Math.round((codeSize - qrs[i].height) / 2));
+        const x = Math.round((W - it.width) / 2);
+        const y = codeY + Math.round((codeSize - it.height) / 2);
+        const path = svgEl('path', { d: it.build(0, 0), fill: '#000000', transform: `translate(${x} ${y})` + (it.scale !== 1 ? ` scale(${it.scale})` : '') }, svg);
+        if (topText) {                                                    // white text on a black bar as wide as the code (wider for long text)
+            const padX = 22, fit = fitBoldSize(topText, fs, maxW - padX * 2, 12);
+            const w = Math.min(maxW, Math.max(it.width, Math.ceil(fit.width) + padX * 2));
+            svgEl('rect', { x: Math.round((W - w) / 2), y: y0, width: Math.round(w), height: tagH, fill: '#000000' }, svg);
+            const t = svgEl('text', { x: W / 2, y: y0 + tagPadY + Math.round(fit.size * 0.72), 'text-anchor': 'middle', 'font-family': LABEL_FONT, 'font-weight': 700, 'font-size': fit.size, fill: '#ffffff' }, svg);
+            t.textContent = topText;
         }
-        if (topText) drawBoxTag(ctx, topText, W / 2, y0, codeW, W - pad * 2, fs, capH, tagPadY);
-        drawBoxHeaderText(ctx, codes[i], W / 2, codeY + Math.round(codeSize) + textGap + capH, W - pad * 2, fs);
-    }
+        const fitCode = fitBoldSize(it.text, fs, maxW, 12);
+        const ct = svgEl('text', { x: W / 2, y: codeY + Math.round(codeSize) + textGap + capH, 'text-anchor': 'middle', 'font-family': LABEL_FONT, 'font-weight': 700, 'font-size': fitCode.size, fill: '#000000' }, svg);
+        ct.textContent = it.text;
+    });
     // a dotted line between neighbouring labels, so the operator can see where to cut
-    if (codes.length > 1) {
-        ctx.save();
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 9]);
-        for (let i = 1; i < codes.length; i++) {
-            const y = Math.round(i * slotH);
-            ctx.beginPath();
-            ctx.moveTo(10, y);
-            ctx.lineTo(W - 10, y);
-            ctx.stroke();
-        }
-        ctx.restore();
+    for (let i = 1; i < codes.length; i++) {
+        const y = Math.round(i * slotH);
+        svgEl('line', { x1: 10, y1: y, x2: W - 10, y2: y, stroke: '#000000', 'stroke-width': 2, 'stroke-dasharray': '5 9', 'shape-rendering': 'crispEdges' }, svg);
     }
-    return canvas;
+    return svg;
 }
 
 // ============================================

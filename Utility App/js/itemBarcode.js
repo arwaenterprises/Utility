@@ -125,6 +125,14 @@ function drawItemBarcode(svgId, value, opts) {
     if (text) addTextAboveBarcode(document.getElementById(svgId), text, o.fontSize);
 }
 
+// For printing: the label is sized so every bar is a whole number of dots on a 203 dpi label printer (a bar is 2
+// drawing units wide = 4 dots, about 0.5 mm). A label wider than the paper is still shrunk to fit by the print rules.
+function sizeItemBarcodeForPrint(svgId) {
+    const svg = document.getElementById(svgId);
+    const w = svg && parseFloat(svg.getAttribute('width'));
+    if (w) svg.style.width = (w * 2 / LABEL_DPI) + 'in';
+}
+
 // QR labels get the same text as a bold line above the code.
 function itemQrHeaderElement(textOverride) {
     const text = textOverride !== undefined ? textOverride : itemLabelText();
@@ -349,8 +357,9 @@ async function printItemLabel() {
                 labelDiv.appendChild(svg);
                 printContainer.appendChild(labelDiv);
                 drawItemBarcode(`printBarcode_${i}`, barcode);
+                sizeItemBarcodeForPrint(`printBarcode_${i}`);
             } else {
-                const qrCanvas = await createQRWithText(barcode, 150);
+                const qrCanvas = await createQRWithText(barcode);
                 const qrHeader = itemQrHeaderElement();
                 if (qrHeader) labelDiv.appendChild(qrHeader);
                 labelDiv.appendChild(qrCanvas);
@@ -509,8 +518,9 @@ async function printFromCSV() {
                     labelDiv.appendChild(svg);
                     printContainer.appendChild(labelDiv);
                     drawItemBarcode(`printBarcode_${labelCount}`, item.barcode, { text: csvRowText(item) });
+                    sizeItemBarcodeForPrint(`printBarcode_${labelCount}`);
                 } else {
-                    const qrCanvas = await createQRWithText(item.barcode, 150);
+                    const qrCanvas = await createQRWithText(item.barcode);
                     const qrHeader = itemQrHeaderElement(csvRowText(item));
                     if (qrHeader) labelDiv.appendChild(qrHeader);
                     labelDiv.appendChild(qrCanvas);
@@ -571,8 +581,9 @@ async function testPrint() {
         printContainer.appendChild(labelDiv);
         JsBarcode('#testBarcode', 'TEST-12345', { format: 'CODE128', width: 2, height: ITEM_BAR_HEIGHT, displayValue: true, fontSize: ITEM_NUMBER_FONT, margin: 10 });
         if (itemLabelText()) addTextAboveBarcode(document.getElementById('testBarcode'), itemLabelText(), ITEM_NUMBER_FONT);
+        sizeItemBarcodeForPrint('testBarcode');
     } else {
-        const qrCanvas = await createQRWithText('TEST-12345', 150);
+        const qrCanvas = await createQRWithText('TEST-12345');
         labelDiv.appendChild(qrCanvas);
         printContainer.appendChild(labelDiv);
     }

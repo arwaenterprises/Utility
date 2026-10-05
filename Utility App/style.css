@@ -1377,7 +1377,14 @@ body.rtl .scans-table td { text-align: right; }
     /* Item Barcode: while the labels print, the rest of the app is taken out of the layout (visibility:hidden
        alone still lays it out on every page, which made big jobs - e.g. 100 labels - hang before the print window) */
     body.printing-labels > *:not(#printContainer) { display: none !important; }
-    .print-label svg { shape-rendering: crispEdges; }
+    /* nothing of the app's page may add a page or colour to the printout */
+    html, body.printing-labels { background: #fff !important; min-height: 0 !important; height: auto !important; overflow: visible !important; }
+    /* bars and squares snap to the printer's dots; text keeps its smooth outlines */
+    .print-label svg rect, .print-label svg path { shape-rendering: crispEdges; }
+    .print-label svg text { text-rendering: geometricPrecision; shape-rendering: auto; }
+    /* Box Code: the label is the whole page (4x6): no padding, so the drawing is exactly the paper width and one unit is one dot */
+    .print-label.box-label { padding: 0; overflow: hidden; align-items: flex-start; justify-content: flex-start; }
+    .print-label.box-label svg { width: 100%; max-width: none; height: auto; }
     .print-label svg,
     .print-label canvas,
     .print-label img {

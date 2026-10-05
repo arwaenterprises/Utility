@@ -93,49 +93,78 @@ window.addEventListener('offline', updateOnlineStatus);
 // ============================================
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-function createQRWithText(text, size) {
-    return new Promise((resolve) => {
-        const tempDiv = document.createElement('div');
-        tempDiv.style.position = 'absolute';
-        tempDiv.style.left = '-9999px';
-        document.body.appendChild(tempDiv);
+// ============================================
+// LABELS AS VECTOR DRAWINGS
+// ============================================
+// Labels are drawn as SVG (bars, squares, text and lines stay sharp at any printer resolution) instead of bitmaps,
+// which looked blocky when the browser or the printer driver resampled them. One drawing unit is one dot of a
+// 203 dpi label printer; bars and squares are whole units, so on such a printer every bar is a whole number of dots.
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const LABEL_DPI = 203;
+const LABEL_FONT = 'Arial, Helvetica, sans-serif';
 
-        new QRCode(tempDiv, {
-            text: text,
-            width: size,
-            height: size,
-            colorDark: '#000000',
-            colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.M
-        });
+function svgEl(tag, attrs, parent) {
+    const el = document.createElementNS(SVG_NS, tag);
+    Object.keys(attrs || {}).forEach(k => el.setAttribute(k, String(attrs[k])));
+    if (parent) parent.appendChild(el);
+    return el;
+}
 
-        setTimeout(() => {
-            const qrImg = tempDiv.querySelector('img') || tempDiv.querySelector('canvas');
-            const canvas = document.createElement('canvas');
-            const padding = 10;
-            const textHeight = 30;
-            canvas.width = size + (padding * 2);
-            canvas.height = size + textHeight + (padding * 2);
-            canvas.style.display = 'block';
-            canvas.style.margin = '0 auto';
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            if (qrImg) { ctx.drawImage(qrImg, padding, padding, size, size); }
-            const maxTextWidth = canvas.width - (padding * 2);
-            let fontSize = 14;
-            const minFontSize = 8;
-            ctx.fillStyle = '#000000';
-            ctx.font = `bold ${fontSize}px Courier New`;
-            while (ctx.measureText(text).width > maxTextWidth && fontSize > minFontSize) {
-                fontSize--;
-                ctx.font = `bold ${fontSize}px Courier New`;
-            }
-            ctx.textAlign = 'center';
-            ctx.fillText(text, canvas.width / 2, size + padding + 20);
-            document.body.removeChild(tempDiv);
-            resolve(canvas);
-        }, 150);
+// The largest font size (not above `size`, not below `min`) at which bold `text` fits in maxWidth.
+function fitBoldSize(text, size, maxWidth, min) {
+    const ctx = document.createElement('canvas').getContext('2d');
+    let fs = size;
+    ctx.font = `bold ${fs}px Arial`;
+    while (fs > (min || 12) && ctx.measureText(text).width > maxWidth) { fs--; ctx.font = `bold ${fs}px Arial`; }
+    return { size: fs, width: ctx.measureText(text).width };
+}
+
+// The squares of a QR code as one path of whole-unit rectangles (neighbouring dark squares in a row are merged).
+function qrMatrix(text) {
+    const holder = document.createElement('div');
+    const qr = new QRCode(holder, { text: text, width: 10, height: 10, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+    const model = qr._oQRCode;                              // the library's matrix of squares
+    return { count: model.getModuleCount(), isDark: (r, c) => model.isDark(r, c) };
+}
+function qrPath(m, mod, x0, y0) {
+    let d = '';
+    for (let r = 0; r < m.count; r++) {
+        for (let c = 0; c < m.count; c++) {
+            if (!m.isDark(r, c)) continue;
+            let e = c;
+            while (e + 1 < m.count && m.isDark(r, e + 1)) e++;
+            d += `M${x0 + c * mod} ${y0 + r * mod}h${(e - c + 1) * mod}v${mod}h-${(e - c + 1) * mod}z`;
+            c = e;
+        }
+    }
+    return d;
+}
+
+// A Code 128 barcode as one path: bars `bar` units wide, `height` units tall, from (x0, y0). Returns { d, width }.
+function barcodePath(text, height, bar, x0, y0) {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    JsBarcode(svg, text, { format: 'CODE128', width: bar, height: height, displayValue: false, margin: 0 });
+    let d = '';
+    svg.querySelectorAll('g > rect').forEach(r => {
+        d += `M${x0 + Number(r.getAttribute('x'))} ${y0}h${r.getAttribute('width')}v${height}h-${r.getAttribute('width')}z`;
     });
+    return { d, width: parseFloat(svg.getAttribute('width')) };
+}
+
+// An item QR label (QR code with its text below) as a vector drawing: squares of 10 dots, so about 36 mm wide.
+function createQRWithText(text) {
+    const mod = 10, pad = 20;
+    const m = qrMatrix(text);
+    const qs = m.count * mod;
+    const W = qs + pad * 2;
+    const fit = fitBoldSize(text, 30, W - pad * 2, 10);
+    const H = pad + qs + 14 + Math.round(fit.size * 0.72) + pad;
+    const svg = svgEl('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: 'qr-label-svg' });
+    svg.style.width = (W / LABEL_DPI) + 'in';                // whole dots on a 203 dpi printer
+    svgEl('rect', { x: 0, y: 0, width: W, height: H, fill: '#ffffff' }, svg);
+    svgEl('path', { d: qrPath(m, mod, pad, pad), fill: '#000000' }, svg);
+    const t = svgEl('text', { x: W / 2, y: pad + qs + 14 + Math.round(fit.size * 0.72), 'text-anchor': 'middle', 'font-family': LABEL_FONT, 'font-weight': 700, 'font-size': fit.size, fill: '#000000' }, svg);
+    t.textContent = text;
+    return svg;
 }
 
