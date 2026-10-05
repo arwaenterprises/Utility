@@ -2489,6 +2489,8 @@ body.rtl .ws-back { transform: scaleX(-1); }
 .ws-pill.ok { background: #dff1e4; color: #1d6b34; }
 .ws-pill.warn { background: #fdf0cf; color: #8a5a00; }
 .ws-pill.off { background: var(--ak-gray-200); color: var(--ak-text-light); }
+.ws-pill.bad { background: #fbe0e2; color: #a3141f; }
+.ws-banner { background: #fbe0e2; color: #7d1018; border: 1px solid #e6a3a9; border-radius: 10px; padding: 10px 12px; font-size: 13px; }
 .ws-tag { font-size: 11px; background: var(--ak-gray-200); border-radius: 4px; padding: 1px 7px; color: var(--ak-text-light); }
 .ws-pager { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; color: var(--ak-text-light); padding: 4px 2px; }
 .ws-empty { padding: 22px 12px; text-align: center; color: var(--ak-text-light); background: var(--ak-white); border: 1px dashed var(--ak-gray-300); border-radius: 10px; font-size: 14px; }

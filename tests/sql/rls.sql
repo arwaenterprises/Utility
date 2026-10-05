@@ -466,3 +466,69 @@ delete from scans where box_number in ('W1','W2');
 delete from ys_scans where box_barcode = 'YB1';
 delete from auth.users where id in ('00000000-0000-0000-0000-0000000000a7','00000000-0000-0000-0000-0000000000a8','00000000-0000-0000-0000-0000000000a9');
 delete from team_links;
+
+-- ============ automatic clean-up of idle jobs (30 days without a scan, 7 days of warning) ============
+alter table scans disable trigger scans_stamp_operator;
+alter table ys_scans disable trigger ys_scans_stamp_operator;
+insert into team_links(id, enterprise_id, tool, job_name, created_at, last_scan_at, stopped_at) values
+  ('c0000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'boxScanner',    'PG idle 24',   now() - interval '30 days',  now() - interval '24 days',  null),
+  ('c0000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'boxScanner',    'PG idle 40',   now() - interval '60 days',  now() - interval '40 days',  null),
+  ('c0000000-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111', 'yearSegregate', 'PG ys idle 40', now() - interval '60 days', now() - interval '40 days',  null),
+  ('c0000000-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111', 'priceCheck',    'PG price 100', now() - interval '200 days', now() - interval '100 days', null),
+  ('c0000000-0000-0000-0000-000000000005', '11111111-1111-1111-1111-111111111111', 'boxSegregate',  'PG segr 100',  now() - interval '200 days', now() - interval '100 days', null),
+  ('c0000000-0000-0000-0000-000000000006', '11111111-1111-1111-1111-111111111111', 'boxScanner',    'PG fresh',     now() - interval '5 days',   now() - interval '2 days',   null),
+  ('c0000000-0000-0000-0000-000000000007', '11111111-1111-1111-1111-111111111111', 'boxScanner',    'PG stopped',   now() - interval '100 days', now() - interval '100 days', now() - interval '1 day'),
+  ('c0000000-0000-0000-0000-000000000008', '22222222-2222-2222-2222-222222222222', 'boxScanner',    'PG other team', now() - interval '60 days', now() - interval '40 days',  null);
+insert into scans(user_id, enterprise_id, link_id, remark, box_number, barcode, qty, box_status, scanned_at) values
+  ('00000000-0000-0000-0000-0000000000e1', '11111111-1111-1111-1111-111111111111', 'c0000000-0000-0000-0000-000000000002', 'PG idle 40', 'P1', 'x1', 1, 'Closed', now() - interval '40 days'),
+  ('00000000-0000-0000-0000-0000000000e1', '11111111-1111-1111-1111-111111111111', 'c0000000-0000-0000-0000-000000000002', 'PG idle 40', 'P1', 'x2', 2, 'Closed', now() - interval '40 days'),
+  ('00000000-0000-0000-0000-0000000000e1', '11111111-1111-1111-1111-111111111111', 'c0000000-0000-0000-0000-000000000001', 'PG idle 24', 'P2', 'y1', 1, 'Closed', now() - interval '24 days'),
+  ('00000000-0000-0000-0000-0000000000e1', '11111111-1111-1111-1111-111111111111', 'c0000000-0000-0000-0000-000000000006', 'PG fresh',   'P3', 'z1', 1, 'Closed', now() - interval '2 days');
+insert into ys_scans(user_id, scan_uid, enterprise_id, link_id, remark, barcode, ptl_number, box_barcode, box_status, qty, scanned_at) values
+  ('00000000-0000-0000-0000-0000000000e1', gen_random_uuid(), '11111111-1111-1111-1111-111111111111', 'c0000000-0000-0000-0000-000000000003', 'PG ys idle 40', 'q1', '01', 'YP1', 'Closed', 4, now() - interval '40 days');
+alter table scans enable trigger scans_stamp_operator;
+alter table ys_scans enable trigger ys_scans_stamp_operator;
+
+select _t_eq('purge look-only: idle jobs of Box-Item Scan and Year/Season would be marked (idle 23+ days), nothing else', (select count(*) from purge_inactive_jobs(true) where action = 'warn' and job_name like 'PG%'), 4);
+select _t_eq('...Price Check and Box Segregate links are never touched, however old', (select count(*) from purge_inactive_jobs(true) where job_name in ('PG price 100', 'PG segr 100')), 0);
+select _t_eq('...a job stopped yesterday is not touched (stopping restarts its clock)', (select count(*) from purge_inactive_jobs(true) where job_name = 'PG stopped'), 0);
+select _t_eq('...a job with a recent scan is not touched', (select count(*) from purge_inactive_jobs(true) where job_name = 'PG fresh'), 0);
+select _t_eq('...nothing can be deleted yet: nobody has been warned', (select count(*) from purge_inactive_jobs(true) where action = 'delete'), 0);
+select _t_eq('look-only changes nothing', (select count(*) from team_links where purge_warned_at is not null), 0);
+select _t_eq('the admin sees the deletion date: a job idle 40 days shows about 7 days (full warning, even though it is already old)', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_jobs('PG idle 40', '', 'all') where purge_at > now() + interval '6 days' and purge_at < now() + interval '8 days'$$), 1);
+select _t_eq('...a job idle 2 days shows a date about 28 days away', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_jobs('PG fresh', '', 'all') where purge_at > now() + interval '27 days' and purge_at < now() + interval '29 days'$$), 1);
+select _t_eq('...Price Check and Box Segregate jobs show no date at all', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_jobs('PG price', '', 'all') where purge_at is null$$) + _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_jobs('PG segr', '', 'all') where purge_at is null$$), 2);
+select _t_err('only the scheduled run (not the API) can start the clean-up', '00000000-0000-0000-0000-0000000000e1', $$select count(*) from purge_inactive_jobs(false)$$, 'permission denied');
+
+-- day 1: the daily run marks them
+select _t_eq('the daily run marks the four idle jobs', (select count(*) from purge_inactive_jobs(false) where action = 'warn' and job_name like 'PG%'), 4);
+select _t_eq('...and deletes nothing: the scans of the idle job are still there', (select count(*) from scans where link_id = 'c0000000-0000-0000-0000-000000000002'), 2);
+select _t_eq('...running again the same day deletes nothing either', (select count(*) from purge_inactive_jobs(false) where action = 'delete'), 0);
+-- 8 days later
+update team_links set purge_warned_at = now() - interval '8 days' where job_name in ('PG idle 40', 'PG ys idle 40', 'PG idle 24');
+select _t_eq('after the 7 days: only jobs idle 30+ days are deleted (idle 40 and the Year/Season one, not idle 24)', (select count(*) from purge_inactive_jobs(false) where action = 'delete'), 2);
+select _t_eq('...the idle job, its link and its scans are gone', (select count(*) from team_links where job_name = 'PG idle 40') + (select count(*) from scans where link_id = 'c0000000-0000-0000-0000-000000000002'), 0);
+select _t_eq('...the Year/Season job and its scans are gone', (select count(*) from team_links where job_name = 'PG ys idle 40') + (select count(*) from ys_scans where link_id = 'c0000000-0000-0000-0000-000000000003'), 0);
+select _t_eq('...a job idle only 24 days is still there, with its scans', (select count(*) from team_links where job_name = 'PG idle 24') + (select count(*) from scans where link_id = 'c0000000-0000-0000-0000-000000000001'), 2);
+select _t_eq('...the other jobs are untouched (fresh, stopped, price, segregate)', (select count(*) from team_links where job_name in ('PG fresh', 'PG stopped', 'PG price 100', 'PG segr 100')), 4);
+select _t_eq('...what was deleted is written to the log (3 units in the idle job)', (select units from job_purge_log where job_name = 'PG idle 40'), 3);
+select _t_eq('...and for Year/Season (4 units, 1 closed box)', (select units * 10 + boxes from job_purge_log where job_name = 'PG ys idle 40'), 41);
+select _t_eq('the admin sees one job about to be deleted (idle 24, date within 7 days)', _t_val('00000000-0000-0000-0000-0000000000e1', $$select (ws_overview(now() - interval '1 day') ->> 'purge_soon_total')::bigint$$), 1);
+select _t_eq('...and the two deleted ones in "deleted automatically"', _t_val('00000000-0000-0000-0000-0000000000e1', $$select jsonb_array_length(ws_overview(now() - interval '1 day') -> 'purged_recent')$$), 2);
+select _t_eq('another team does not see our log', _t_val('00000000-0000-0000-0000-0000000000e2', $$select jsonb_array_length(ws_overview(now() - interval '1 day') -> 'purged_recent')$$), 0);
+-- a new scan keeps a job alive and clears the mark
+update team_links set last_scan_at = now() - interval '1 day' where job_name = 'PG idle 24';
+do $$ begin perform count(*) from purge_inactive_jobs(false); end $$;
+select _t_eq('the daily run clears the mark of a job that is active again', (select count(*) from team_links where job_name = 'PG idle 24' and purge_warned_at is null), 1);
+select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('boxScanner', 'PG live')$$);
+select token as tokpg from team_links where job_name = 'PG live' \gset
+insert into auth.users(id,email) values ('00000000-0000-0000-0000-0000000000b9', null);
+select _ta_do('00000000-0000-0000-0000-0000000000b9', format($$select join_team_link(%L,'Pia')$$, :'tokpg'));
+update team_links set purge_warned_at = now() - interval '3 days' where job_name = 'PG live';
+select _ta_do('00000000-0000-0000-0000-0000000000b9', $$insert into scans(user_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000b9','PL1','1')$$);
+select _t_eq('a labourer''s scan clears the mark at once', (select count(*) from team_links where job_name = 'PG live' and purge_warned_at is null), 1);
+
+delete from scans where box_number in ('P1','P2','P3','PL1');
+delete from auth.users where id = '00000000-0000-0000-0000-0000000000b9';
+delete from team_links where job_name like 'PG%';
+delete from job_purge_log;

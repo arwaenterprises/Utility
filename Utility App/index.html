@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=73"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=73"></script>
-    <script src="vendor/qrcode.min.js?v=73"></script>
-    <script src="vendor/html5-qrcode.min.js?v=73"></script>
-    <script src="vendor/supabase.js?v=73"></script>
+    <script src="vendor/xlsx.full.min.js?v=74"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=74"></script>
+    <script src="vendor/qrcode.min.js?v=74"></script>
+    <script src="vendor/html5-qrcode.min.js?v=74"></script>
+    <script src="vendor/supabase.js?v=74"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -151,14 +151,14 @@
                 <div class="trust-badge b-google"><span class="tb-ico tb-google"><span></span></span><span class="tb-t" data-i18n="b_google_t">Google sign-in</span><span class="tb-s" data-i18n="b_google_s">We never see your password</span></div>
                 <a class="trust-badge b-ssl" href="https://www.ssllabs.com/ssltest/analyze.html?d=utility.arwaenterprises.com" target="_blank" rel="noopener"><span class="tb-ico tb-grade">A+</span><span class="tb-t" data-i18n="b_ssl_t">HTTPS: grade A+</span><span class="tb-s" data-i18n="b_ssl_s">SSL Labs, 1 Oct 2026 &#8599;</span></a>
                 <a class="trust-badge b-safe" href="https://transparencyreport.google.com/safe-browsing/search?url=https%3A%2F%2Futility.arwaenterprises.com" target="_blank" rel="noopener"><span class="tb-ico tb-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><span class="tb-t" data-i18n="b_safe_t">Safe Browsing: clean</span><span class="tb-s" data-i18n="b_safe_s">Google, 1 Oct 2026 &#8599;</span></a>
-                <div class="trust-badge b-noads"><span class="tb-ico tb-noads"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M6.7 6.7l10.6 10.6"/></svg></span><span class="tb-t" data-i18n="b_noads_t">No ads, no tracking</span><span class="tb-s" data-i18n="b_noads_s">Your data stays until you delete it</span></div>
+                <div class="trust-badge b-noads"><span class="tb-ico tb-noads"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M6.7 6.7l10.6 10.6"/></svg></span><span class="tb-t" data-i18n="b_noads_t">No ads, no tracking</span><span class="tb-s" data-i18n="b_noads_s">Your data stays until you delete it (idle QR jobs: 30 days)</span></div>
             </div>
 
             <div class="card login-info data-promise">
                 <h3 data-i18n="dp_h">Your data, your control</h3>
                 <ul class="dp-list">
                     <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b data-i18n="dp1_b">Only your team sees your data</b><small data-i18n="dp1_s">Your scans and lists are private from other teams. The team admin can see them, and the names of labourers who joined by QR.</small></div></li>
-                    <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b data-i18n="dp2_b">Your data stays until you delete it</b><small data-i18n="dp2_s">Delete it yourself in the app when the work is done, or email us and we will remove it.</small></div></li>
+                    <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b data-i18n="dp2_b">Your data stays until you delete it</b><small data-i18n="dp2_s">Delete it yourself in the app when the work is done, or email us and we will remove it. A QR job with no scans for 30 days is cleared automatically, after a 7-day warning.</small></div></li>
                     <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b data-i18n="dp3_b">Never sold, no ads, no tracking</b><small data-i18n="dp3_s">We do not sell data or show ads. Usage statistics are plain counts, never your barcodes.</small></div></li>
                     <li><span class="dp-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div><b data-i18n="dp4_b">Camera stays on your device</b><small data-i18n="dp4_s">Barcode scanning happens in your browser. Nothing is recorded or uploaded.</small></div></li>
                 </ul>
@@ -1051,24 +1051,24 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=73"></script>
-    <script src="js/lang.js?v=73"></script>
-    <script src="js/supabaseClient.js?v=73"></script>
-    <script src="js/camera.js?v=73"></script>
-    <script src="js/lists.js?v=73"></script>
-    <script src="js/usage.js?v=73"></script>
-    <script src="js/syncstatus.js?v=73"></script>
-    <script src="js/help.js?v=73"></script>
-    <script src="js/tooltip.js?v=73"></script>
-    <script src="js/operator.js?v=73"></script>
-    <script src="js/teamlinks.js?v=73"></script>
-    <script src="js/workspace.js?v=73"></script>
-    <script src="js/app.js?v=73"></script>
-    <script src="js/boxScanner.js?v=73"></script>
-    <script src="js/itemBarcode.js?v=73"></script>
-    <script src="js/boxCode.js?v=73"></script>
-    <script src="js/boxSegregate.js?v=73"></script>
-    <script src="js/priceCheck.js?v=73"></script>
-    <script src="js/yearSegregate.js?v=73"></script>
+    <script src="js/config.js?v=74"></script>
+    <script src="js/lang.js?v=74"></script>
+    <script src="js/supabaseClient.js?v=74"></script>
+    <script src="js/camera.js?v=74"></script>
+    <script src="js/lists.js?v=74"></script>
+    <script src="js/usage.js?v=74"></script>
+    <script src="js/syncstatus.js?v=74"></script>
+    <script src="js/help.js?v=74"></script>
+    <script src="js/tooltip.js?v=74"></script>
+    <script src="js/operator.js?v=74"></script>
+    <script src="js/teamlinks.js?v=74"></script>
+    <script src="js/workspace.js?v=74"></script>
+    <script src="js/app.js?v=74"></script>
+    <script src="js/boxScanner.js?v=74"></script>
+    <script src="js/itemBarcode.js?v=74"></script>
+    <script src="js/boxCode.js?v=74"></script>
+    <script src="js/boxSegregate.js?v=74"></script>
+    <script src="js/priceCheck.js?v=74"></script>
+    <script src="js/yearSegregate.js?v=74"></script>
 </body>
 </html>

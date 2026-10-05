@@ -799,6 +799,46 @@ as $$
     end;
 $$;
 
+-- ---- Automatic clean-up of idle jobs (Box-Item Scan and Year/Season only) ----
+-- A job whose link has had NO SCAN for 30 days is deleted together with its data (QR link, labourers and scans).
+-- Price Check, Box Segregate (and the print tools, which store nothing) are never touched: their links stay until
+-- the admin stops them. "Activity" means scans only (looking at a job or downloading it does not count); stopping a
+-- job also restarts its clock so a job stopped today is never deleted today.
+-- The admin is warned 7 days before: the daily run marks a job as warned when it has been idle 23 days, and deletes it
+-- only when it is idle 30 days AND has been marked for 7 days - so even a job that is already very old when this
+-- is first switched on gets a full 7 days of warning. A new scan clears the mark. The daily run is started by
+-- pg_cron (see the end of this file); what it deleted is written to job_purge_log.
+alter table public.team_links add column if not exists purge_warned_at timestamptz;
+
+create table if not exists public.job_purge_log (
+    id uuid primary key default gen_random_uuid(),
+    enterprise_id uuid references public.enterprises(id) on delete cascade,
+    job_name text not null,
+    tool text not null,
+    units bigint not null default 0,
+    boxes bigint not null default 0,
+    last_activity timestamptz,
+    purged_at timestamptz not null default now()
+);
+create index if not exists job_purge_log_ent_idx on public.job_purge_log(enterprise_id, purged_at desc);
+alter table public.job_purge_log enable row level security;       -- no policies: only ws_overview (below) reads it
+revoke all on public.job_purge_log from anon, authenticated;
+
+-- The moment of the last activity of a job: its last scan (or its creation), or its stop - whichever is later.
+-- When the job will be deleted: null for tools that are never cleaned up.
+create or replace function public.team_link_purge_at(p_tool text, p_last_scan_at timestamptz, p_created_at timestamptz, p_stopped_at timestamptz, p_warned_at timestamptz)
+returns timestamptz
+language sql
+stable
+as $$
+    select case
+        when p_tool not in ('boxScanner', 'yearSegregate') then null
+        when now() >= la + interval '23 days' then greatest(la + interval '30 days', coalesce(p_warned_at, now()) + interval '7 days')
+        else la + interval '30 days'
+    end
+    from (select greatest(coalesce(p_last_scan_at, p_created_at), coalesce(p_stopped_at, p_created_at)) as la) x;
+$$;
+
 -- Every scan an operator sends is checked and stamped here; nobody can forge the job, the name or the team.
 create or replace function public.stamp_operator_scan()
 returns trigger
@@ -842,7 +882,7 @@ begin
     new.remark := lk.job_name;
 
     update public.team_links
-    set last_scan_at = greatest(coalesce(last_scan_at, v_at), v_at)
+    set last_scan_at = greatest(coalesce(last_scan_at, v_at), v_at), purge_warned_at = null
     where id = lk.id;
     return new;
 end;
@@ -1144,7 +1184,8 @@ create or replace function public.ws_jobs(
     p_search text default '', p_tool text default '', p_status text default 'active', p_sort text default 'last_scan',
     p_limit integer default 25, p_offset integer default 0)
 returns table (id uuid, tool text, job_name text, token text, created_at timestamptz, stopped_at timestamptz,
-               last_scan_at timestamptz, state text, people bigint, boxes bigint, units bigint, total_count bigint)
+               last_scan_at timestamptz, state text, people bigint, boxes bigint, units bigint, total_count bigint,
+               purge_at timestamptz)
 language sql
 security definer
 set search_path = public
@@ -1170,7 +1211,8 @@ as $$
            (select count(*) from public.team_operators o
              where o.link_id = pg.id and o.removed_at is null
                and o.joined_at = (select max(x.joined_at) from public.team_operators x where x.user_id = o.user_id and x.removed_at is null)),
-           coalesce(a.boxes, 0), coalesce(a.units, 0), pg.total
+           coalesce(a.boxes, 0), coalesce(a.units, 0), pg.total,
+           public.team_link_purge_at(pg.tool, pg.last_scan_at, pg.created_at, pg.stopped_at, pg.purge_warned_at)
     from page pg
     left join lateral (
         select count(distinct t.box) filter (where t.st = 'Closed') as boxes, sum(t.qty)::bigint as units
@@ -1521,6 +1563,13 @@ begin
         'idle_jobs', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'job', job_name, 'tool', tool, 'last_scan_at', last_scan_at, 'created_at', created_at)) from idle), '[]'::jsonb),
         'idle_total', (select count(*) from public.team_links l where l.enterprise_id = v_eid and l.stopped_at is null
                         and coalesce(l.last_scan_at, l.created_at) < now() - make_interval(hours => greatest(coalesce(p_idle_hours, 24), 1))),
+        'purge_soon', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'job', job_name, 'tool', tool, 'purge_at', pa) order by pa) from (
+                          select l.id, l.job_name, l.tool, public.team_link_purge_at(l.tool, l.last_scan_at, l.created_at, l.stopped_at, l.purge_warned_at) as pa
+                          from public.team_links l where l.enterprise_id = v_eid) z where pa is not null and pa <= now() + interval '7 days'), '[]'::jsonb),
+        'purge_soon_total', (select count(*) from public.team_links l where l.enterprise_id = v_eid
+                              and public.team_link_purge_at(l.tool, l.last_scan_at, l.created_at, l.stopped_at, l.purge_warned_at) <= now() + interval '7 days'),
+        'purged_recent', coalesce((select jsonb_agg(jsonb_build_object('job', job_name, 'tool', tool, 'units', units, 'purged_at', purged_at) order by purged_at desc) from (
+                          select * from public.job_purge_log where enterprise_id = v_eid and purged_at >= now() - interval '30 days' order by purged_at desc limit 5) pl), '[]'::jsonb),
         'quiet_people', (select count(*) from public.team_operators o where o.enterprise_id = v_eid and o.removed_at is null
                           and not exists (select 1 from public.scans s where s.enterprise_id = v_eid and s.operator_name = o.name and s.scanned_at >= now() - interval '7 days')
                           and not exists (select 1 from public.ys_scans y where y.enterprise_id = v_eid and y.operator_name = o.name and y.scanned_at >= now() - interval '7 days'))
@@ -1549,6 +1598,89 @@ grant execute on function public.ws_data_delete(text, text[], text, timestamptz,
 grant execute on function public.ws_facets(text, text, text, integer) to authenticated;
 grant execute on function public.ws_people(text, text, integer, integer) to authenticated;
 grant execute on function public.ws_overview(timestamptz, integer) to authenticated;
+
+-- ============================================
+-- AUTOMATIC CLEAN-UP OF IDLE JOBS: the daily run
+-- ============================================
+-- purge_inactive_jobs(true)  = look only: lists what would be marked and what would be deleted, changes nothing
+-- purge_inactive_jobs(false) = does it (this is what the daily schedule runs)
+drop function if exists public.purge_inactive_jobs(boolean);
+create or replace function public.purge_inactive_jobs(p_dry_run boolean default false)
+returns table (job_name text, tool text, enterprise_id uuid, units bigint, last_activity timestamptz, action text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    lk record;
+    v_units bigint;
+    v_boxes bigint;
+begin
+    -- a job that is active again (new scan, or stopped later) is no longer marked
+    if not p_dry_run then
+        update public.team_links l set purge_warned_at = null
+        where l.purge_warned_at is not null
+          and (l.tool not in ('boxScanner', 'yearSegregate')
+               or now() < greatest(coalesce(l.last_scan_at, l.created_at), coalesce(l.stopped_at, l.created_at)) + interval '23 days');
+    end if;
+
+    -- 1. idle 23 days: mark it (the admin sees the date in Team & Data)
+    for lk in
+        select l.* from public.team_links l
+        where l.tool in ('boxScanner', 'yearSegregate') and l.purge_warned_at is null
+          and now() >= greatest(coalesce(l.last_scan_at, l.created_at), coalesce(l.stopped_at, l.created_at)) + interval '23 days'
+    loop
+        if not p_dry_run then update public.team_links set purge_warned_at = now() where id = lk.id; end if;
+        job_name := lk.job_name; tool := lk.tool; enterprise_id := lk.enterprise_id; units := null;
+        last_activity := greatest(coalesce(lk.last_scan_at, lk.created_at), coalesce(lk.stopped_at, lk.created_at)); action := 'warn';
+        return next;
+    end loop;
+
+    -- 2. idle 30 days and marked for at least 7 days: delete the data, the labourers and the link
+    for lk in
+        select l.* from public.team_links l
+        where l.tool in ('boxScanner', 'yearSegregate') and l.purge_warned_at is not null
+          and l.purge_warned_at <= now() - interval '7 days'
+          and now() >= greatest(coalesce(l.last_scan_at, l.created_at), coalesce(l.stopped_at, l.created_at)) + interval '30 days'
+    loop
+        if lk.tool = 'yearSegregate' then
+            select coalesce(sum(y.qty), 0), count(distinct y.box_barcode) filter (where y.box_status = 'Closed') into v_units, v_boxes from public.ys_scans y where y.link_id = lk.id;
+        else
+            select coalesce(sum(s.qty), 0), count(distinct s.box_number) filter (where s.box_status = 'Closed') into v_units, v_boxes from public.scans s where s.link_id = lk.id;
+        end if;
+        if not p_dry_run then
+            if lk.tool = 'yearSegregate' then delete from public.ys_scans where link_id = lk.id; else delete from public.scans where link_id = lk.id; end if;
+            insert into public.job_purge_log (enterprise_id, job_name, tool, units, boxes, last_activity)
+            values (lk.enterprise_id, lk.job_name, lk.tool, v_units, v_boxes,
+                    greatest(coalesce(lk.last_scan_at, lk.created_at), coalesce(lk.stopped_at, lk.created_at)));
+            delete from public.team_links where id = lk.id;            -- its labourers (team_operators) go with it
+        end if;
+        job_name := lk.job_name; tool := lk.tool; enterprise_id := lk.enterprise_id; units := v_units;
+        last_activity := greatest(coalesce(lk.last_scan_at, lk.created_at), coalesce(lk.stopped_at, lk.created_at)); action := 'delete';
+        return next;
+    end loop;
+end;
+$$;
+revoke execute on function public.purge_inactive_jobs(boolean) from public, anon, authenticated;
+
+-- The daily schedule (03:15 UTC) needs the pg_cron extension: enable it once in the Supabase dashboard
+-- (Database > Extensions > pg_cron). This block does nothing - and never fails - when pg_cron is not enabled yet;
+-- run this file again after enabling it. To check:  select jobid, jobname, schedule, active from cron.job;
+-- To look at what it would do right now:           select * from public.purge_inactive_jobs(true);
+-- To switch the automatic clean-up off:             select cron.unschedule('purge-inactive-jobs');
+do $cron$
+begin
+    if exists (select 1 from pg_extension where extname = 'pg_cron') then
+        begin
+            perform cron.unschedule('purge-inactive-jobs');
+        exception when others then null;                    -- it was not scheduled yet
+        end;
+        perform cron.schedule('purge-inactive-jobs', '15 3 * * *', 'select count(*) from public.purge_inactive_jobs(false)');
+    else
+        raise notice 'pg_cron is not enabled: idle jobs will NOT be cleaned up automatically until you enable it and run this file again.';
+    end if;
+end
+$cron$;
 
 -- ============================================
 -- REMOVED OBJECTS (cleaned out of an existing database each time this file is run; nothing here is used any more)

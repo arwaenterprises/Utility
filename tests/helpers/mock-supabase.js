@@ -122,7 +122,7 @@ window.__rpcCalls = [];
       if (p_sort === 'name') rows = rows.slice().sort((a, b) => a.job_name.localeCompare(b.job_name));
       const total = rows.length;
       return rows.slice(p_offset || 0, (p_offset || 0) + (p_limit || 25)).map(l => ({ id: l.id, tool: l.tool, job_name: l.job_name, token: l.token, created_at: l.created_at || now, stopped_at: l.state === 'stopped' ? now : null,
-        last_scan_at: l.last_scan_at === undefined ? now : l.last_scan_at, state: l.state, people: l.operators || 0, boxes: l.boxes || 0, units: l.units || 0, total_count: total }));
+        last_scan_at: l.last_scan_at === undefined ? now : l.last_scan_at, state: l.state, people: l.operators || 0, boxes: l.boxes || 0, units: l.units || 0, total_count: total, purge_at: l.purge_at || null }));
     },
     ws_job_boxes: ({ p_link_id, p_search }) => ((window.__wsBoxes || {})[p_link_id] || []).filter(b => !p_search || b.box.includes(p_search)).map(b => ({ ...b, total_count: ((window.__wsBoxes || {})[p_link_id] || []).length })),
     ws_job_people: ({ p_link_id }) => (window.__wsJobPeople || {})[p_link_id] || [],

@@ -192,6 +192,25 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   await page.evaluate(() => AppLang.set('en'));
   await wait(300);
 
+  // automatic clean-up: a job with no scans for 30 days is deleted after a 7-day warning
+  await page.evaluate(() => {
+    const day = 86400000;
+    window.__links.push({ id: 'PG1', token: 'p'.repeat(31) + '1', tool: 'boxScanner', job_name: 'Old stock job', state: 'active', operators: 2, boxes: 4, units: 90, last_scan_at: new Date(Date.now() - 25 * day).toISOString(), purge_at: new Date(Date.now() + 5 * day).toISOString() },
+                       { id: 'PG2', token: 'q'.repeat(31) + '1', tool: 'priceCheck', job_name: 'Price counter', state: 'active', operators: 1, boxes: 0, units: 0, purge_at: null },
+                       { id: 'PG3', token: 'r'.repeat(31) + '1', tool: 'boxScanner', job_name: 'Recent job', state: 'active', operators: 1, boxes: 1, units: 5, purge_at: new Date(Date.now() + 25 * day).toISOString() });
+  });
+  await page.fill('#wsJobSearch', ''); await page.selectOption('#wsJobSort', 'name'); await page.click('[data-ws-status="all"]'); await wait(500);
+  await page.fill('#wsJobSearch', 'Old stock'); await wait(500);
+  ok('a job within 7 days of its automatic deletion shows the date in red instead of its status', /Deletes \d+ \w+ \d{4}/.test(await page.textContent('#wsJobsList')) && (await page.$$('#wsJobsList .ws-pill.bad')).length === 1, await page.textContent('#wsJobsList'));
+  await page.fill('#wsJobSearch', 'Recent job'); await wait(500);
+  ok('a job with a recent scan shows no deletion date (a date 25 days away is not a warning yet)', !(await page.$('#wsJobsList .ws-pill.bad')) && /Active/.test(await page.textContent('#wsJobsList')));
+  await page.fill('#wsJobSearch', 'Price counter'); await wait(500);
+  ok('a Price Check link never shows a deletion date', !(await page.$('#wsJobsList .ws-pill.bad')));
+  await page.fill('#wsJobSearch', 'Old stock'); await wait(500);
+  await page.click('[data-ws-open="PG1"]'); await wait(400);
+  ok('opening that job shows a clear warning with the date and what to do', /will be deleted automatically on/.test(await page.textContent('.ws-banner')) && /Download the data first/.test(await page.textContent('.ws-banner')));
+  await page.click('[data-ws="job-back"]'); await page.fill('#wsJobSearch', ''); await wait(300);
+
   // --- 8b. job detail: boxes, people, activity, download, delete ---
   await page.evaluate(() => {
     const l = window.__links.find(x => x.job_name === 'Inbound 7') || window.__links[0];
@@ -325,12 +344,14 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   await page.click('[data-ws-pdata="0"]'); await wait(500);
   ok('View data jumps to Data filtered to that person', await page.evaluate(() => WS.section === 'data' && WS.data.person === 'Ravi') && /Ravi/.test(await page.textContent('#wsDataChips')));
   // Overview
-  await page.evaluate(() => { window.__wsOverview = { active_jobs: 14, stopped_jobs: 52, people_now: 22, units_today: 18420, boxes_today: 312, top_jobs: [{ job: 'Team A', units: 9640 }, { job: 'Team B', units: 7310 }], idle_jobs: [{ id: 'LD', job: 'Inbound 7', tool: 'boxScanner', last_scan_at: new Date(Date.now() - 50 * 3600000).toISOString(), created_at: new Date(Date.now() - 80 * 3600000).toISOString() }], idle_total: 3, quiet_people: 2 }; });
+  await page.evaluate(() => { window.__wsOverview = { active_jobs: 14, stopped_jobs: 52, people_now: 22, units_today: 18420, boxes_today: 312, top_jobs: [{ job: 'Team A', units: 9640 }, { job: 'Team B', units: 7310 }], idle_jobs: [{ id: 'LD', job: 'Inbound 7', tool: 'boxScanner', last_scan_at: new Date(Date.now() - 50 * 3600000).toISOString(), created_at: new Date(Date.now() - 80 * 3600000).toISOString() }], idle_total: 3, quiet_people: 2, purge_soon: [{ id: 'PG1', job: 'Old stock job', tool: 'boxScanner', purge_at: new Date(Date.now() + 5 * 86400000).toISOString() }], purge_soon_total: 3, purged_recent: [{ job: 'Last season A', tool: 'boxScanner', units: 1200, purged_at: new Date(Date.now() - 2 * 86400000).toISOString() }] }; });
   await page.click('[data-ws-go="overview"]:visible'); await wait(500);
   const ov = await page.textContent('#wsOv');
   ok('Overview shows today\'s totals', /14/.test(ov) && /22/.test(ov) && /18,420/.test(ov) && /312/.test(ov) && /Team A/.test(ov) && /9,640/.test(ov), ov.slice(0, 200));
   ok('...and what needs attention: idle jobs (with how long), more idle jobs, quiet people, stopped jobs', /Inbound 7 has had no scans for 2 days/.test(ov) && /2 more idle jobs/.test(ov) && /2 labourer/.test(ov) && /52 stopped/.test(ov), ov);
-  await page.click('.ws-alert [data-ws-open]'); await wait(500);
+  ok('Overview warns about jobs to be deleted automatically (date, name, and how many more)', /Old stock job will be deleted with its data on/.test(ov) && /2 more jobs will be deleted within 7 days/.test(ov), ov);
+  ok('...and lists what was deleted automatically in the last 30 days', /Deleted automatically in the last 30 days/.test(ov) && /Last season A: 1,200 units/.test(ov), ov);
+  await page.click('.ws-alert [data-ws-open="LD"]'); await wait(500);
   ok('an idle job in the alerts opens that job', /Inbound 7/.test(await page.textContent('.ws-head h3')));
   ok('the Jobs count shows in the navigation', /14/.test(await page.textContent('#wsNav')));
   await page.click('#wsCloseBtn');

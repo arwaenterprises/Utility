@@ -165,7 +165,8 @@ const HELP = {
             tips: [
                 'Creating a link with the <b>same tool and same job name</b> replaces only that job&rsquo;s old link. Other jobs are not affected.',
                 'A link <b>never expires by itself</b>. It works until you stop it. An <b>Idle</b> label only warns you; it never stops anything.',
-                'Scans stay on the server until <b>you</b> delete them. A labourer&rsquo;s <b>Reset</b> only clears their own handheld.',
+                'A <b>Box-Item Scan or Year/Season</b> job with <b>no scans for 30 days</b> is deleted automatically with its QR link and its data. A red date shows 7 days before; download the data first, or scan again to keep the job. <b>Price Check and Box Segregate</b> links are never deleted automatically.',
+                'Scans stay on the server until <b>you</b> delete them (or the 30-day clean-up above removes an idle job). A labourer&rsquo;s <b>Reset</b> only clears their own handheld.',
                 'Give each team its own box-number range or prefix. Two teams using the same box number stay separate in Data, but are easy to confuse on the floor.',
                 'Anyone who gets a QR can join, so share it only with your team and stop it when the job is done.'
             ]
@@ -185,7 +186,8 @@ const HELP = {
             tips: [
                 'إنشاء رابط بنفس الأداة ونفس اسم المهمة يحلّ محل الرابط القديم لتلك المهمة فقط. المهام الأخرى لا تتأثر.',
                 'لا تنتهي صلاحية الرابط تلقائيًا. يبقى يعمل حتى توقفه. علامة <b>خامل</b> تنبّهك فقط ولا توقف أي شيء.',
-                'تبقى عمليات المسح على الخادم حتى <b>تحذفها أنت</b>. زر <b>Reset</b> عند العامل يمسح جهازه فقط.',
+                'تُحذف مهمة <b>مسح الصناديق والقطع أو الفرز حسب السنة والموسم</b> التي <b>لا مسح فيها لمدة 30 يومًا</b> تلقائيًا مع رابط QR وبياناتها. يظهر تاريخ أحمر قبل 7 أيام؛ حمّل البيانات أولًا، أو امسح مرة أخرى للإبقاء على المهمة. أما روابط <b>التحقق من السعر وفرز الصناديق</b> فلا تُحذف تلقائيًا.',
+                'تبقى عمليات المسح على الخادم حتى <b>تحذفها أنت</b> (أو يحذف التنظيف بعد 30 يومًا مهمة خاملة). زر <b>Reset</b> عند العامل يمسح جهازه فقط.',
                 'أعطِ كل فريق نطاق أرقام صناديق أو بادئة خاصة به. الفريقان اللذان يستخدمان رقم الصندوق نفسه يبقيان منفصلين في البيانات، لكن يسهل الخلط بينهما في الميدان.',
                 'يستطيع أي شخص يحصل على الرمز الانضمام، فشاركه مع فريقك فقط وأوقفه عند انتهاء المهمة.'
             ]

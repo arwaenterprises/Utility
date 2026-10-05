@@ -29,6 +29,8 @@ const WS_T = {
         topJobs: 'Units today by job', attention: 'Needs attention', allGood: 'Nothing needs attention.',
         idleJob: '{job} has had no scans for {t}', idleMore: '{n} more idle jobs', quietPeople: '{n} labourer(s) have not scanned in 7 days',
         stoppedInfo: '{n} stopped job(s) still keep their data. Open Jobs, choose Stopped.',
+        deletesOn: 'Deletes {d}', purgeSoon: '{job} will be deleted with its data on {d}', purgeSoonMore: '{n} more jobs will be deleted within 7 days', purgedRecent: 'Deleted automatically in the last 30 days', purgedLine: '{job}: {u} units, {d}',
+        purgeBanner: 'No scans for a long time. This job, its QR link and its data will be deleted automatically on {d}. Download the data first, or scan again to keep the job.',
         // jobs
         newJob: '+ New job', chooseTool: 'Choose a tool', jobPlaceholder: 'Job name (becomes the Remark)', createJob: 'Create QR link',
         searchJobs: 'Search job name', sortLast: 'Sort: last scan', sortNewest: 'Sort: newest', sortName: 'Sort: name',
@@ -74,6 +76,8 @@ const WS_T = {
         topJobs: 'قطع اليوم حسب المهمة', attention: 'يحتاج إلى انتباه', allGood: 'لا شيء يحتاج إلى انتباه.',
         idleJob: 'لا مسح في {job} منذ {t}', idleMore: '{n} مهام خاملة أخرى', quietPeople: '{n} عامل لم يمسحوا خلال 7 أيام',
         stoppedInfo: '{n} مهمة متوقفة ما زالت بياناتها محفوظة. افتح المهام واختر المتوقفة.',
+        deletesOn: 'تُحذف {d}', purgeSoon: 'ستُحذف {job} مع بياناتها في {d}', purgeSoonMore: 'سيتم حذف {n} مهام أخرى خلال 7 أيام', purgedRecent: 'حُذف تلقائيًا خلال آخر 30 يومًا', purgedLine: '{job}: {u} قطعة، {d}',
+        purgeBanner: 'لا يوجد مسح منذ مدة طويلة. ستُحذف هذه المهمة ورابط QR وبياناتها تلقائيًا في {d}. حمّل البيانات أولًا، أو امسح مرة أخرى للإبقاء على المهمة.',
         newJob: '+ مهمة جديدة', chooseTool: 'اختر أداة', jobPlaceholder: 'اسم المهمة (يصبح الملاحظة)', createJob: 'إنشاء رابط QR',
         searchJobs: 'ابحث باسم المهمة', sortLast: 'الترتيب: آخر مسح', sortNewest: 'الترتيب: الأحدث', sortName: 'الترتيب: الاسم',
         noJobs: 'لا توجد مهام مطابقة. أنشئ واحدة بزر + مهمة جديدة.', selected: 'تم تحديد {n}', downloadSel: 'تحميل', stopSel: 'إيقاف الروابط',
@@ -136,7 +140,13 @@ function wsTools() { return APPS.filter(a => !a.modal); }
 function wsIsIdle(j) {
     return j.state === 'active' && (Date.now() - new Date(j.last_scan_at || j.created_at).getTime()) > WS_IDLE_HOURS * 3600000;
 }
+// Within 7 days of its automatic deletion (a job with no scan for 30 days): the date, in red.
+function wsPurgeSoon(j) {
+    return !!j.purge_at && (new Date(j.purge_at).getTime() - Date.now()) <= 7 * 86400000;
+}
+function wsDate(iso) { return new Date(iso).toLocaleDateString(wsLang() === 'ar' ? 'ar' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 function wsPill(j) {
+    if (wsPurgeSoon(j)) return `<span class="ws-pill bad" title="${wsEsc(wsT('purgeBanner', { d: wsDate(j.purge_at) }))}">${wsEsc(wsT('deletesOn', { d: wsDate(j.purge_at) }))}</span>`;
     if (j.state !== 'active') return `<span class="ws-pill off">${wsEsc(wsT('stopped'))}</span>`;
     if (wsIsIdle(j)) return `<span class="ws-pill warn">${wsEsc(wsT('idle'))}</span>`;
     return `<span class="ws-pill ok">${wsEsc(wsT('active'))}</span>`;
@@ -277,6 +287,8 @@ async function wsRenderOverview() {
     const idleShown = (data.idle_jobs || []).slice(0, 5);
     idleShown.forEach(j => alerts.push(`<div class="ws-alert"><span class="ws-pill warn">${wsEsc(wsT('idle'))}</span><button type="button" class="ws-link" data-ws-open="${j.id}" data-ws-name="${wsEsc(j.job)}" data-ws-tool="${wsEsc(j.tool)}">${wsEsc(wsT('idleJob', { job: j.job, t: wsDuration(j.last_scan_at || j.created_at) }))}</button></div>`));
     if (Number(data.idle_total) > idleShown.length) alerts.push(`<div class="ws-alert"><span class="ws-pill off">+</span><span>${wsEsc(wsT('idleMore', { n: Number(data.idle_total) - idleShown.length }))}</span></div>`);
+    (data.purge_soon || []).slice(0, 5).forEach(j => alerts.unshift(`<div class="ws-alert"><span class="ws-pill bad">${wsEsc(wsT('deletesOn', { d: wsDate(j.purge_at) }))}</span><button type="button" class="ws-link" data-ws-open="${j.id}" data-ws-name="${wsEsc(j.job)}" data-ws-tool="${wsEsc(j.tool)}">${wsEsc(wsT('purgeSoon', { job: j.job, d: wsDate(j.purge_at) }))}</button></div>`));
+    if (Number(data.purge_soon_total) > Math.min(5, (data.purge_soon || []).length)) alerts.push(`<div class="ws-alert"><span class="ws-pill bad">+</span><span>${wsEsc(wsT('purgeSoonMore', { n: Number(data.purge_soon_total) - Math.min(5, (data.purge_soon || []).length) }))}</span></div>`);
     if (Number(data.quiet_people) > 0) alerts.push(`<div class="ws-alert"><span class="ws-pill off">i</span><span>${wsEsc(wsT('quietPeople', { n: data.quiet_people }))}</span></div>`);
     if (Number(data.stopped_jobs) > 0) alerts.push(`<div class="ws-alert"><span class="ws-pill off">i</span><span>${wsEsc(wsT('stoppedInfo', { n: data.stopped_jobs }))}</span></div>`);
     box.innerHTML = `
@@ -284,7 +296,8 @@ async function wsRenderOverview() {
         <div class="ws-split">
             <div class="ws-card"><h4>${wsEsc(wsT('topJobs'))}</h4>${top.length ? top.map(t => `<div class="ws-hbar"><span title="${wsEsc(t.job)}">${wsEsc(t.job || '-')}</span><div class="ws-track"><i style="width:${Math.max(2, Math.round(100 * Number(t.units) / max))}%"></i></div><span class="v">${wsNum(t.units)}</span></div>`).join('') : `<p class="ws-muted">${wsEsc(wsT('none'))}</p>`}</div>
             <div class="ws-card"><h4>${wsEsc(wsT('attention'))}</h4>${alerts.length ? alerts.join('') : `<p class="ws-muted">${wsEsc(wsT('allGood'))}</p>`}</div>
-        </div>`;
+        </div>
+        ${(data.purged_recent || []).length ? `<div class="ws-card"><h4>${wsEsc(wsT('purgedRecent'))}</h4>${data.purged_recent.map(p => `<div class="ws-alert"><span class="ws-pill off">${wsEsc(wsToolName(p.tool))}</span><span>${wsEsc(wsT('purgedLine', { job: p.job, u: wsNum(p.units), d: wsDate(p.purged_at) }))}</span></div>`).join('')}</div>` : ''}`;
 }
 
 // ============================================
@@ -419,6 +432,7 @@ function wsRenderJobDetail() {
         <div class="ws-head"><h3><button type="button" class="ws-back" data-ws="job-back" aria-label="${wsEsc(wsT('back'))}">&lsaquo;</button> ${wsEsc(j.job_name)} ${wsPill(j)}</h3>
             <span class="ws-head-btns"><small class="ws-muted">${wsEsc(wsToolName(j.tool))}</small>
             ${j.state === 'active' ? `<button type="button" class="btn btn-secondary btn-sm" data-ws-qr="${j.id}">${wsEsc(wsT('showQr'))}</button><button type="button" class="btn btn-secondary btn-sm btn-danger-text" data-ws="job-stop">${wsEsc(wsT('stopLink'))}</button>` : ''}</span></div>
+        ${wsPurgeSoon(j) ? `<div class="ws-banner">${wsEsc(wsT('purgeBanner', { d: wsDate(j.purge_at) }))}</div>` : ''}
         <div class="ws-tiles">${tile(wsNum(j.units), wsT('units'))}${tile(wsNum(j.boxes), wsT('boxes'))}${tile(wsNum(j.people), wsT('peopleCol'))}${tile(wsEsc(wsAgo(j.last_scan_at)), wsT('lastScan'))}</div>
         <div class="ws-tabs">${tab('boxes', wsT('tabBoxes'))}${tab('people', wsT('tabPeople'))}${tab('activity', wsT('tabActivity'))}</div>
         <div id="wsJobTab"></div>

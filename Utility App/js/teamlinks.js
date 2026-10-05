@@ -5,7 +5,8 @@
 // scan it with the phone's own scanner - see js/operator.js for what happens on their device.
 // Many teams can work on the same tool at once: one link per team, each with its own job name. Creating a link with the
 // same tool AND the same job name replaces just that link (a fresh QR for that job). A link never expires by itself: it works until
-// the admin stops it (the server decides - supabase/schema.sql); data is never deleted by this.
+// the admin stops it (the server decides - supabase/schema.sql). Only Box-Item Scan and Year/Season jobs with no scan for
+// 30 days are deleted automatically with their data, after a 7-day warning (see purge_inactive_jobs in schema.sql).
 const QL_T = {
     en: {
         none: 'No QR links yet. Create one below.',
