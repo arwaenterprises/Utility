@@ -239,97 +239,28 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     AppState.isOnline = true; await ysExecuteReset();
     ok('YS member reset clears device only, server keeps data', (await ysDbGetAll(YS_SCANS_STORE)).length === 0 && __db.ys_scans.length === 1);
 
-    // ---------- Team YS ----------
-    await refreshTeamYsStats(); ok('Team YS table renders member', /Ann/.test(document.getElementById('teamYsList').textContent));
-    AppState.profile.enterprise_id = 'E1'; __db.ys_scans.forEach(s => s.enterprise_id = 'E1');
-    await downloadTeamYs(['u1'], 'x'); ok('Team YS download exports rows w/ member name', written[written.length-1].rows.length === 1 && written[written.length-1].rows[0]['Scanned By'] === 'Ann');
-    selectedYsMemberIds.add('u1'); await resetSelectedTeamYs(); ok('Team YS reset deletes from database', __db.ys_scans.length === 0);
-
-    // ---------- Team: removing a teammate ----------
-    AppState.profile = { display_name: 'Admin', enterprise_id: 'E1', tier: 'enterprise_admin' };
-    teamMemberStatsCache = [{ user_id: 'u-gone', email: 'Gone@X.com', display_name: 'Gone', boxes_closed: 0, total_qty: 0 }];
-    window.confirm = () => true; AppState.profile.enterprise_id = 'E1';
-    await removeMember('u-gone');
-    ok('removing a teammate calls the server', window.__removedMember === 'u-gone');
-    // ---------- Team & Data workspace (user icon / 7th tile) for an admin; the small Account window for everybody else ----------
+    // ---------- Team & Data workspace (home tile) for an admin; no user icon, no older windows ----------
     AppState.profile = { ...AppState.profile, tier: 'enterprise_admin', enterprise_id: 'E1' };
     window.__me = { ...window.__me, tier: 'enterprise_admin', enterprise_id: 'E1' };
-    const vis = id => document.getElementById(id).style.display !== 'none';
     const wsOpen = () => document.getElementById('wsRoot').classList.contains('active');
-    await openAccountModal(); await new Promise(r => setTimeout(r, 150));
-    ok('an admin gets the Team & Data workspace from the user icon (not the small account window)', wsOpen() && !document.getElementById('accountModal').classList.contains('active'));
+    ok('the user icon is gone from the top bar', !document.getElementById('accountBtn') && !document.getElementById('accountModal'));
+    ok('the older Data Management window is gone (page, code and database functions)', !document.getElementById('teamModal') && typeof openTeamModal === 'undefined' && typeof openAccountModal === 'undefined' && typeof refreshTeamMemberStats === 'undefined' && typeof resetSelectedTeamData === 'undefined' && !HELP.dataManagement);
+    renderAppGrid();
+    document.querySelector('.app-tile[data-app-id="dataManagement"]').click(); await new Promise(r => setTimeout(r, 150));
+    ok('the Team & Data tile opens the workspace for an admin', wsOpen());
     ok('the workspace has five sections: Overview, Jobs, People, Data, Account', [...document.querySelectorAll('#wsNav .ws-nav-btn')].map(b => b.dataset.wsGo).join() === 'overview,jobs,people,data,account');
     ok('there is no e-mail invitation and no "create an enterprise" any more', !document.getElementById('inviteToggleBtn') && !document.getElementById('sendInviteBtn') && !document.getElementById('createEnterpriseSection') && !document.getElementById('inviteBanner') && !document.getElementById('inviteModal'));
-    ok('the old User management admin section is gone from the account window', !document.getElementById('enterpriseAdminSection') && !document.getElementById('qrLinksSection') && !document.getElementById('umMemberList'));
     wsGo('account'); await new Promise(r => setTimeout(r, 50));
     ok('Account section shows the enterprise name', /Acme/.test(document.getElementById('wsMain').textContent), document.getElementById('wsMain').textContent);
     window.prompt = () => '  Acme Corp  '; await wsRenameEnterprise();
     ok('rename updates the enterprise name', WS.enterprise === 'Acme Corp' && /Acme Corp/.test(document.getElementById('wsMain').textContent), WS.enterprise);
     document.getElementById('wsCloseBtn').click();
     ok('the ✕ closes the workspace', !wsOpen());
-    // members and individuals keep the small account window
-    AppState.profile = { ...AppState.profile, tier: 'enterprise_member' };
-    await openAccountModal();
-    ok('a member gets the small account window with just their details', !wsOpen() && document.getElementById('accountModal').classList.contains('active') && !!document.getElementById('accountEmailDisp').textContent);
-    document.getElementById('closeAccountBtn').click();
-    AppState.profile = { ...AppState.profile, tier: 'enterprise_admin' };
-
-    // ---------- Data Management window (7th tile): two tabs, one Download/Reset pair per tab, close ✕ ----------
-    document.querySelector('.app-tile[data-app-id="dataManagement"]') || renderAppGrid();
-    document.querySelector('.app-tile[data-app-id="dataManagement"]').click(); await new Promise(r => setTimeout(r, 150));
-    ok('for an admin the Team & Data tile opens the workspace on its Data section', wsOpen() && WS.section === 'data' && !document.getElementById('teamModal').classList.contains('active'));
-    document.getElementById('wsCloseBtn').click();
-    await openTeamModal(); await new Promise(r => setTimeout(r, 120));
-    ok('the older Data Management window still opens (for members and individuals)', document.getElementById('teamModal').classList.contains('active'));
-    ok('admin title says whose data: the whole team', /Team & Data — Acme Corp \(all users\)/.test(document.getElementById('teamModalTitle').textContent), document.getElementById('teamModalTitle').textContent);
-    document.getElementById('helpCloseBtn').click();
-    ok('Data Management has no invite or rename controls', !document.querySelector('#teamModal #inviteToggleBtn, #teamModal #renameEnterpriseBtn, #teamModal [data-remove-member]'));
-    ok('opens on the Box Scanner tab', vis('teamPanelBs') && !vis('teamPanelYs'));
-    ok('admin sees everybody in the Box Scanner list', /Ann/.test(document.getElementById('teamMemberList').textContent) && /Bob/.test(document.getElementById('teamMemberList').textContent));
-    document.getElementById('teamTabYs').click();
-    ok('Year/Season tab shows its own list and hides the Box Scanner one', !vis('teamPanelBs') && vis('teamPanelYs') && document.getElementById('teamTabYs').classList.contains('active'));
-    ok('each tab has exactly one Download and one Reset button', document.querySelectorAll('#teamPanelBs .team-actions .btn').length === 2 && document.querySelectorAll('#teamPanelYs .team-actions .btn').length === 2 && document.querySelectorAll('#teamModal [id*="Reset"], #teamModal [id*="reset"]').length === 2);
-    document.getElementById('teamYsSelectAll').click();
-    ok('Year/Season "Select All" ticks every member', selectedYsMemberIds.size === 2 && [...document.querySelectorAll('.team-ys-checkbox')].every(c => c.checked));
-    document.getElementById('teamYsSelectAll').click();
-    ok('... and un-ticks them', selectedYsMemberIds.size === 0);
-    let asked = 0; window.confirm = () => { asked++; return false; }; window.alert = () => {};
-    document.getElementById('teamYsList').querySelector('.team-ys-checkbox').click();
-    document.getElementById('resetTeamYsBtn').click(); await new Promise(r => setTimeout(r, 30));
-    selectedMemberIds.add('u1'); document.getElementById('resetTeamSelectedBtn').click(); await new Promise(r => setTimeout(r, 30));
-    ok('both Reset buttons ask "Are you sure?" first', asked === 2, 'asked ' + asked);
-    document.getElementById('closeTeamBtn').click();
-    ok('the ✕ in the corner closes the window', !document.getElementById('teamModal').classList.contains('active') && document.getElementById('closeTeamBtn').textContent.trim() === '✕');
-
-    // individual account: same window, only their own data, can download and reset
-    AppState.profile = { display_name: 'Ann', enterprise_id: null, tier: 'individual' };
-    window.__me = { ...window.__me, tier: 'individual', enterprise_id: null };
-    __db.scans.push({ id: 'ind1', scan_uid: 'ind1', user_id: 'u1', enterprise_id: null, remark: 'R', box_number: 'IB1', barcode: '123', qty: 2, box_status: 'Closed', scanned_at: new Date().toISOString() },
-                    { id: 'oth1', scan_uid: 'oth1', user_id: 'u2', enterprise_id: null, remark: 'R', box_number: 'OB1', barcode: '999', qty: 1, box_status: 'Closed', scanned_at: new Date().toISOString() });
-    await openDataManagement(); document.getElementById('helpCloseBtn').click();
-    ok('individual: title says "my data"', /Team & Data — my data/.test(document.getElementById('teamModalTitle').textContent), document.getElementById('teamModalTitle').textContent);
-    ok('individual: sees only their own row', document.querySelectorAll('#teamMemberList .team-member-checkbox').length === 1);
-    ok('individual: Reset is available', document.getElementById('resetTeamSelectedBtn').style.display !== 'none' && document.getElementById('resetTeamYsBtn').style.display !== 'none');
-    selectedMemberIds.clear(); selectedMemberIds.add('u1'); written.length = 0;
-    await downloadSelectedTeamData();
-    ok('individual: Download exports their own rows (and nobody else\'s)', written.length === 1 && written[0].rows.length === 1 && written[0].rows[0]['Box Number'] === 'IB1', JSON.stringify(written[0] && written[0].rows));
-    window.confirm = () => true; await resetSelectedTeamData();
-    ok('individual: Reset removes only their own scans', !__db.scans.some(r => r.id === 'ind1') && __db.scans.some(r => r.id === 'oth1'));
-    document.getElementById('closeTeamBtn').click();
-
-    // enterprise member: same window, own data only, download only (no Reset)
-    AppState.profile = { display_name: 'Mia', enterprise_id: 'E1', tier: 'enterprise_member' };
-    window.__me = { ...window.__me, tier: 'enterprise_member', enterprise_id: 'E1' };
-    await openDataManagement(); document.getElementById('helpCloseBtn').click();
-    ok('member: sees only their own row', document.querySelectorAll('#teamMemberList .team-member-checkbox').length === 1);
-    ok('member: Download only - both Reset buttons are hidden', document.getElementById('resetTeamSelectedBtn').style.display === 'none' && document.getElementById('resetTeamYsBtn').style.display === 'none');
-    ok('member: Download buttons are there', document.getElementById('downloadTeamSelectedBtn').style.display !== 'none' && document.getElementById('downloadTeamYsBtn').style.display !== 'none');
-    document.getElementById('closeTeamBtn').click();
-    AppState.profile = { display_name: 'Admin', enterprise_id: 'E1', tier: 'enterprise_admin' };
-    window.__me = { ...window.__me, tier: 'enterprise_admin', enterprise_id: 'E1' };
-    await openTeamModal(); document.getElementById('helpCloseBtn').click();
-    ok('admin in the older window: Reset buttons are there', document.getElementById('resetTeamSelectedBtn').style.display !== 'none');
-    document.getElementById('closeTeamBtn').click();
+    // only a team admin sees the tile (members from older invitations have no workspace)
+    AppState.profile = { ...AppState.profile, tier: 'enterprise_member' }; renderAppGrid();
+    ok('a non-admin does not get the Team & Data tile', !document.querySelector('.app-tile[data-app-id="dataManagement"]'));
+    AppState.profile = { ...AppState.profile, tier: 'enterprise_admin' }; renderAppGrid();
+    ok('an admin does', !!document.querySelector('.app-tile[data-app-id="dataManagement"]'));
     ok('photo capture is gone', !document.getElementById('photoCaptureApp') && !APPS.some(a => a.id === 'photoCapture') && typeof initPhotoCapture === 'undefined');
     ok('6 tools + the Team & Data tile', APPS.length === 7 && APPS.filter(a => a.modal).map(a => a.id).join() === 'dataManagement', APPS.map(a => a.id).join());
     ok('NO content-security-policy violations during the whole run', window.__csp.length === 0, JSON.stringify(window.__csp));
@@ -400,10 +331,10 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     document.getElementById('updateBtn').click(); await sleep(30);
     ok('tapping the update icon with an update waiting opens the popup again', popup());
     document.getElementById('updateLaterBtn').click();
-    document.getElementById('accountModal').classList.add('active');
+    document.getElementById('qrSheetModal').classList.add('active');
     window.fetch = async (u, o) => /sw\.js/.test(u) ? new Response(swText(running + 1)) : realFetch(u, o);
     ok('an automatic check does not interrupt another open window (only the dot)', (await checkForAppUpdate({ popup: true })) === 'newer' && !popup());
-    document.getElementById('accountModal').classList.remove('active');
+    document.getElementById('qrSheetModal').classList.remove('active');
     window.fetch = async (u, o) => /sw\.js/.test(u) ? new Response(swText(running)) : realFetch(u, o);
     ok('same version again clears the dot', (await checkForAppUpdate()) === 'current' && !dot());
     window.fetch = async () => { throw new TypeError('Failed to fetch'); };

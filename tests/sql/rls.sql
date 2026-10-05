@@ -102,13 +102,6 @@ select _t_eq('other enterprise admin sees none', _t_val('00000000-0000-0000-0000
 select _t_eq('individual can delete own scans', _t_val('00000000-0000-0000-0000-00000000000a', $$with d as (delete from scans where user_id='00000000-0000-0000-0000-00000000000a' returning 1) select count(*) from d$$), 1);
 -- Box Scanner data screen: same functions, own rows only for non-admins
 select _t_do('00000000-0000-0000-0000-00000000000a', $$insert into scans(user_id,box_number,barcode,qty) values ('00000000-0000-0000-0000-00000000000a','IB','5',2)$$);
-select _t_eq('individual: stats show their own total', _t_val('00000000-0000-0000-0000-00000000000a', $$select total_qty from team_member_stats() where email='indiv@x.com'$$), 2);
-select _t_eq('individual: stats show only themselves', _t_val('00000000-0000-0000-0000-00000000000a', $$select count(*) from team_member_stats()$$), 1);
-select _t_eq('member: stats show only themselves', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from team_member_stats()$$), 1);
-select _t_eq('member: stats total is their own scans only', _t_val('00000000-0000-0000-0000-0000000000b1', $$select total_qty from team_member_stats()$$), 2);
-select _t_eq('member: search finds their own box', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from search_team_scans('B',50)$$), 2);
-select _t_eq('individual: search never returns other people''s scans', _t_val('00000000-0000-0000-0000-00000000000a', $$select count(*) from search_team_scans('B',50) where user_id <> '00000000-0000-0000-0000-00000000000a'$$), 0);
-select _t_eq('admin: search covers the whole team', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(distinct user_id) from search_team_scans('B',50)$$), 1);
 select _t_eq('admin can delete team scans', _t_val('00000000-0000-0000-0000-0000000000e1', $$with d as (delete from scans where enterprise_id='11111111-1111-1111-1111-111111111111' returning 1) select count(*) from d$$), 2);
 
 -- ============ Year/Season scans ============
@@ -117,14 +110,6 @@ select _t_do('00000000-0000-0000-0000-0000000000b1', $$insert into ys_scans(scan
 select _t_eq('re-sending a scan (same scan_uid) does not duplicate', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from ys_scans where scan_uid='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'$$), 1);
 select _t_err('member cannot plant Year/Season scans in another enterprise', '00000000-0000-0000-0000-0000000000b1', $$insert into ys_scans(scan_uid,user_id,enterprise_id,barcode) values (gen_random_uuid(),'00000000-0000-0000-0000-0000000000b1','22222222-2222-2222-2222-222222222222','x')$$, 'row-level security');
 select _t_eq('member cannot delete own Year/Season scans', _t_val('00000000-0000-0000-0000-0000000000b1', $$with d as (delete from ys_scans where user_id='00000000-0000-0000-0000-0000000000b1' returning 1) select count(*) from d$$), 0);
-select _t_eq('admin team stats: member qty', _t_val('00000000-0000-0000-0000-0000000000e1', $$select total_qty from team_ys_member_stats() where email='member1@x.com'$$), 3);
-select _t_eq('admin team stats: closed boxes (distinct PTL+box)', _t_val('00000000-0000-0000-0000-0000000000e1', $$select boxes_closed from team_ys_member_stats() where email='member1@x.com'$$), 1);
-select _t_eq('member sees only their own row in the stats (not the team)', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from team_ys_member_stats()$$), 1);
-select _t_eq('... and that row is their own', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from team_ys_member_stats() where email='member1@x.com'$$), 1);
-select _t_eq('member cannot see the admin in the stats', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from team_ys_member_stats() where email='admin1@x.com'$$), 0);
-select _t_eq('individual sees only their own row in the stats', _t_val('00000000-0000-0000-0000-00000000000a', $$select count(*) from team_ys_member_stats()$$), 1);
-select _t_eq('admin still sees the whole enterprise (admin + member)', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from team_ys_member_stats()$$), 2);
-select _t_eq('another enterprise admin never sees this enterprise', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from team_ys_member_stats() where email in ('member1@x.com','admin1@x.com')$$), 0);
 select _t_eq('other enterprise admin cannot delete these', _t_val('00000000-0000-0000-0000-0000000000e2', $$with d as (delete from ys_scans returning 1) select count(*) from d$$), 0);
 select _t_eq('admin can delete team Year/Season scans', _t_val('00000000-0000-0000-0000-0000000000e1', $$with d as (delete from ys_scans where enterprise_id='11111111-1111-1111-1111-111111111111' returning 1) select count(*) from d$$), 3);
 
@@ -165,7 +150,7 @@ select _t_eq('delete_my_account() does not exist (feature rolled back)', (select
 
 -- ============ e-mail invitations are gone (replaced by Team QR links) ============
 select _t_eq('the invitation functions no longer exist', (select count(*) from pg_proc where proname in ('send_enterprise_invite','accept_enterprise_invite','my_pending_invites','current_user_email')), 0);
-select _t_err('nobody can read the old invitation table through the API', '00000000-0000-0000-0000-0000000000e1', $$select count(*) from enterprise_invites$$, 'permission denied');
+select _t_eq('the old invitation table is gone', (select count(*) from pg_tables where schemaname = 'public' and tablename = 'enterprise_invites'), 0);
 
 -- ============ Team QR links (labourers without accounts) ============
 -- helpers that behave like an ANONYMOUS sign-in (the JWT says is_anonymous = true) or like the API's anon role
@@ -253,18 +238,19 @@ select _t_eq('operator cannot change the job, name or team of a scan afterwards 
 select _ta_do('00000000-0000-0000-0000-0000000000f2', $$insert into scans(user_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000f2','OB2','222')$$);
 select _t_eq('operator sees only their own scans, not the other operator''s', _ta_val('00000000-0000-0000-0000-0000000000f1', $$select count(*) from scans$$), 1);
 select _ta_err('operator cannot upload lists', '00000000-0000-0000-0000-0000000000f1', $$select begin_list_upload('box_list')$$, 'Only an enterprise admin');
-select _ta_err('operator cannot create an enterprise', '00000000-0000-0000-0000-0000000000f1', $$select create_enterprise('My own')$$, 'already belong');
+select _t_eq('create_enterprise() no longer exists (every Google sign-in gets its own team automatically)', (select count(*) from pg_proc where proname = 'create_enterprise'), 0);
+select _ta_err('operator cannot create an enterprise through the API', '00000000-0000-0000-0000-0000000000f1', $$insert into enterprises(name, admin_user_id) values ('My own', '00000000-0000-0000-0000-0000000000f1')$$, 'permission denied');
 select _ta_err('operator cannot create links', '00000000-0000-0000-0000-0000000000f1', $$select create_team_link('boxScanner','x')$$, 'Only the enterprise admin');
 select _t_eq('operator cannot see the other team''s data', _ta_val('00000000-0000-0000-0000-0000000000f1', $$select count(*) from scans where enterprise_id='22222222-2222-2222-2222-222222222222'$$), 0);
 select _t_eq('the team admin sees the operators'' scans, with their names', (select count(*) from scans where box_number in ('OB1','OB2') and operator_name in ('Ravi','Sana')), 2);
 select _t_eq('a normal (Google) user cannot fake an operator name on their own scans', (select count(*) from (select 1) q where _t_val('00000000-0000-0000-0000-0000000000b1', $$with i as (insert into scans(user_id,enterprise_id,box_number,barcode,operator_name) values ('00000000-0000-0000-0000-0000000000b1','11111111-1111-1111-1111-111111111111','FB','9','Fake Name') returning operator_name) select count(*) from i where operator_name is null$$) = 1), 1);
 
 -- the admin's views and tools
-select _t_eq('admin: list of links shows state and the number of people who joined', _t_val('00000000-0000-0000-0000-0000000000e1', $$select operators from list_team_links() where job_name='Inbound 8' and state='active'$$), 2);
-select _t_eq('admin: list of people', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from list_team_operators() where name in ('Ravi','Sana')$$), 2);
-select _t_eq('a member cannot list links', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from list_team_links()$$), 0);
-select _t_eq('another team''s admin sees none of these links', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from list_team_links()$$), 0);
-select _t_eq('another team''s admin sees none of these people', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from list_team_operators()$$), 0);
+select _t_eq('admin: the job list shows state and the number of people who joined', _t_val('00000000-0000-0000-0000-0000000000e1', $$select people from ws_jobs('Inbound 8', '', 'all') where state='active'$$), 2);
+select _t_eq('admin: list of people', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_people('', 'labourer') where name in ('Ravi','Sana')$$), 2);
+select _t_eq('a member cannot list jobs', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from ws_jobs('', '', 'all')$$), 0);
+select _t_eq('another team''s admin sees none of these jobs', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from ws_jobs('', '', 'all')$$), 0);
+select _t_eq('another team''s admin sees none of these people', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from ws_people('', 'labourer')$$), 0);
 select id as op_ravi from team_operators where name = 'Ravi' \gset
 select _t_do('00000000-0000-0000-0000-0000000000e2', format($$select stop_team_link(%L)$$, (select id from team_links where job_name='Inbound 8')));
 select _t_eq('another team''s admin cannot stop this link', (select count(*) from team_links where job_name='Inbound 8' and stopped_at is null), 1);
@@ -307,7 +293,7 @@ select _ta_err('a removed person cannot rejoin the same job', '00000000-0000-000
 
 -- an anonymous device that has NOT joined a team (anyone with the public key can create one) can do nothing
 insert into auth.users(id,email) values ('00000000-0000-0000-0000-0000000000f3', null);
-select _ta_err('unjoined anonymous device cannot create an enterprise', '00000000-0000-0000-0000-0000000000f3', $$select create_enterprise('Free storage Ltd')$$, 'Join a team');
+select _ta_err('unjoined anonymous device cannot create an enterprise', '00000000-0000-0000-0000-0000000000f3', $$insert into enterprises(name, admin_user_id) values ('Free storage Ltd', '00000000-0000-0000-0000-0000000000f3')$$, 'permission denied');
 select _ta_err('...cannot start a list upload', '00000000-0000-0000-0000-0000000000f3', $$select begin_list_upload('box_list')$$, 'Join a team');
 select _ta_err('...cannot log usage', '00000000-0000-0000-0000-0000000000f3', $$select log_usage('box_scanner','box_closed',1,1,current_date)$$, 'Join a team');
 select _ta_err('...cannot store scans', '00000000-0000-0000-0000-0000000000f3', $$insert into scans(user_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000f3','U1','1')$$, 'row-level security');
@@ -324,14 +310,6 @@ select _ta_do('00000000-0000-0000-0000-0000000000f4', format($$select join_team_
 select _ta_do('00000000-0000-0000-0000-0000000000f5', format($$select join_team_link(%L,'  ravi')$$, :'tok9'));
 select _ta_do('00000000-0000-0000-0000-0000000000f4', $$insert into scans(user_id,box_number,barcode,qty,box_status) values ('00000000-0000-0000-0000-0000000000f4','PB1','1',2,'Closed')$$);
 select _ta_do('00000000-0000-0000-0000-0000000000f5', $$insert into scans(user_id,box_number,barcode,qty,box_status) values ('00000000-0000-0000-0000-0000000000f5','PB2','2',3,'Closed')$$);
-select _t_eq('admin people list: the same labourer on two handhelds is ONE person', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from team_member_stats() where is_operator and person_key = 'o:ravi'$$), 1);
-select _t_eq('...with both boxes and all the quantity', _t_val('00000000-0000-0000-0000-0000000000e1', $$select boxes_closed * 100 + total_qty from team_member_stats() where person_key = 'o:ravi'$$), 205);
-select _t_eq('...knowing both handhelds and the job', _t_val('00000000-0000-0000-0000-0000000000e1', $$select cardinality(member_ids) * 10 + cardinality(operator_names) from team_member_stats() where person_key = 'o:ravi' and jobs = 'Inbound 9'$$), 22);
-select _t_eq('...and no labourer shows up as an ordinary account row', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from team_member_stats() where not is_operator and user_id in ('00000000-0000-0000-0000-0000000000f4','00000000-0000-0000-0000-0000000000f5')$$), 0);
-select _t_eq('a team member does not see labourers in the people list', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from team_member_stats() where is_operator$$), 0);
-select _t_eq('another team''s admin does not see them either', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from team_member_stats() where is_operator$$), 0);
-select _t_eq('search finds a labourer by name and shows the name', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from search_team_scans('rav', 50) where operator_name ilike 'ravi'$$), 2);
-select _t_eq('search finds scans by job name', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from search_team_scans('Inbound 9', 50)$$), 2);
 delete from scans where box_number in ('PB1','PB2');
 
 -- ============ every Google sign-in is its own team ============
@@ -340,7 +318,7 @@ insert into auth.users(id,email) values ('00000000-0000-0000-0000-0000000000a1',
 select _t_eq('a brand-new Google sign-in gets its own team and is its admin', (select count(*) from profiles p join enterprises e on e.id = p.enterprise_id where p.email='newbie@x.com' and p.tier='enterprise_admin' and e.admin_user_id = p.id), 1);
 select _t_do('00000000-0000-0000-0000-0000000000a1', $$select create_team_link('boxScanner','Solo job')$$);
 select _t_eq('...so a solo user can make Team QR links straight away', (select count(*) from team_links l join profiles p on p.enterprise_id = l.enterprise_id where p.email='newbie@x.com'), 1);
-select _t_eq('...and still sees none of the other teams', _t_val('00000000-0000-0000-0000-0000000000a1', $$select count(*) from list_team_operators()$$), 0);
+select _t_eq('...and still sees none of the other teams', _t_val('00000000-0000-0000-0000-0000000000a1', $$select count(*) from ws_people('', 'labourer')$$), 0);
 -- a labourer (anonymous, no e-mail) never gets a team of its own
 insert into auth.users(id,email) values ('00000000-0000-0000-0000-0000000000a2', null);
 select _t_eq('an anonymous labourer does not get a team', (select count(*) from profiles where id='00000000-0000-0000-0000-0000000000a2' and enterprise_id is null and tier='individual'), 1);
@@ -372,10 +350,10 @@ select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('
 select token as tokl from team_links where job_name = 'Leave test' \gset
 select _ta_do('00000000-0000-0000-0000-0000000000a6', format($$select join_team_link(%L,'Lea')$$, :'tokl'));
 select _ta_do('00000000-0000-0000-0000-0000000000a6', $$insert into scans(user_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000a6','LV1','1')$$);
-select _t_eq('before leaving the admin counts the labourer on the link', _t_val('00000000-0000-0000-0000-0000000000e1', $$select operators from list_team_links() where job_name='Leave test'$$), 1);
+select _t_eq('before leaving the admin counts the labourer on the link', _t_val('00000000-0000-0000-0000-0000000000e1', $$select people from ws_jobs('Leave test', '', 'all')$$), 1);
 select _ta_do('00000000-0000-0000-0000-0000000000a6', $$select leave_team_link()$$);
-select _t_eq('after leaving the link no longer counts them', _t_val('00000000-0000-0000-0000-0000000000e1', $$select operators from list_team_links() where job_name='Leave test'$$), 0);
-select _t_eq('...and the admin''s labourers list drops them', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from list_team_operators() where name='Lea' and removed_at is null$$), 0);
+select _t_eq('after leaving the link no longer counts them', _t_val('00000000-0000-0000-0000-0000000000e1', $$select people from ws_jobs('Leave test', '', 'all')$$), 0);
+select _t_eq('...and the admin''s people list drops them', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_people('', 'labourer') where name='Lea'$$), 0);
 select _t_eq('...but what they scanned stays', (select count(*) from scans where box_number='LV1' and operator_name='Lea'), 1);
 select _t_err('...and that old identity can no longer add scans', '00000000-0000-0000-0000-0000000000a6', $$insert into scans(user_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000a6','LV2','2')$$, 'has ended');
 delete from scans where box_number = 'LV1';

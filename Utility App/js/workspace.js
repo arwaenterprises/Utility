@@ -159,8 +159,6 @@ const WS = {
 
 // ---------- opening, closing, navigation ----------
 async function openWorkspace(section) {
-    if (typeof closeAccountModal === 'function') closeAccountModal();
-    if (typeof closeTeamModal === 'function') closeTeamModal();
     WS.open = true;
     wsEl('wsRoot').classList.add('active');
     document.body.classList.add('ws-open');

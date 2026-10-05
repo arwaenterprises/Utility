@@ -191,32 +191,6 @@ const HELP = {
             ]
         }
     },
-    dataManagement: {
-        en: {
-            intro: 'See what you have scanned, download it as Excel, or clear it.',
-            before: 'An enterprise admin sees everyone on the team. An individual account or a team member sees only their own data. Team members can look and download but not reset. Labourers who joined by QR appear by name, with their job.',
-            steps: [
-                'Tap the <b>Data Management</b> tile on the home screen.',
-                'Choose the <b>Box-Item Scan</b> or <b>Year/Season</b> tab.',
-                'Tap <b>+</b> next to a name to see the boxes, and <b>+</b> next to a box to see its items. Use the search box to find a box number, a barcode or a person.',
-                'Tick the names you want (or <b>Select All</b>), then tap <b>Download Selected</b> to get the Excel file. The small arrow on a row downloads just that row.',
-                '<b>Reset Selected</b> downloads the data first and then deletes it from the server. It asks <b>Are you sure?</b> before it does anything.'
-            ],
-            tips: ['Reset cannot be undone, so check the downloaded file first.', 'Close the window with the ✕ in the top corner.']
-        },
-        ar: {
-            intro: 'اطّلع على ما قمت بمسحه، حمّله كملف Excel، أو امسحه.',
-            before: 'مسؤول المؤسسة يرى جميع أعضاء الفريق. أما الحساب الفردي أو عضو الفريق فيرى بياناته فقط. يستطيع عضو الفريق العرض والتحميل لكن لا يستطيع الحذف (Reset). ويظهر العمال الذين انضموا عبر QR بأسمائهم مع مهمتهم.',
-            steps: [
-                'اضغط على بطاقة <b>Data Management</b> في الشاشة الرئيسية.',
-                'اختر تبويب <b>Box-Item Scan</b> أو <b>Year/Season</b>.',
-                'اضغط <b>+</b> بجانب الاسم لرؤية الصناديق، و<b>+</b> بجانب الصندوق لرؤية قطعه. استخدم مربع البحث للعثور على رقم صندوق أو باركود أو شخص.',
-                'حدّد الأسماء المطلوبة (أو <b>Select All</b>) ثم اضغط <b>Download Selected</b> للحصول على ملف Excel. السهم الصغير في أي صف يحمّل ذلك الصف فقط.',
-                'زر <b>Reset Selected</b> يحمّل البيانات أولًا ثم يحذفها من الخادم. ويسألك <b>Are you sure?</b> قبل أي إجراء.'
-            ],
-            tips: ['لا يمكن التراجع عن Reset، لذا تحقق من الملف المحمّل أولًا.', 'أغلق النافذة بزر ✕ في الزاوية العلوية.']
-        }
-    },
     yearSegregate: {
         en: {
             intro: 'Sort items by year and season into PTL boxes.',

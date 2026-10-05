@@ -7,12 +7,12 @@ const { start, openApp, report, stop } = require('./helpers/harness');
   const log = await page.evaluate(async () => {
     const log = []; const ok = (name, cond, extra) => log.push({ pass: !!cond, name, extra: extra === undefined ? '' : String(extra) });
     window.alert = () => {};
-    AppState.user = { id: 'u1', email: 'a@b.c' }; AppState.profile = { display_name: 'Ann', enterprise_id: null, tier: 'individual' };
+    AppState.user = { id: 'u1', email: 'a@b.c' }; AppState.profile = { display_name: 'Ann', enterprise_id: 'E1', tier: 'enterprise_admin' };
     renderAppGrid();
     const tiles = [...document.querySelectorAll('.app-tile')].map(t => t.dataset.appId);
-    ok('home shows all 6 tools + the 7th tile Data Management', tiles.join() === 'boxScanner,itemBarcode,boxCode,boxSegregate,priceCheck,yearSegregate,dataManagement', tiles.join());
+    ok('home shows all 6 tools + the 7th tile Team & Data', tiles.join() === 'boxScanner,itemBarcode,boxCode,boxSegregate,priceCheck,yearSegregate,dataManagement', tiles.join());
     ok('tool names: Box-Item Scan, Item Barcode Print, Box Code Print', [...document.querySelectorAll('.app-tile .app-tile-name')].map(e => e.textContent).slice(0, 3).join('|') === 'Box-Item Scan|Item Barcode Print|Box Code Print', [...document.querySelectorAll('.app-tile .app-tile-name')].map(e => e.textContent).join('|'));
-    ok('Data Management tab is called Box-Item Scan', /Box-Item Scan/.test(document.getElementById('teamTabBs').textContent));
+    ok('the 7th tile is called Team & Data', /Team & Data/.test(document.querySelector('.app-tile[data-app-id="dataManagement"] .app-tile-name').textContent));
     ok('the 7th tile uses its picture icon', !!document.querySelector('.app-tile[data-app-id="dataManagement"] img.app-tile-img[src="icons/ui-data.png"]'));
     // Arabic tool names and descriptions
     ok('every tool has an Arabic name and description', APPS.every(a => /[\u0600-\u06FF]/.test(a.nameAr) && /[\u0600-\u06FF]/.test(a.descAr)));

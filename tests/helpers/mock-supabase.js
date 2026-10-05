@@ -71,7 +71,6 @@ window.__rpcCalls = [];
       const l = window.__teamLink, o = JSON.parse(localStorage.getItem('mock_operator') || 'null');
       return l && o ? [{ link_id: l.id, tool: l.tool, job_name: l.job_name, enterprise_name: 'Acme', admin_name: 'Akhtar', operator_name: o.name, state: l.state }] : [];
     },
-    list_team_links: () => (window.__links = window.__links || []).map(l => ({ ...l, operators: l.operators || 0 })),
     create_team_link: ({ p_tool, p_job }) => {
       if (!p_job || !p_job.trim()) throw { message: 'Please type a job name (1 to 60 characters).' };
       window.__links = window.__links || [];
@@ -82,7 +81,6 @@ window.__rpcCalls = [];
       return { id: l.id, token: l.token, tool: l.tool, job_name: l.job_name };
     },
     stop_team_link: ({ p_link_id }) => { (window.__links || []).forEach(l => { if (l.id === p_link_id) l.state = 'stopped'; }); },
-    list_team_operators: () => (window.__labourers = window.__labourers || []).map(o => ({ ...o })),
     rename_team_operator: ({ p_operator_id, p_name }) => { window.__labourers.forEach(o => { if (o.id === p_operator_id) o.name = p_name; }); },
     remove_team_operator: ({ p_operator_id }) => { window.__labourers.forEach(o => { if (o.id === p_operator_id) o.removed_at = new Date().toISOString(); }); },
     ensure_own_team: () => { window.__me.tier = 'enterprise_admin'; window.__me.enterprise_id = 'E1'; return 'E1'; },
@@ -147,14 +145,7 @@ window.__rpcCalls = [];
       return n;
     },
     ws_facets: ({ p_kind }) => (window.__wsFacets || {})[p_kind] || [],
-    rename_enterprise: ({ new_name }) => { db.enterprises[0].name = new_name.trim(); },
-    // like the real functions: an enterprise admin gets everyone, anybody else only their own row
-    team_member_stats: () => (window.__operatorPeople || []).concat(window.__me.tier === 'enterprise_admin' || window.__teamAll
-      ? [{ user_id: 'u1', display_name: 'Ann', email: 'a@b.c', boxes_closed: 0, total_qty: 0 }, { user_id: 'u2', display_name: 'Bob', email: 'b@b.c', boxes_closed: 0, total_qty: 0 }]
-      : [{ user_id: window.__me.id, display_name: 'Ann', email: window.__me.email, boxes_closed: 0, total_qty: 0 }]),
-    team_ys_member_stats: () => window.__me.tier === 'enterprise_admin' || window.__teamAll
-      ? [{ user_id: 'u1', display_name: 'Ann', email: 'a@b.c', boxes_closed: 1, total_qty: db.ys_scans.length }, { user_id: 'u2', display_name: 'Bob', email: 'b@b.c', boxes_closed: 0, total_qty: 0 }]
-      : [{ user_id: window.__me.id, display_name: 'Ann', email: window.__me.email, boxes_closed: 1, total_qty: db.ys_scans.length }]
+    rename_enterprise: ({ new_name }) => { db.enterprises[0].name = new_name.trim(); }
   };
   window.supabase = { createClient: () => ({
     auth: {

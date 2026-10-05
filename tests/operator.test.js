@@ -254,9 +254,9 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
     window.__wsPeople = [{ person_key: 'o:ravi', name: 'Ravi', kind: 'labourer', jobs: 'Inbound 9', boxes: 1, units: 5, last_at: at(4), operator_ids: ['op1', 'op1b'], user_id: null }, { person_key: 'u:u1', name: 'Akhtar', kind: 'google', jobs: 'Own', boxes: 0, units: 0, last_at: null, operator_ids: null, user_id: 'u1' }, { person_key: 'u:u7', name: 'Priya', kind: 'google', jobs: '', boxes: 2, units: 9, last_at: at(60), operator_ids: null, user_id: 'u7' }];
     window.__rpcLog = []; window.__files.length = 0;
   });
-  await page.evaluate(() => openDataManagement());
+  await page.evaluate(() => openWorkspace('data'));
   await wait(500);
-  ok('the Team & Data tile for an admin opens the Data section', await page.evaluate(() => WS.section === 'data'));
+  ok('the workspace opens on the Data section', await page.evaluate(() => WS.section === 'data'));
   ok('Data shows the matching boxes with their job, person, status and totals', /Inbound 9/.test(await page.textContent('#wsDataList')) && /Sana/.test(await page.textContent('#wsDataList')) && /2 boxes, 8 units match/.test(await page.textContent('#wsDataTotals')), await page.textContent('#wsDataTotals'));
   ok('it opens on the last 7 days of Box-Item Scan', await page.evaluate(() => { const a = window.__rpcLog.find(x => x.name === 'ws_data_boxes').args; return a.p_tool === 'boxScanner' && !!a.p_from && !a.p_to && a.p_jobs === null; }));
   await page.fill('#wsDataJobIn', 'Inbound 9'); await page.dispatchEvent('#wsDataJobIn', 'change'); await wait(400);

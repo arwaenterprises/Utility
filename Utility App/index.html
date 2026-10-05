@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=72"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=72"></script>
-    <script src="vendor/qrcode.min.js?v=72"></script>
-    <script src="vendor/html5-qrcode.min.js?v=72"></script>
-    <script src="vendor/supabase.js?v=72"></script>
+    <script src="vendor/xlsx.full.min.js?v=73"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=73"></script>
+    <script src="vendor/qrcode.min.js?v=73"></script>
+    <script src="vendor/html5-qrcode.min.js?v=73"></script>
+    <script src="vendor/supabase.js?v=73"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -39,21 +39,6 @@
         <button class="hdr-btn" id="updateBtn" type="button" title="App updates" aria-label="App updates"><img src="icons/ui-update.png" alt=""><span class="hdr-dot" id="updateDot" hidden></span></button>
         <div class="online-status online" id="onlineStatus">Online</div>
     </header>
-
-    <!-- ACCOUNT (the user icon in the top bar) for members and individuals: account details only. An enterprise admin gets the
-         Team & Data workspace (below) instead, with jobs / QR links, people and data. -->
-    <div class="modal-overlay" id="accountModal">
-        <div class="modal" style="max-width: 640px;">
-            <h3 class="modal-title team-title"><img class="title-icon" src="icons/ui-users.png" alt=""> <span>Account</span>
-                <button class="team-close-x" id="closeAccountBtn" type="button" title="Close" aria-label="Close">✕</button></h3>
-            <div class="modal-body" style="text-align: left; max-height: 78vh; overflow-y: auto;">
-                <div class="settings-section">
-                    <p><strong id="accountEmailDisp"></strong></p>
-                    <p id="accountTierDisp" style="color: var(--ak-text-light); font-size: 13px;"></p>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- QR SHEET: the code with the names a labourer must check (enterprise, admin, tool, job) -->
     <div class="modal-overlay" id="qrSheetModal">
@@ -125,51 +110,6 @@
             <div class="modal-buttons">
                 <button class="btn btn-primary" id="updateNowBtn" type="button">Update now</button>
                 <button class="btn btn-secondary" id="updateLaterBtn" type="button">Later</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- DATA MANAGEMENT (7th tile): scans per person - download / reset. Admin: whole team. Individual / member: own data. -->
-    <div class="modal-overlay" id="teamModal">
-        <div class="modal" style="max-width: 720px;">
-            <h3 class="modal-title team-title"><span id="teamModalTitle">Data Management</span>
-                <button class="icon-btn" id="dataHelpBtn" type="button" title="How to use this tool" aria-label="How to use this tool">?</button>
-                <button class="team-close-x" id="closeTeamBtn" type="button" title="Close" aria-label="Close">✕</button></h3>
-            <div class="modal-body" style="text-align: left; max-height: 78vh; overflow-y: auto;">
-                <div class="team-tabs" role="tablist">
-                    <button class="team-tab active" id="teamTabBs" type="button" role="tab" data-team-tab="bs">📦 Box-Item Scan</button>
-                    <button class="team-tab" id="teamTabYs" type="button" role="tab" data-team-tab="ys">🗂️ Year/Season</button>
-                </div>
-
-                <!-- Tab 1: Box-Item Scan scans -->
-                <div id="teamPanelBs" class="team-panel">
-                    <div class="settings-section">
-                        <input type="text" id="teamSearchInput" class="form-input" placeholder="🔍 Search box number, user, or item...">
-                    </div>
-                    <div class="settings-section" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
-                        <label style="display:flex; align-items:center; gap:8px; margin-bottom: 8px; font-weight: 600; font-size: 13px;">
-                            <input type="checkbox" id="teamSelectAllCheckbox"> <span>Select All</span>
-                        </label>
-                        <div id="teamMemberList"></div>
-                        <div id="teamSearchResults" style="display:none;"></div>
-                    </div>
-                    <div class="team-actions">
-                        <button class="btn btn-secondary" id="downloadTeamSelectedBtn">⬇ Download Selected</button>
-                        <button class="btn btn-secondary" id="resetTeamSelectedBtn" style="background: var(--ak-danger); color: white; border: none;">Reset Selected</button>
-                    </div>
-                </div>
-
-                <!-- Tab 2: Year/Season Sort scans -->
-                <div id="teamPanelYs" class="team-panel" style="display:none;">
-                    <label style="display:flex; align-items:center; gap:8px; margin-bottom: 8px; font-weight: 600; font-size: 13px;">
-                        <input type="checkbox" id="teamYsSelectAll"> <span>Select All</span>
-                    </label>
-                    <div id="teamYsList"><p style="font-size:13px; color: var(--ak-text-light);">Loading...</p></div>
-                    <div class="team-actions">
-                        <button class="btn btn-secondary" id="downloadTeamYsBtn">⬇ Download Selected</button>
-                        <button class="btn btn-secondary" id="resetTeamYsBtn" style="background: var(--ak-danger); color: white; border: none;">Reset Selected</button>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -1111,24 +1051,24 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=72"></script>
-    <script src="js/lang.js?v=72"></script>
-    <script src="js/supabaseClient.js?v=72"></script>
-    <script src="js/camera.js?v=72"></script>
-    <script src="js/lists.js?v=72"></script>
-    <script src="js/usage.js?v=72"></script>
-    <script src="js/syncstatus.js?v=72"></script>
-    <script src="js/help.js?v=72"></script>
-    <script src="js/tooltip.js?v=72"></script>
-    <script src="js/operator.js?v=72"></script>
-    <script src="js/teamlinks.js?v=72"></script>
-    <script src="js/workspace.js?v=72"></script>
-    <script src="js/app.js?v=72"></script>
-    <script src="js/boxScanner.js?v=72"></script>
-    <script src="js/itemBarcode.js?v=72"></script>
-    <script src="js/boxCode.js?v=72"></script>
-    <script src="js/boxSegregate.js?v=72"></script>
-    <script src="js/priceCheck.js?v=72"></script>
-    <script src="js/yearSegregate.js?v=72"></script>
+    <script src="js/config.js?v=73"></script>
+    <script src="js/lang.js?v=73"></script>
+    <script src="js/supabaseClient.js?v=73"></script>
+    <script src="js/camera.js?v=73"></script>
+    <script src="js/lists.js?v=73"></script>
+    <script src="js/usage.js?v=73"></script>
+    <script src="js/syncstatus.js?v=73"></script>
+    <script src="js/help.js?v=73"></script>
+    <script src="js/tooltip.js?v=73"></script>
+    <script src="js/operator.js?v=73"></script>
+    <script src="js/teamlinks.js?v=73"></script>
+    <script src="js/workspace.js?v=73"></script>
+    <script src="js/app.js?v=73"></script>
+    <script src="js/boxScanner.js?v=73"></script>
+    <script src="js/itemBarcode.js?v=73"></script>
+    <script src="js/boxCode.js?v=73"></script>
+    <script src="js/boxSegregate.js?v=73"></script>
+    <script src="js/priceCheck.js?v=73"></script>
+    <script src="js/yearSegregate.js?v=73"></script>
 </body>
 </html>

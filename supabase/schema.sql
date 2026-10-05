@@ -27,17 +27,6 @@ create table if not exists public.profiles (
     created_at timestamptz not null default now()
 );
 
-create table if not exists public.enterprise_invites (
-    id uuid primary key default gen_random_uuid(),
-    enterprise_id uuid not null references public.enterprises(id) on delete cascade,
-    invited_email text not null,
-    status text not null default 'pending' check (status in ('pending', 'accepted', 'expired')),
-    token uuid not null default gen_random_uuid(),
-    invited_by uuid not null references auth.users(id) on delete cascade,
-    created_at timestamptz not null default now(),
-    expires_at timestamptz not null default (now() + interval '7 days')
-);
-
 create table if not exists public.scans (
     id uuid primary key default gen_random_uuid(),
     user_id uuid not null references public.profiles(id) on delete cascade,
@@ -148,36 +137,8 @@ $$;
 -- before touching anything, so there's no path to attach yourself to an
 -- enterprise you don't belong to.
 
-create or replace function public.create_enterprise(enterprise_name text)
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-    new_enterprise_id uuid;
-    caller_enterprise_id uuid;
-begin
-    if public.is_unjoined_anon() then raise exception 'Join a team with its QR code first.'; end if;
-    select enterprise_id into caller_enterprise_id from public.profiles where id = auth.uid();
-    if caller_enterprise_id is not null then
-        raise exception 'You already belong to an enterprise.';
-    end if;
-
-    insert into public.enterprises (name, admin_user_id)
-    values (enterprise_name, auth.uid())
-    returning id into new_enterprise_id;
-
-    update public.profiles
-    set tier = 'enterprise_admin', enterprise_id = new_enterprise_id
-    where id = auth.uid();
-
-    return new_enterprise_id;
-end;
-$$;
-
 -- E-mail invitations were replaced by Team QR links. These three functions are removed (safe if they never existed).
--- The table enterprise_invites is kept only as history; nothing can read or write it any more.
+-- (E-mail invitations were replaced by Team QR links; the old invitation table is removed at the end of this file.)
 drop function if exists public.accept_enterprise_invite(uuid);
 drop function if exists public.my_pending_invites();
 drop function if exists public.send_enterprise_invite(text);
@@ -211,132 +172,8 @@ begin
 end;
 $$;
 
-grant execute on function public.create_enterprise(text) to authenticated;
 grant execute on function public.remove_enterprise_member(uuid) to authenticated;
 
--- ============================================
--- DATA MANAGEMENT - READ-ONLY RPCS (same screen for everyone)
--- ============================================
--- An enterprise ADMIN gets the whole enterprise; anyone else (an individual account or an
--- enterprise member) gets ONLY their own rows. The rule is checked inside the function body
--- (not just by who can call it) - also protects direct PostgREST calls, not just UI buttons.
-
--- One row per PERSON the admin should see: every ordinary account in the team, plus every labourer (grouped by
--- name, ignoring capitals and spaces at the ends - the same person who Reset and re-joined on another handheld is
--- still one person). Labourers have no e-mail. member_ids / operator_names say which rows belong to a labourer, so
--- the app can fetch, download and delete exactly that person's scans.
-drop function if exists public.team_member_stats();
-create or replace function public.team_member_stats()
-returns table (
-    user_id uuid,
-    display_name text,
-    email text,
-    boxes_closed bigint,
-    total_qty bigint,
-    person_key text,
-    is_operator boolean,
-    member_ids uuid[],
-    operator_names text[],
-    jobs text
-)
-language sql
-security definer
-set search_path = public
-stable
-as $$
-    with my_scans as (
-        select * from public.scans
-        where (public.current_user_is_enterprise_admin() and enterprise_id = public.current_user_enterprise_id())
-           or user_id = auth.uid()
-    ),
-    box_status_per_user as (
-        select user_id, box_number, bool_and(box_status = 'Closed') as closed
-        from my_scans
-        where operator_name is null
-        group by user_id, box_number
-    ),
-    ops as (
-        select lower(btrim(operator_name)) as k,
-               (array_agg(operator_name order by scanned_at desc))[1] as shown,
-               array_agg(distinct user_id) as ids,
-               array_agg(distinct operator_name) as names,
-               string_agg(distinct remark, ', ') as jobs,
-               sum(qty) as qty
-        from my_scans
-        where operator_name is not null and public.current_user_is_enterprise_admin()
-        group by 1
-    ),
-    ops_box as (
-        select lower(btrim(operator_name)) as k, box_number, bool_and(box_status = 'Closed') as closed
-        from my_scans
-        where operator_name is not null
-        group by 1, 2
-    )
-    select
-        p.id as user_id,
-        p.display_name,
-        p.email,
-        coalesce((select count(*) from box_status_per_user b where b.user_id = p.id and b.closed), 0) as boxes_closed,
-        coalesce((select sum(qty) from my_scans s where s.user_id = p.id and s.operator_name is null), 0)::bigint as total_qty,
-        'u:' || p.id::text as person_key,
-        false as is_operator,
-        array[p.id] as member_ids,
-        null::text[] as operator_names,
-        (select string_agg(distinct s.remark, ', ') from my_scans s where s.user_id = p.id and s.operator_name is null) as jobs
-    from public.profiles p
-    where p.tier <> 'operator'
-      and ((p.enterprise_id = public.current_user_enterprise_id() and public.current_user_is_enterprise_admin())
-           or p.id = auth.uid())
-    union all
-    select
-        o.ids[1], o.shown, ''::text,
-        coalesce((select count(*) from ops_box b where b.k = o.k and b.closed), 0),
-        o.qty::bigint,
-        'o:' || o.k, true, o.ids, o.names, o.jobs
-    from ops o;
-$$;
-
--- Return type gained `remark`, and CREATE OR REPLACE cannot change a function's
--- return type, so drop the old version first.
-drop function if exists public.search_team_scans(text, int);
-create or replace function public.search_team_scans(search_term text, limit_count int default 100)
-returns table (
-    id uuid,
-    remark text,
-    barcode text,
-    box_number text,
-    box_status text,
-    qty integer,
-    scanned_at timestamptz,
-    user_id uuid,
-    display_name text,
-    email text,
-    operator_name text
-)
-language sql
-security definer
-set search_path = public
-stable
-as $$
-    select s.id, s.remark, s.barcode, s.box_number, s.box_status, s.qty, s.scanned_at, s.user_id, p.display_name, p.email, s.operator_name
-    from public.scans s
-    join public.profiles p on p.id = s.user_id
-    where ((s.enterprise_id = public.current_user_enterprise_id() and public.current_user_is_enterprise_admin())
-           or s.user_id = auth.uid())
-      and (
-        s.barcode ilike '%' || search_term || '%'
-        or s.box_number ilike '%' || search_term || '%'
-        or s.operator_name ilike '%' || search_term || '%'
-        or s.remark ilike '%' || search_term || '%'
-        or p.display_name ilike '%' || search_term || '%'
-        or p.email ilike '%' || search_term || '%'
-      )
-    order by s.scanned_at desc
-    limit limit_count;
-$$;
-
-grant execute on function public.team_member_stats() to authenticated;
-grant execute on function public.search_team_scans(text, int) to authenticated;
 
 -- ============================================
 -- ROW LEVEL SECURITY
@@ -344,7 +181,6 @@ grant execute on function public.search_team_scans(text, int) to authenticated;
 
 alter table public.profiles enable row level security;
 alter table public.enterprises enable row level security;
-alter table public.enterprise_invites enable row level security;
 alter table public.scans enable row level security;
 
 -- profiles
@@ -368,7 +204,7 @@ create policy "profiles_update_own" on public.profiles for update
 -- own tier to 'enterprise_admin' and enterprise_id to ANY existing enterprise's id,
 -- instantly gaining access to that enterprise's scan data. Column-level grants close
 -- that: tier/enterprise_id can only ever change via the SECURITY DEFINER functions
--- below (create_enterprise / make_own_team), which contain their own checks.
+-- below (make_own_team), which contains its own checks.
 revoke update on public.profiles from authenticated;
 grant update (display_name) on public.profiles to authenticated;
 
@@ -381,7 +217,7 @@ drop policy if exists "enterprises_insert_self" on public.enterprises;
 create policy "enterprises_insert_self" on public.enterprises for insert
     with check (admin_user_id = auth.uid());
 
--- Direct insert is blocked in favor of create_enterprise() below, so creating the
+-- Direct insert is blocked in favor of make_own_team() below, so creating the
 -- enterprise row and promoting the caller to enterprise_admin happen atomically -
 -- otherwise a crashed/partial request could leave an orphaned enterprise with no
 -- admin profile pointing at it, or an admin profile pointing at nothing.
@@ -391,12 +227,7 @@ drop policy if exists "enterprises_update_admin" on public.enterprises;
 create policy "enterprises_update_admin" on public.enterprises for update
     using (admin_user_id = auth.uid());
 
--- enterprise_invites: no policies any more (e-mail invitations were replaced by Team QR links), so the API
--- cannot read or write the old rows.
-drop policy if exists "invites_all_admin" on public.enterprise_invites;
-drop policy if exists "invites_select_invitee" on public.enterprise_invites;
 drop function if exists public.current_user_email();
-revoke all on public.enterprise_invites from anon, authenticated;
 
 -- scans — own rows always visible/writable; enterprise admin also gets their team's rows
 drop policy if exists "scans_select_own" on public.scans;
@@ -716,79 +547,6 @@ create policy "ys_scans_delete_team" on public.ys_scans for delete
         and enterprise_id = public.current_user_enterprise_id()
     );
 
--- Per-member summary for the Team console's Year/Season section.
-drop function if exists public.team_ys_member_stats();
-create or replace function public.team_ys_member_stats()
-returns table (
-    user_id uuid,
-    display_name text,
-    email text,
-    boxes_closed bigint,
-    total_qty bigint,
-    person_key text,
-    is_operator boolean,
-    member_ids uuid[],
-    operator_names text[],
-    jobs text
-)
-language sql
-security definer
-set search_path = public
-stable
-as $$
-    with my_scans as (
-        select * from public.ys_scans
-        where (public.current_user_is_enterprise_admin() and enterprise_id = public.current_user_enterprise_id())
-           or user_id = auth.uid()
-    ),
-    box_status_per_user as (
-        select user_id, ptl_number, box_barcode, bool_and(box_status = 'Closed') as closed
-        from my_scans
-        where operator_name is null
-        group by user_id, ptl_number, box_barcode
-    ),
-    ops as (
-        select lower(btrim(operator_name)) as k,
-               (array_agg(operator_name order by scanned_at desc))[1] as shown,
-               array_agg(distinct user_id) as ids,
-               array_agg(distinct operator_name) as names,
-               string_agg(distinct remark, ', ') as jobs,
-               sum(qty) as qty
-        from my_scans
-        where operator_name is not null and public.current_user_is_enterprise_admin()
-        group by 1
-    ),
-    ops_box as (
-        select lower(btrim(operator_name)) as k, ptl_number, box_barcode, bool_and(box_status = 'Closed') as closed
-        from my_scans
-        where operator_name is not null
-        group by 1, 2, 3
-    )
-    select
-        p.id as user_id,
-        p.display_name,
-        p.email,
-        coalesce((select count(*) from box_status_per_user b where b.user_id = p.id and b.closed), 0) as boxes_closed,
-        coalesce((select sum(qty) from my_scans s where s.user_id = p.id and s.operator_name is null), 0)::bigint as total_qty,
-        'u:' || p.id::text as person_key,
-        false as is_operator,
-        array[p.id] as member_ids,
-        null::text[] as operator_names,
-        (select string_agg(distinct s.remark, ', ') from my_scans s where s.user_id = p.id and s.operator_name is null) as jobs
-    from public.profiles p
-    where p.tier <> 'operator'
-      and ((p.enterprise_id = public.current_user_enterprise_id() and public.current_user_is_enterprise_admin())
-           or p.id = auth.uid())
-    union all
-    select
-        o.ids[1], o.shown, ''::text,
-        coalesce((select count(*) from ops_box b where b.k = o.k and b.closed), 0),
-        o.qty::bigint,
-        'o:' || o.k, true, o.ids, o.names, o.jobs
-    from ops o;
-$$;
-
-grant execute on function public.team_ys_member_stats() to authenticated;
 
 
 -- ============================================
@@ -1179,41 +937,6 @@ begin
 end;
 $$;
 
-create or replace function public.list_team_links()
-returns table (id uuid, tool text, job_name text, token text, created_at timestamptz, stopped_at timestamptz,
-               last_scan_at timestamptz, state text, operators bigint)
-language sql
-security definer
-set search_path = public
-stable
-as $$
-    select l.id, l.tool, l.job_name, l.token, l.created_at, l.stopped_at, l.last_scan_at,
-           public.team_link_state(l.stopped_at, l.last_scan_at, l.created_at),
-           -- people whose handheld is on THIS link now (a handheld that moved to another team's QR counts there)
-           (select count(*) from public.team_operators o
-             where o.link_id = l.id and o.removed_at is null
-               and o.joined_at = (select max(x.joined_at) from public.team_operators x where x.user_id = o.user_id and x.removed_at is null))
-    from public.team_links l
-    where l.enterprise_id = public.current_user_enterprise_id()
-      and public.current_user_is_enterprise_admin()
-    order by l.created_at desc;
-$$;
-
-create or replace function public.list_team_operators()
-returns table (id uuid, name text, link_id uuid, job_name text, tool text, joined_at timestamptz, removed_at timestamptz)
-language sql
-security definer
-set search_path = public
-stable
-as $$
-    select o.id, o.name, o.link_id, l.job_name, l.tool, o.joined_at, o.removed_at
-    from public.team_operators o
-    join public.team_links l on l.id = o.link_id
-    where o.enterprise_id = public.current_user_enterprise_id()
-      and public.current_user_is_enterprise_admin()
-    order by o.joined_at desc;
-$$;
-
 -- fixes a typo in a name everywhere (also on the scans already sent)
 create or replace function public.rename_team_operator(p_operator_id uuid, p_name text)
 returns void
@@ -1357,16 +1080,12 @@ grant execute on function public.leave_team_link() to authenticated;
 
 revoke execute on function public.create_team_link(text, text) from public, anon;
 revoke execute on function public.stop_team_link(uuid) from public, anon;
-revoke execute on function public.list_team_links() from public, anon;
-revoke execute on function public.list_team_operators() from public, anon;
 revoke execute on function public.rename_team_operator(uuid, text) from public, anon;
 revoke execute on function public.remove_team_operator(uuid) from public, anon;
 revoke execute on function public.join_team_link(text, text) from public, anon;
 revoke execute on function public.my_team_link() from public, anon;
 grant execute on function public.create_team_link(text, text) to authenticated;
 grant execute on function public.stop_team_link(uuid) to authenticated;
-grant execute on function public.list_team_links() to authenticated;
-grant execute on function public.list_team_operators() to authenticated;
 grant execute on function public.rename_team_operator(uuid, text) to authenticated;
 grant execute on function public.remove_team_operator(uuid) to authenticated;
 grant execute on function public.join_team_link(text, text) to authenticated;
@@ -1830,6 +1549,18 @@ grant execute on function public.ws_data_delete(text, text[], text, timestamptz,
 grant execute on function public.ws_facets(text, text, text, integer) to authenticated;
 grant execute on function public.ws_people(text, text, integer, integer) to authenticated;
 grant execute on function public.ws_overview(timestamptz, integer) to authenticated;
+
+-- ============================================
+-- REMOVED OBJECTS (cleaned out of an existing database each time this file is run; nothing here is used any more)
+-- ============================================
+-- E-mail invitations (replaced by Team QR links) and the old Data Management window (replaced by Team & Data).
+drop function if exists public.create_enterprise(text);
+drop function if exists public.team_member_stats();
+drop function if exists public.team_ys_member_stats();
+drop function if exists public.search_team_scans(text, int);
+drop function if exists public.list_team_links();
+drop function if exists public.list_team_operators();
+drop table if exists public.enterprise_invites;
 
 -- Make the API (PostgREST) notice new or changed functions straight away (harmless if nothing changed).
 notify pgrst, 'reload schema';
