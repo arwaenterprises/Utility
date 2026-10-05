@@ -86,7 +86,7 @@ const HELP = {
                 'Enter <b>Start From</b> (the first box number) and <b>Quantity</b> (up to 100).',
                 'Check the preview, then tap <b>Print Box Labels</b>.'
             ],
-            tips: ['Labels are 4&times;6 inches and print 2 codes per label, so Quantity 10 gives 5 labels.']
+            tips: ['Labels are 4&times;6 inches and print 2 codes per label, so Quantity 10 gives 5 labels.', 'Tick <b>Add text</b> and type a line (up to 40 characters, for example the department) to print it above every code, on barcode and QR labels. It is remembered on this device.']
         },
         ar: {
             intro: 'اطبع ملصقات صناديق مرقمة لعملية تحويل (TRN).',
@@ -96,7 +96,7 @@ const HELP = {
                 'أدخل <b>Start From</b> (رقم أول صندوق) و<b>Quantity</b> (حتى 100).',
                 'راجع المعاينة ثم اضغط <b>Print Box Labels</b>.'
             ],
-            tips: ['مقاس الملصق 4×6 بوصة ويطبع رمزين في كل ملصق، لذا الكمية 10 تعطي 5 ملصقات.']
+            tips: ['مقاس الملصق 4×6 بوصة ويطبع رمزين في كل ملصق، لذا الكمية 10 تعطي 5 ملصقات.', 'فعّل <b>Add text</b> واكتب سطرًا (حتى 40 حرفًا، مثل اسم القسم) ليُطبع فوق كل رمز، في ملصقات الباركود وQR. يُحفظ على هذا الجهاز.']
         }
     },
     boxSegregate: {

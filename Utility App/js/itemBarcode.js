@@ -8,7 +8,9 @@ const PrintState = {
         boxPrefix: 'RTO',
         boxOutputFormat: 'barcode',
         labelTextOn: false,       // Item Barcode: print a line of text above the barcode
-        labelText: ''
+        labelText: '',
+        boxLabelTextOn: false,    // Box Code: print a line of text above each code (barcode or QR)
+        boxLabelText: ''
     },
     printMode: 'single',
     csvData: [],
@@ -32,9 +34,9 @@ const ITEM_BAR_HEIGHT = 70;
 const ITEM_PREVIEW_BAR_HEIGHT = 52;
 // The number under the bars (was 16) and the optional text above them are the same, larger size.
 const ITEM_NUMBER_FONT = 22;
-// Code 128 needs a blank "quiet zone" of at least 10 bar-widths (20px at width 2) left and right of the bars,
-// otherwise a scanner can fail to find where the barcode starts.
-const ITEM_QUIET_ZONE = 20;
+// A small blank "quiet zone" left and right of the bars so a scanner can find where the barcode starts. Kept small
+// (10px = 5 bar-widths) so the label does not waste paper; the paper around the label adds to it when printed.
+const ITEM_QUIET_ZONE = 10;
 const ITEM_PREVIEW_NUMBER_FONT = 19;
 
 // The text to print above the barcode, or '' when "Add text" is off.
