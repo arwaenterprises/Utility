@@ -3,7 +3,8 @@
 // ============================================
 // The admin picks a tool, types a job name (it becomes the Remark of every scan) and gets a QR code. Labourers
 // scan it with the phone's own scanner - see js/operator.js for what happens on their device.
-// One active link per tool: creating a new one stops the old one. A link never expires by itself: it works until
+// Many teams can work on the same tool at once: one link per team, each with its own job name. Creating a link with the
+// same tool AND the same job name replaces just that link (a fresh QR for that job). A link never expires by itself: it works until
 // the admin stops it (the server decides - supabase/schema.sql); data is never deleted by this.
 const QL_T = {
     en: {
@@ -14,7 +15,7 @@ const QL_T = {
         stopAsk: 'Stop this link? Nobody can start new work on it. Scans already made are kept.',
         pickTool: 'Choose a tool', jobPlaceholder: 'Job name (becomes the Remark)',
         needJob: 'Please type a job name.', needTool: 'Please choose a tool.',
-        replaces: 'This replaces the current link for {tool}. Continue?',
+        replaces: 'A link for {tool} named "{job}" is already active. Creating this one stops the old QR of that job (other jobs are not affected). Continue?',
         copied: 'Link copied.', copyFail: 'Could not copy. Select the link and copy it by hand.',
         failed: 'Could not do that. Please try again.',
         sheetLine: 'Scan with your phone camera or QR scanner. Only your name is needed.',
@@ -32,7 +33,7 @@ const QL_T = {
         stopAsk: 'هل تريد إيقاف هذا الرابط؟ لن يستطيع أحد بدء عمل جديد عليه. عمليات المسح التي تمت تبقى محفوظة.',
         pickTool: 'اختر أداة', jobPlaceholder: 'اسم المهمة (يصبح الملاحظة)',
         needJob: 'الرجاء كتابة اسم المهمة.', needTool: 'الرجاء اختيار أداة.',
-        replaces: 'سيحلّ هذا محل الرابط الحالي لأداة {tool}. هل تريد المتابعة؟',
+        replaces: 'يوجد رابط نشط لأداة {tool} باسم "{job}". إنشاء هذا الرابط سيوقف رمز QR القديم لهذه المهمة (المهام الأخرى لا تتأثر). هل تريد المتابعة؟',
         copied: 'تم نسخ الرابط.', copyFail: 'تعذّر النسخ. حدّد الرابط وانسخه يدويًا.',
         failed: 'تعذّر تنفيذ ذلك. حاول مرة أخرى.',
         sheetLine: 'امسح بكاميرا الهاتف أو ماسح QR. يكفي اسمك فقط.',
@@ -95,8 +96,9 @@ async function createTeamLink() {
     const job = document.getElementById('qrJobInput').value.trim();
     if (!tool) { alert(qlT('needTool')); return; }
     if (!job) { alert(qlT('needJob')); return; }
-    const existing = teamLinksCache.find(l => l.tool === tool && l.state === 'active');
-    if (existing && !confirm(qlT('replaces').replace('{tool}', opToolName(tool)))) return;
+    const same = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+    const existing = teamLinksCache.find(l => l.tool === tool && l.state === 'active' && same(l.job_name, job));
+    if (existing && !confirm(qlT('replaces').replace('{tool}', opToolName(tool)).replace('{job}', existing.job_name))) return;
     const btn = document.getElementById('qrCreateBtn');
     btn.disabled = true;
     try {

@@ -152,34 +152,34 @@ const HELP = {
         title: { en: 'Team QR links', ar: 'روابط QR للفريق' },
         en: {
             intro: 'Let labourers work on a handheld without a Google account: they scan a QR code and type only their name.',
-            before: 'You must be signed in with your Google account. Each link is for ONE tool and ONE job.',
+            before: 'You must be signed in with your Google account. Each link is for ONE tool and ONE job (make one per team).',
             steps: [
                 'Open <b>User management</b> (the people icon at the top).',
                 'Under <b>Team QR links</b> choose the tool, type a <b>job name</b> (it becomes the Remark on every scan) and tap <b>Create QR link</b>.',
                 'The QR sheet shows your enterprise, your name, the tool and the job. Tap <b>Print</b>, <b>Share</b> or <b>Copy link</b> and give it to the team.',
                 'Each labourer scans the QR with the phone&rsquo;s own camera or QR scanner, checks the names, types their name and taps <b>Join</b>. That handheld then shows only that one tool.',
-                'To start another job on the same tool, create a new link: it replaces the old one. Tap <b>Stop this link</b> to end a job.',
+                'Several teams can work on the same tool at the same time: create one link per team, each with its own job name. Creating a link with the <b>same tool and same job name</b> replaces only that job&rsquo;s old link. Tap <b>Stop this link</b> to end a job.',
                 'Under <b>Labourers</b> you can correct a name or remove a person. In <b>Data Management</b> you see every labourer by name, with the job.'
             ],
             tips: [
-                'A link <b>never expires by itself</b>. It works until you tap <b>Stop this link</b> (or create a new link for the same tool).',
+                'A link <b>never expires by itself</b>. It works until you tap <b>Stop this link</b> (or create a new link with the same tool and job name).',
                 'Scans stay on the server until <b>you</b> delete them in Data Management. A labourer&rsquo;s <b>Reset</b> only clears their own handheld.',
                 'Anyone who gets the QR can join, so share it only with your team and stop it when the job is done.'
             ]
         },
         ar: {
             intro: 'دع العمال يعملون على الجهاز المحمول دون حساب Google: يمسحون رمز QR ويكتبون اسمهم فقط.',
-            before: 'يجب أن تكون مسجّل الدخول بحساب Google. كل رابط لأداة واحدة ومهمة واحدة.',
+            before: 'يجب أن تكون مسجّل الدخول بحساب Google. كل رابط لأداة واحدة ومهمة واحدة (أنشئ رابطًا لكل فريق).',
             steps: [
                 'افتح <b>User management</b> (أيقونة الأشخاص في الأعلى).',
                 'تحت <b>روابط QR للفريق</b> اختر الأداة، واكتب <b>اسم المهمة</b> (يصبح الملاحظة في كل عملية مسح) ثم اضغط <b>إنشاء رابط QR</b>.',
                 'تعرض ورقة QR اسم مؤسستك واسمك والأداة والمهمة. اضغط <b>طباعة</b> أو <b>مشاركة</b> أو <b>نسخ الرابط</b> وسلّمها للفريق.',
                 'يمسح كل عامل الرمز بكاميرا الهاتف أو ماسح QR، ويتأكد من الأسماء، ويكتب اسمه ثم يضغط <b>انضمام</b>. بعدها يعرض الجهاز تلك الأداة فقط.',
-                'لبدء مهمة أخرى على الأداة نفسها أنشئ رابطًا جديدًا: يحلّ محل القديم. اضغط <b>إيقاف هذا الرابط</b> لإنهاء مهمة.',
+                'يمكن لعدة فرق العمل على الأداة نفسها في الوقت نفسه: أنشئ رابطًا لكل فريق وباسم مهمة مختلف. إنشاء رابط بنفس الأداة ونفس اسم المهمة يحلّ محل الرابط القديم لتلك المهمة فقط. اضغط <b>إيقاف هذا الرابط</b> لإنهاء مهمة.',
                 'تحت <b>العمال</b> يمكنك تصحيح اسم أو إزالة شخص. وفي <b>Data Management</b> ترى كل عامل باسمه مع المهمة.'
             ],
             tips: [
-                'لا تنتهي صلاحية الرابط تلقائيًا. يبقى يعمل حتى تضغط <b>إيقاف هذا الرابط</b> (أو تنشئ رابطًا جديدًا لنفس الأداة).',
+                'لا تنتهي صلاحية الرابط تلقائيًا. يبقى يعمل حتى تضغط <b>إيقاف هذا الرابط</b> (أو تنشئ رابطًا جديدًا بنفس الأداة واسم المهمة).',
                 'تبقى عمليات المسح على الخادم حتى <b>تحذفها أنت</b> في Data Management. زر <b>Reset</b> عند العامل يمسح جهازه فقط.',
                 'يستطيع أي شخص يحصل على الرمز الانضمام، فشاركه مع فريقك فقط وأوقفه عند انتهاء المهمة.'
             ]

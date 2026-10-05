@@ -74,7 +74,8 @@ window.__rpcCalls = [];
     create_team_link: ({ p_tool, p_job }) => {
       if (!p_job || !p_job.trim()) throw { message: 'Please type a job name (1 to 60 characters).' };
       window.__links = window.__links || [];
-      window.__links.forEach(l => { if (l.tool === p_tool && l.state === 'active') l.state = 'stopped'; });
+      // same tool AND same job name (ignoring capitals / end spaces) replaces that link; other jobs stay active
+      window.__links.forEach(l => { if (l.tool === p_tool && l.state === 'active' && l.job_name.trim().toLowerCase() === p_job.trim().toLowerCase()) l.state = 'stopped'; });
       const l = { id: 'L' + (window.__links.length + 1), token: 'f'.repeat(31) + (window.__links.length + 1), tool: p_tool, job_name: p_job.trim(), state: 'active', operators: 0 };
       window.__links.push(l);
       return { id: l.id, token: l.token, tool: l.tool, job_name: l.job_name };

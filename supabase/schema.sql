@@ -910,7 +910,9 @@ revoke all on public.usage_report from anon, authenticated;
 -- normal row-level-security rules already keep teams apart. Everything below is reached only through the
 -- functions: the two tables are closed to the API.
 --
---  * one active link per tool: creating a new link for the same tool stops the old one (new job = new link)
+--  * many teams can work on the same tool at the same time: each has its own link and job name. Creating a link
+--    with the SAME tool and the SAME job name (ignoring capitals and spaces at the ends) replaces that one link
+--    ("a fresh QR for this job"); links with other job names are left alone
 --  * a link stops accepting NEW work only when the admin stops it (it never expires by itself; scans recorded
 --    before the stop on an offline device are still accepted when they arrive)
 --  * the job name becomes the Remark of every scan, and the operator's name is stamped on every scan
@@ -1000,6 +1002,9 @@ create table if not exists public.team_links (
     last_scan_at timestamptz
 );
 create index if not exists team_links_enterprise_idx on public.team_links(enterprise_id);
+-- the job name is the Remark of every scan, so two active links of one tool must never share it
+create unique index if not exists team_links_one_active_job
+    on public.team_links (enterprise_id, tool, lower(btrim(job_name))) where stopped_at is null;
 
 create table if not exists public.team_operators (
     id uuid primary key default gen_random_uuid(),
@@ -1145,9 +1150,11 @@ begin
         raise exception 'Please type a job name (1 to 60 characters).';
     end if;
 
-    -- a new job replaces the old link for the same tool
+    -- Several teams can work on one tool at once, each on its own job name. Only a link with the same tool AND the
+    -- same job name is replaced (a fresh QR for that job); every other active link is left alone.
     update public.team_links set stopped_at = now()
-    where enterprise_id = v_eid and tool = p_tool and stopped_at is null;
+    where enterprise_id = v_eid and tool = p_tool and stopped_at is null
+      and lower(btrim(job_name)) = lower(v_job);
 
     insert into public.team_links (enterprise_id, tool, job_name, created_by)
     values (v_eid, p_tool, v_job, auth.uid())
@@ -1182,7 +1189,10 @@ stable
 as $$
     select l.id, l.tool, l.job_name, l.token, l.created_at, l.stopped_at, l.last_scan_at,
            public.team_link_state(l.stopped_at, l.last_scan_at, l.created_at),
-           (select count(*) from public.team_operators o where o.link_id = l.id and o.removed_at is null)
+           -- people whose handheld is on THIS link now (a handheld that moved to another team's QR counts there)
+           (select count(*) from public.team_operators o
+             where o.link_id = l.id and o.removed_at is null
+               and o.joined_at = (select max(x.joined_at) from public.team_operators x where x.user_id = o.user_id and x.removed_at is null))
     from public.team_links l
     where l.enterprise_id = public.current_user_enterprise_id()
       and public.current_user_is_enterprise_admin()

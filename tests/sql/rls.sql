@@ -210,8 +210,12 @@ select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('
 select token as tok1 from team_links where job_name = 'Inbound 7' \gset
 select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('boxScanner','Inbound 8')$$);
 select token as tok2 from team_links where job_name = 'Inbound 8' \gset
-select _t_eq('a new link for the same tool stops the old one', (select count(*) from team_links where job_name='Inbound 7' and stopped_at is not null), 1);
-select _t_eq('...and the new one is the only active one', (select count(*) from team_links where tool='boxScanner' and stopped_at is null), 1);
+select _t_eq('a second team on the same tool gets its own link: the first stays active', (select count(*) from team_links where tool='boxScanner' and stopped_at is null), 2);
+select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('boxScanner',' inbound 7 ')$$);
+select _t_eq('same tool + same job name (any capitals, end spaces) replaces only that one link', (select count(*) from team_links where lower(btrim(job_name))='inbound 7' and stopped_at is not null), 1);
+select _t_eq('...it has a fresh active link, and Inbound 8 was not touched', (select count(*) from team_links where tool='boxScanner' and stopped_at is null and lower(btrim(job_name)) in ('inbound 7','inbound 8')), 2);
+select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('priceCheck','Counter 1')$$);
+select _t_eq('a link for another tool does not touch the Box Scanner links', (select count(*) from team_links where tool='boxScanner' and stopped_at is null), 2);
 select _t_err('an enterprise member cannot create links', '00000000-0000-0000-0000-0000000000b1', $$select create_team_link('boxScanner','x')$$, 'Only the enterprise admin');
 select _t_err('an individual cannot create links', '00000000-0000-0000-0000-00000000000a', $$select create_team_link('boxScanner','x')$$, 'Only the enterprise admin');
 select _t_err('a made-up tool is refused', '00000000-0000-0000-0000-0000000000e1', $$select create_team_link('hackTool','x')$$, 'choose a tool');

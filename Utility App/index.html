@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=64"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=64"></script>
-    <script src="vendor/qrcode.min.js?v=64"></script>
-    <script src="vendor/html5-qrcode.min.js?v=64"></script>
-    <script src="vendor/supabase.js?v=64"></script>
+    <script src="vendor/xlsx.full.min.js?v=65"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=65"></script>
+    <script src="vendor/qrcode.min.js?v=65"></script>
+    <script src="vendor/html5-qrcode.min.js?v=65"></script>
+    <script src="vendor/supabase.js?v=65"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -58,7 +58,7 @@
                         <button class="icon-btn" id="renameEnterpriseBtn" title="Rename enterprise" aria-label="Rename enterprise" style="font-size:14px;">✏️</button></div>
                     <div class="settings-section" id="qrLinksSection">
                         <h4><span data-i18n="ql_h">Team QR links</span> <button class="icon-btn" id="qlHelpBtn" type="button" title="How to use this tool" aria-label="How to use this tool">?</button></h4>
-                        <p class="ql-hint" data-i18n="ql_p">Labourers join with a QR code &mdash; no Google account. Each link is for one tool and one job. A new link for the same tool replaces the old one.</p>
+                        <p class="ql-hint" data-i18n="ql_p">Labourers join with a QR code &mdash; no Google account. Each link is for one tool and one job; make one link per team, even for the same tool. Creating a link with the same tool and job name replaces that job&rsquo;s old link.</p>
                         <div id="qrLinkList"></div>
                         <div class="ql-new">
                             <select id="qrToolSelect" class="form-input"></select>
@@ -1076,23 +1076,23 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=64"></script>
-    <script src="js/lang.js?v=64"></script>
-    <script src="js/supabaseClient.js?v=64"></script>
-    <script src="js/camera.js?v=64"></script>
-    <script src="js/lists.js?v=64"></script>
-    <script src="js/usage.js?v=64"></script>
-    <script src="js/syncstatus.js?v=64"></script>
-    <script src="js/help.js?v=64"></script>
-    <script src="js/tooltip.js?v=64"></script>
-    <script src="js/operator.js?v=64"></script>
-    <script src="js/teamlinks.js?v=64"></script>
-    <script src="js/app.js?v=64"></script>
-    <script src="js/boxScanner.js?v=64"></script>
-    <script src="js/itemBarcode.js?v=64"></script>
-    <script src="js/boxCode.js?v=64"></script>
-    <script src="js/boxSegregate.js?v=64"></script>
-    <script src="js/priceCheck.js?v=64"></script>
-    <script src="js/yearSegregate.js?v=64"></script>
+    <script src="js/config.js?v=65"></script>
+    <script src="js/lang.js?v=65"></script>
+    <script src="js/supabaseClient.js?v=65"></script>
+    <script src="js/camera.js?v=65"></script>
+    <script src="js/lists.js?v=65"></script>
+    <script src="js/usage.js?v=65"></script>
+    <script src="js/syncstatus.js?v=65"></script>
+    <script src="js/help.js?v=65"></script>
+    <script src="js/tooltip.js?v=65"></script>
+    <script src="js/operator.js?v=65"></script>
+    <script src="js/teamlinks.js?v=65"></script>
+    <script src="js/app.js?v=65"></script>
+    <script src="js/boxScanner.js?v=65"></script>
+    <script src="js/itemBarcode.js?v=65"></script>
+    <script src="js/boxCode.js?v=65"></script>
+    <script src="js/boxSegregate.js?v=65"></script>
+    <script src="js/priceCheck.js?v=65"></script>
+    <script src="js/yearSegregate.js?v=65"></script>
 </body>
 </html>

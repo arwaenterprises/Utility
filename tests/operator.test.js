@@ -148,12 +148,20 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   await page.selectOption('#qrToolSelect', 'boxScanner'); await page.fill('#qrJobInput', 'Inbound 8'); await page.click('#qrCreateBtn'); await page.waitForTimeout(400);
   await page.click('#qsCloseBtn');
   const list2 = await page.textContent('#qrLinkList');
-  ok('a new link for the same tool replaces the old one in the list', /Inbound 8/.test(list2) && !/Inbound 7/.test(list2), list2);
-  await page.click('[data-ql-show]'); 
-  ok('"Show QR" reopens the sheet for that link', (await page.textContent('#qsJob')) === 'Inbound 8');
+  ok('a second team on the same tool gets its own link: both stay in the list', /Inbound 8/.test(list2) && /Inbound 7/.test(list2), list2);
+  ok('...and both are active', (await page.$$('#qrLinkList .ql-active')).length === 2);
+  await page.evaluate(() => { window.__confirms = []; window.confirm = (m) => { window.__confirms.push(m); return true; }; });
+  await page.selectOption('#qrToolSelect', 'boxScanner'); await page.fill('#qrJobInput', ' inbound 8 '); await page.click('#qrCreateBtn'); await page.waitForTimeout(400);
+  await page.click('#qsCloseBtn');
+  const list3 = await page.textContent('#qrLinkList');
+  ok('same tool + same job name (any capitals) asks first and replaces only that job', (await page.evaluate(() => window.__confirms.length)) === 1 && /Inbound 7/.test(list3) && (list3.match(/Inbound 8|inbound 8/gi) || []).length === 1, list3);
+  await page.click('[data-ql-show]');
+  ok('"Show QR" reopens the sheet for a link', /Inbound/i.test(await page.textContent('#qsJob')));
   await page.click('#qsCloseBtn');
   await page.click('[data-ql-stop]'); await page.waitForTimeout(300);
-  ok('"Stop this link" removes it from the list', /No QR links/.test(await page.textContent('#qrLinkList')));
+  ok('"Stop this link" removes just that link', (await page.$$('#qrLinkList .ql-row')).length === 1);
+  await page.click('[data-ql-stop]'); await page.waitForTimeout(300);
+  ok('...stopping the other one empties the list', /No QR links/.test(await page.textContent('#qrLinkList')));
   await page.evaluate(() => AppLang.set('ar'));
   ok('the section is in Arabic when the app is Arabic', /[\u0600-\u06FF]/.test(await page.textContent('#qrLinksSection')) && /[\u0600-\u06FF]/.test(await page.getAttribute('#qrJobInput', 'placeholder')));
   // --- 9. Data Management and User management with labourers ---
