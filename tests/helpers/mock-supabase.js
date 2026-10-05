@@ -15,6 +15,7 @@ window.__rpcCalls = [];
       in(c, vs) { st.filters.push(r => vs.includes(r[c])); return b; },
       order(c, o) { st.order.push([c, !(o && o.ascending === false)]); return b; },
       range(f, t) { st.range = [f, t]; return b; },
+      limit(n) { st.range = [0, n - 1]; return b; },
       upsert(rows, o) { st.op = 'upsert'; st.rows = rows; st.conflict = o && o.onConflict; return b; },
       delete() { st.op = 'delete'; return b; },
       maybeSingle() { st.single = true; return b; },
@@ -113,6 +114,30 @@ window.__rpcCalls = [];
       if (!r) { r = { user_id: window.__me.id, day: p_day, tool: p_tool, action: p_action, event_count: 0, qty: 0 }; db.usage_daily.push(r); }
       r.event_count += p_count; r.qty += p_qty;
     },
+    // ---- Team & Data workspace (admin). Tests can set window.__wsOverview / __wsBoxes / __wsPeople / __wsData / __wsRows / __wsFacets ----
+    ws_overview: () => window.__wsOverview || { active_jobs: 2, stopped_jobs: 1, people_now: 3, units_today: 120, boxes_today: 7, top_jobs: [{ job: 'Inbound 7', units: 80 }, { job: 'Inbound 8', units: 40 }], idle_jobs: [], idle_total: 0, quiet_people: 0 },
+    ws_jobs: ({ p_search, p_tool, p_status, p_sort, p_limit, p_offset }) => {
+      const now = new Date().toISOString();
+      let rows = (window.__links = window.__links || []).filter(l =>
+        (!p_tool || l.tool === p_tool) && (p_status === 'all' || (p_status === 'active' ? l.state === 'active' : l.state === 'stopped')) &&
+        (!p_search || l.job_name.toLowerCase().includes(String(p_search).toLowerCase())));
+      if (p_sort === 'name') rows = rows.slice().sort((a, b) => a.job_name.localeCompare(b.job_name));
+      const total = rows.length;
+      return rows.slice(p_offset || 0, (p_offset || 0) + (p_limit || 25)).map(l => ({ id: l.id, tool: l.tool, job_name: l.job_name, token: l.token, created_at: l.created_at || now, stopped_at: l.state === 'stopped' ? now : null,
+        last_scan_at: l.last_scan_at === undefined ? now : l.last_scan_at, state: l.state, people: l.operators || 0, boxes: l.boxes || 0, units: l.units || 0, total_count: total }));
+    },
+    ws_job_boxes: ({ p_link_id, p_search }) => ((window.__wsBoxes || {})[p_link_id] || []).filter(b => !p_search || b.box.includes(p_search)).map(b => ({ ...b, total_count: ((window.__wsBoxes || {})[p_link_id] || []).length })),
+    ws_job_people: ({ p_link_id }) => (window.__wsJobPeople || {})[p_link_id] || [],
+    ws_job_activity: () => Array.from({ length: 24 }, (_, i) => ({ hour: new Date(Date.now() - (23 - i) * 3600000).toISOString(), units: i === 23 ? 5 : 0 })),
+    ws_people: ({ p_search, p_type }) => (window.__wsPeople || []).filter(p => (p_type === 'all' || p.kind === p_type) && (!p_search || p.name.toLowerCase().includes(String(p_search).toLowerCase()))).map(p => ({ ...p, total_count: (window.__wsPeople || []).length })),
+    ws_data_boxes: (a) => { const rows = window.__wsData || []; return rows.map(r => ({ ...r, total_boxes: rows.length, total_units: rows.reduce((n, x) => n + x.items, 0), total_rows: rows.reduce((n, x) => n + x.items, 0) })).slice(a.p_offset || 0, (a.p_offset || 0) + (a.p_limit || 50)); },
+    ws_data_rows: (a) => {
+      const all = window.__wsRows || [];
+      const i = a.p_after_id ? all.findIndex(r => r.id === a.p_after_id) + 1 : 0;
+      return all.slice(i, i + (a.p_limit || 1000));
+    },
+    ws_data_delete: (a) => { window.__wsDeleteArgs = a; const n = (window.__wsRows || []).length; window.__wsRows = []; window.__wsData = []; return n; },
+    ws_facets: ({ p_kind }) => (window.__wsFacets || {})[p_kind] || [],
     rename_enterprise: ({ new_name }) => { db.enterprises[0].name = new_name.trim(); },
     // like the real functions: an enterprise admin gets everyone, anybody else only their own row
     team_member_stats: () => (window.__operatorPeople || []).concat(window.__me.tier === 'enterprise_admin' || window.__teamAll
@@ -136,6 +161,6 @@ window.__rpcCalls = [];
       }
     },
     from: builder,
-    rpc: async (name, args) => { window.__rpcCalls.push(name); try { return { data: rpcs[name](args || {}), error: null }; } catch (e) { return { data: null, error: e }; } }
+    rpc: async (name, args) => { window.__rpcCalls.push(name); (window.__rpcLog = window.__rpcLog || []).push({ name, args: args || {} }); try { return { data: rpcs[name](args || {}), error: null }; } catch (e) { return { data: null, error: e }; } }
   }) };
 })();

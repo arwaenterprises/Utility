@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=65"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=65"></script>
-    <script src="vendor/qrcode.min.js?v=65"></script>
-    <script src="vendor/html5-qrcode.min.js?v=65"></script>
-    <script src="vendor/supabase.js?v=65"></script>
+    <script src="vendor/xlsx.full.min.js?v=66"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=66"></script>
+    <script src="vendor/qrcode.min.js?v=66"></script>
+    <script src="vendor/html5-qrcode.min.js?v=66"></script>
+    <script src="vendor/supabase.js?v=66"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -35,41 +35,22 @@
         <h1 class="header-title">Utility</h1>
         <div class="header-store" id="headerUser"></div>
         <button class="hdr-circle" id="langBtn" type="button" title="Language" aria-label="Language">EN</button>
-        <button class="btn-signout" id="accountBtn" type="button" title="User management" aria-label="User management"><img src="icons/ui-users.png" alt=""></button>
+        <button class="btn-signout" id="accountBtn" type="button" title="Team &amp; Data" aria-label="Team &amp; Data"><img src="icons/ui-users.png" alt=""></button>
         <button class="btn-signout" id="signOutBtn" type="button" title="Sign out" aria-label="Sign out"><img src="icons/ui-logout.png" alt=""></button>
         <button class="hdr-btn" id="updateBtn" type="button" title="App updates" aria-label="App updates"><img src="icons/ui-update.png" alt=""><span class="hdr-dot" id="updateDot" hidden></span></button>
         <div class="online-status online" id="onlineStatus">Online</div>
     </header>
 
-    <!-- USER MANAGEMENT (the user icon in the top bar): account details and - for the
-         enterprise admin - rename, Team QR links, members, labourers. The scans / downloads / resets live in Data Management. -->
+    <!-- ACCOUNT (the user icon in the top bar) for members and individuals: account details only. An enterprise admin gets the
+         Team & Data workspace (below) instead, with jobs / QR links, people and data. -->
     <div class="modal-overlay" id="accountModal">
         <div class="modal" style="max-width: 640px;">
-            <h3 class="modal-title team-title"><img class="title-icon" src="icons/ui-users.png" alt=""> <span>User management</span>
+            <h3 class="modal-title team-title"><img class="title-icon" src="icons/ui-users.png" alt=""> <span>Account</span>
                 <button class="team-close-x" id="closeAccountBtn" type="button" title="Close" aria-label="Close">✕</button></h3>
             <div class="modal-body" style="text-align: left; max-height: 78vh; overflow-y: auto;">
                 <div class="settings-section">
                     <p><strong id="accountEmailDisp"></strong></p>
                     <p id="accountTierDisp" style="color: var(--ak-text-light); font-size: 13px;"></p>
-                </div>
-
-                <div id="enterpriseAdminSection" style="display:none;">
-                    <div class="um-enterprise"><strong id="umEnterprise">Team</strong>
-                        <button class="icon-btn" id="renameEnterpriseBtn" title="Rename enterprise" aria-label="Rename enterprise" style="font-size:14px;">✏️</button></div>
-                    <div class="settings-section" id="qrLinksSection">
-                        <h4><span data-i18n="ql_h">Team QR links</span> <button class="icon-btn" id="qlHelpBtn" type="button" title="How to use this tool" aria-label="How to use this tool">?</button></h4>
-                        <p class="ql-hint" data-i18n="ql_p">Labourers join with a QR code &mdash; no Google account. Each link is for one tool and one job; make one link per team, even for the same tool. Creating a link with the same tool and job name replaces that job&rsquo;s old link.</p>
-                        <div id="qrLinkList"></div>
-                        <div class="ql-new">
-                            <select id="qrToolSelect" class="form-input"></select>
-                            <input type="text" id="qrJobInput" class="form-input" maxlength="60" autocomplete="off">
-                            <button class="btn btn-primary btn-block" id="qrCreateBtn" type="button" data-i18n="ql_create">Create QR link</button>
-                        </div>
-                    </div>
-                    <h4 style="margin: 10px 0 6px;">Team members</h4>
-                    <div id="umMemberList"></div>
-                    <h4 style="margin: 10px 0 6px;" data-i18n="lab_h">Labourers (joined by QR)</h4>
-                    <div id="umLabourList"></div>
                 </div>
             </div>
         </div>
@@ -95,6 +76,39 @@
                 <button class="btn btn-secondary" id="qsShareBtn" type="button" data-i18n="qs_share">Share</button>
                 <button class="btn btn-secondary" id="qsCopyBtn" type="button" data-i18n="qs_copy">Copy link</button>
                 <button class="btn btn-secondary" id="qsCloseBtn" type="button" data-i18n="qs_close">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TEAM & DATA WORKSPACE (enterprise admin): Overview, Jobs (one job = one QR link), People, Data, Account. Built by js/workspace.js. -->
+    <div class="ws" id="wsRoot" role="dialog" aria-modal="true" aria-labelledby="wsTitle">
+        <aside class="ws-side">
+            <div class="ws-brand"><strong id="wsEnterprise">Team</strong><small id="wsAdmin"></small></div>
+            <nav class="ws-nav" id="wsNav" aria-label="Team & Data"></nav>
+        </aside>
+        <div class="ws-body">
+            <header class="ws-top">
+                <h2 id="wsTitle">Team &amp; Data</h2>
+                <span class="ws-top-actions">
+                    <button class="icon-btn" id="wsHelpBtn" type="button" title="How to use this tool" aria-label="How to use this tool">?</button>
+                    <button class="team-close-x" id="wsCloseBtn" type="button" title="Close" aria-label="Close">&#10005;</button>
+                </span>
+            </header>
+            <div class="ws-status" id="wsStatus" hidden></div>
+            <main class="ws-main" id="wsMain"></main>
+        </div>
+        <nav class="ws-bottom" id="wsBottomNav" aria-label="Team & Data"></nav>
+    </div>
+
+    <!-- WORKSPACE DIALOG: a confirmation that can ask for a typed word (used before anything is deleted) -->
+    <div class="modal-overlay" id="wsDialog">
+        <div class="modal" style="max-width: 440px;">
+            <h3 class="modal-title" id="wsDialogTitle"></h3>
+            <div class="modal-body ws-dialog-body" id="wsDialogBody" style="text-align:left;"></div>
+            <input type="text" id="wsDialogInput" class="form-input" autocomplete="off" hidden>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" id="wsDialogCancel" type="button">Cancel</button>
+                <button class="btn btn-primary" id="wsDialogOk" type="button">OK</button>
             </div>
         </div>
     </div>
@@ -1076,23 +1090,24 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=65"></script>
-    <script src="js/lang.js?v=65"></script>
-    <script src="js/supabaseClient.js?v=65"></script>
-    <script src="js/camera.js?v=65"></script>
-    <script src="js/lists.js?v=65"></script>
-    <script src="js/usage.js?v=65"></script>
-    <script src="js/syncstatus.js?v=65"></script>
-    <script src="js/help.js?v=65"></script>
-    <script src="js/tooltip.js?v=65"></script>
-    <script src="js/operator.js?v=65"></script>
-    <script src="js/teamlinks.js?v=65"></script>
-    <script src="js/app.js?v=65"></script>
-    <script src="js/boxScanner.js?v=65"></script>
-    <script src="js/itemBarcode.js?v=65"></script>
-    <script src="js/boxCode.js?v=65"></script>
-    <script src="js/boxSegregate.js?v=65"></script>
-    <script src="js/priceCheck.js?v=65"></script>
-    <script src="js/yearSegregate.js?v=65"></script>
+    <script src="js/config.js?v=66"></script>
+    <script src="js/lang.js?v=66"></script>
+    <script src="js/supabaseClient.js?v=66"></script>
+    <script src="js/camera.js?v=66"></script>
+    <script src="js/lists.js?v=66"></script>
+    <script src="js/usage.js?v=66"></script>
+    <script src="js/syncstatus.js?v=66"></script>
+    <script src="js/help.js?v=66"></script>
+    <script src="js/tooltip.js?v=66"></script>
+    <script src="js/operator.js?v=66"></script>
+    <script src="js/teamlinks.js?v=66"></script>
+    <script src="js/workspace.js?v=66"></script>
+    <script src="js/app.js?v=66"></script>
+    <script src="js/boxScanner.js?v=66"></script>
+    <script src="js/itemBarcode.js?v=66"></script>
+    <script src="js/boxCode.js?v=66"></script>
+    <script src="js/boxSegregate.js?v=66"></script>
+    <script src="js/priceCheck.js?v=66"></script>
+    <script src="js/yearSegregate.js?v=66"></script>
 </body>
 </html>

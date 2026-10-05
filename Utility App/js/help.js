@@ -148,39 +148,45 @@ const HELP = {
         }
     },
     // Not a tool: opened by the "?" next to "Team QR links" in User management.
-    teamLinks: {
-        title: { en: 'Team QR links', ar: 'روابط QR للفريق' },
+    workspace: {
+        title: { en: 'Team & Data', ar: 'الفريق والبيانات' },
         en: {
-            intro: 'Let labourers work on a handheld without a Google account: they scan a QR code and type only their name.',
-            before: 'You must be signed in with your Google account. Each link is for ONE tool and ONE job (make one per team).',
+            intro: 'Manage your jobs (QR links), your people and all scanned data from one place.',
+            before: 'You must be signed in with your Google account. One <b>job</b> is one QR link: a tool plus a job name. Make one job per team, even on the same tool.',
             steps: [
-                'Open <b>User management</b> (the people icon at the top).',
-                'Under <b>Team QR links</b> choose the tool, type a <b>job name</b> (it becomes the Remark on every scan) and tap <b>Create QR link</b>.',
-                'The QR sheet shows your enterprise, your name, the tool and the job. Tap <b>Print</b>, <b>Share</b> or <b>Copy link</b> and give it to the team.',
+                'Open <b>Team &amp; Data</b> from the people icon at the top or from the home screen tile.',
+                '<b>Overview</b> shows today&rsquo;s totals, units by job, and anything that needs attention, such as a job with no scans for 24 hours.',
+                'Under <b>Jobs</b> tap <b>+ New job</b>, choose the tool, type a <b>job name</b> (it becomes the Remark on every scan) and tap <b>Create QR link</b>. The QR sheet shows your enterprise, your name, the tool and the job. Tap <b>Print</b>, <b>Share</b> or <b>Copy link</b> and give it to the team.',
                 'Each labourer scans the QR with the phone&rsquo;s own camera or QR scanner, checks the names, types their name and taps <b>Join</b>. That handheld then shows only that one tool.',
-                'Several teams can work on the same tool at the same time: create one link per team, each with its own job name. Creating a link with the <b>same tool and same job name</b> replaces only that job&rsquo;s old link. Tap <b>Stop this link</b> to end a job.',
-                'Under <b>Labourers</b> you can correct a name or remove a person. In <b>Data Management</b> you see every labourer by name, with the job.'
+                'Tap a job&rsquo;s name to open it: see its boxes, who joined and their totals, and activity per hour. Tap <b>QR</b> to show its code again, or <b>Stop this link</b> to end the job.',
+                'Under <b>People</b> you see labourers and Google members with their jobs and totals. You can correct a name or remove a person, or tap <b>View data</b> for their scans.',
+                'Under <b>Data</b> filter by tool, job, person, dates and box status. <b>Download everything that matches</b> gives Excel files (large downloads are split into several files). <b>Download and delete</b> downloads first, then deletes exactly those scans after you type DELETE.'
             ],
             tips: [
-                'A link <b>never expires by itself</b>. It works until you tap <b>Stop this link</b> (or create a new link with the same tool and job name).',
-                'Scans stay on the server until <b>you</b> delete them in Data Management. A labourer&rsquo;s <b>Reset</b> only clears their own handheld.',
-                'Anyone who gets the QR can join, so share it only with your team and stop it when the job is done.'
+                'Creating a link with the <b>same tool and same job name</b> replaces only that job&rsquo;s old link. Other jobs are not affected.',
+                'A link <b>never expires by itself</b>. It works until you stop it. An <b>Idle</b> label only warns you; it never stops anything.',
+                'Scans stay on the server until <b>you</b> delete them. A labourer&rsquo;s <b>Reset</b> only clears their own handheld.',
+                'Give each team its own box-number range or prefix. Two teams using the same box number stay separate in Data, but are easy to confuse on the floor.',
+                'Anyone who gets a QR can join, so share it only with your team and stop it when the job is done.'
             ]
         },
         ar: {
-            intro: 'دع العمال يعملون على الجهاز المحمول دون حساب Google: يمسحون رمز QR ويكتبون اسمهم فقط.',
-            before: 'يجب أن تكون مسجّل الدخول بحساب Google. كل رابط لأداة واحدة ومهمة واحدة (أنشئ رابطًا لكل فريق).',
+            intro: 'أدر مهامك (روابط QR) وأشخاصك وكل البيانات الممسوحة من مكان واحد.',
+            before: 'يجب أن تكون مسجّل الدخول بحساب Google. <b>المهمة</b> الواحدة هي رابط QR واحد: أداة مع اسم مهمة. أنشئ مهمة لكل فريق حتى على الأداة نفسها.',
             steps: [
-                'افتح <b>User management</b> (أيقونة الأشخاص في الأعلى).',
-                'تحت <b>روابط QR للفريق</b> اختر الأداة، واكتب <b>اسم المهمة</b> (يصبح الملاحظة في كل عملية مسح) ثم اضغط <b>إنشاء رابط QR</b>.',
-                'تعرض ورقة QR اسم مؤسستك واسمك والأداة والمهمة. اضغط <b>طباعة</b> أو <b>مشاركة</b> أو <b>نسخ الرابط</b> وسلّمها للفريق.',
+                'افتح <b>الفريق والبيانات</b> من أيقونة الأشخاص في الأعلى أو من بطاقة الشاشة الرئيسية.',
+                'تعرض <b>نظرة عامة</b> إجماليات اليوم والقطع حسب المهمة وأي شيء يحتاج إلى انتباه، مثل مهمة بلا مسح منذ 24 ساعة.',
+                'تحت <b>المهام</b> اضغط <b>+ مهمة جديدة</b> واختر الأداة واكتب <b>اسم المهمة</b> (يصبح الملاحظة في كل عملية مسح) ثم اضغط <b>إنشاء رابط QR</b>. تعرض ورقة QR اسم مؤسستك واسمك والأداة والمهمة. اضغط <b>طباعة</b> أو <b>مشاركة</b> أو <b>نسخ الرابط</b> وسلّمها للفريق.',
                 'يمسح كل عامل الرمز بكاميرا الهاتف أو ماسح QR، ويتأكد من الأسماء، ويكتب اسمه ثم يضغط <b>انضمام</b>. بعدها يعرض الجهاز تلك الأداة فقط.',
-                'يمكن لعدة فرق العمل على الأداة نفسها في الوقت نفسه: أنشئ رابطًا لكل فريق وباسم مهمة مختلف. إنشاء رابط بنفس الأداة ونفس اسم المهمة يحلّ محل الرابط القديم لتلك المهمة فقط. اضغط <b>إيقاف هذا الرابط</b> لإنهاء مهمة.',
-                'تحت <b>العمال</b> يمكنك تصحيح اسم أو إزالة شخص. وفي <b>Data Management</b> ترى كل عامل باسمه مع المهمة.'
+                'اضغط على اسم المهمة لفتحها: ترى صناديقها ومن انضم وإجمالياتهم والنشاط في كل ساعة. اضغط <b>QR</b> لعرض رمزها مرة أخرى، أو <b>إيقاف هذا الرابط</b> لإنهاء المهمة.',
+                'تحت <b>الأشخاص</b> ترى العمال وأعضاء Google مع مهامهم وإجمالياتهم. يمكنك تصحيح اسم أو إزالة شخص، أو الضغط على <b>عرض البيانات</b> لرؤية عمليات مسحه.',
+                'تحت <b>البيانات</b> رشّح حسب الأداة والمهمة والشخص والتواريخ وحالة الصندوق. <b>تحميل كل ما يطابق</b> يعطيك ملفات Excel (التحميلات الكبيرة تُقسَّم إلى عدة ملفات). <b>تحميل ثم حذف</b> يحمّل أولًا ثم يحذف تلك العمليات تحديدًا بعد أن تكتب DELETE.'
             ],
             tips: [
-                'لا تنتهي صلاحية الرابط تلقائيًا. يبقى يعمل حتى تضغط <b>إيقاف هذا الرابط</b> (أو تنشئ رابطًا جديدًا بنفس الأداة واسم المهمة).',
-                'تبقى عمليات المسح على الخادم حتى <b>تحذفها أنت</b> في Data Management. زر <b>Reset</b> عند العامل يمسح جهازه فقط.',
+                'إنشاء رابط بنفس الأداة ونفس اسم المهمة يحلّ محل الرابط القديم لتلك المهمة فقط. المهام الأخرى لا تتأثر.',
+                'لا تنتهي صلاحية الرابط تلقائيًا. يبقى يعمل حتى توقفه. علامة <b>خامل</b> تنبّهك فقط ولا توقف أي شيء.',
+                'تبقى عمليات المسح على الخادم حتى <b>تحذفها أنت</b>. زر <b>Reset</b> عند العامل يمسح جهازه فقط.',
+                'أعطِ كل فريق نطاق أرقام صناديق أو بادئة خاصة به. الفريقان اللذان يستخدمان رقم الصندوق نفسه يبقيان منفصلين في البيانات، لكن يسهل الخلط بينهما في الميدان.',
                 'يستطيع أي شخص يحصل على الرمز الانضمام، فشاركه مع فريقك فقط وأوقفه عند انتهاء المهمة.'
             ]
         }

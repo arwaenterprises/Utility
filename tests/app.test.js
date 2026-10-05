@@ -251,26 +251,37 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     window.confirm = () => true; AppState.profile.enterprise_id = 'E1';
     await removeMember('u-gone');
     ok('removing a teammate calls the server', window.__removedMember === 'u-gone');
-    // ---------- User management window (user icon): account, rename, invite, members ----------
+    // ---------- Team & Data workspace (user icon / 7th tile) for an admin; the small Account window for everybody else ----------
     AppState.profile = { ...AppState.profile, tier: 'enterprise_admin', enterprise_id: 'E1' };
     window.__me = { ...window.__me, tier: 'enterprise_admin', enterprise_id: 'E1' };
     const vis = id => document.getElementById(id).style.display !== 'none';
-    await openAccountModal();
-    ok('User management shows the admin section (rename, Team QR links, members, labourers)', vis('enterpriseAdminSection') && !!document.getElementById('qrLinksSection') && !!document.getElementById('umLabourList'));
+    const wsOpen = () => document.getElementById('wsRoot').classList.contains('active');
+    await openAccountModal(); await new Promise(r => setTimeout(r, 150));
+    ok('an admin gets the Team & Data workspace from the user icon (not the small account window)', wsOpen() && !document.getElementById('accountModal').classList.contains('active'));
+    ok('the workspace has five sections: Overview, Jobs, People, Data, Account', [...document.querySelectorAll('#wsNav .ws-nav-btn')].map(b => b.dataset.wsGo).join() === 'overview,jobs,people,data,account');
     ok('there is no e-mail invitation and no "create an enterprise" any more', !document.getElementById('inviteToggleBtn') && !document.getElementById('sendInviteBtn') && !document.getElementById('createEnterpriseSection') && !document.getElementById('inviteBanner') && !document.getElementById('inviteModal'));
-    ok('User management lists the members with a remove button for others but not for yourself', document.querySelectorAll('#umMemberList [data-remove-member]').length === 1 && /Ann/.test(document.getElementById('umMemberList').textContent) && /Bob/.test(document.getElementById('umMemberList').textContent));
-    ok('team title shows name + member count', document.getElementById('umEnterprise').textContent === 'Acme (2 members)', document.getElementById('umEnterprise').textContent);
-    window.prompt = () => '  Acme Corp  '; await renameEnterprise();
-    ok('rename updates title', document.getElementById('umEnterprise').textContent === 'Acme Corp (2 members)', document.getElementById('umEnterprise').textContent);
-    ok('User management has no data tables or Reset buttons any more', !document.querySelector('#accountModal .team-tabs, #accountModal #resetTeamSelectedBtn, #accountModal #resetTeamYsBtn'));
+    ok('the old User management admin section is gone from the account window', !document.getElementById('enterpriseAdminSection') && !document.getElementById('qrLinksSection') && !document.getElementById('umMemberList'));
+    wsGo('account'); await new Promise(r => setTimeout(r, 50));
+    ok('Account section shows the enterprise name', /Acme/.test(document.getElementById('wsMain').textContent), document.getElementById('wsMain').textContent);
+    window.prompt = () => '  Acme Corp  '; await wsRenameEnterprise();
+    ok('rename updates the enterprise name', WS.enterprise === 'Acme Corp' && /Acme Corp/.test(document.getElementById('wsMain').textContent), WS.enterprise);
+    document.getElementById('wsCloseBtn').click();
+    ok('the ✕ closes the workspace', !wsOpen());
+    // members and individuals keep the small account window
+    AppState.profile = { ...AppState.profile, tier: 'enterprise_member' };
+    await openAccountModal();
+    ok('a member gets the small account window with just their details', !wsOpen() && document.getElementById('accountModal').classList.contains('active') && !!document.getElementById('accountEmailDisp').textContent);
     document.getElementById('closeAccountBtn').click();
-    ok('the ✕ closes User management', !document.getElementById('accountModal').classList.contains('active'));
+    AppState.profile = { ...AppState.profile, tier: 'enterprise_admin' };
 
     // ---------- Data Management window (7th tile): two tabs, one Download/Reset pair per tab, close ✕ ----------
     document.querySelector('.app-tile[data-app-id="dataManagement"]') || renderAppGrid();
-    document.querySelector('.app-tile[data-app-id="dataManagement"]').click(); await new Promise(r => setTimeout(r, 120));
-    ok('the Data Management tile opens the window', document.getElementById('teamModal').classList.contains('active'));
-    ok('admin title says whose data: the whole team', /Data Management — Acme Corp \(all users\)/.test(document.getElementById('teamModalTitle').textContent), document.getElementById('teamModalTitle').textContent);
+    document.querySelector('.app-tile[data-app-id="dataManagement"]').click(); await new Promise(r => setTimeout(r, 150));
+    ok('for an admin the Team & Data tile opens the workspace on its Data section', wsOpen() && WS.section === 'data' && !document.getElementById('teamModal').classList.contains('active'));
+    document.getElementById('wsCloseBtn').click();
+    await openTeamModal(); await new Promise(r => setTimeout(r, 120));
+    ok('the older Data Management window still opens (for members and individuals)', document.getElementById('teamModal').classList.contains('active'));
+    ok('admin title says whose data: the whole team', /Team & Data — Acme Corp \(all users\)/.test(document.getElementById('teamModalTitle').textContent), document.getElementById('teamModalTitle').textContent);
     document.getElementById('helpCloseBtn').click();
     ok('Data Management has no invite or rename controls', !document.querySelector('#teamModal #inviteToggleBtn, #teamModal #renameEnterpriseBtn, #teamModal [data-remove-member]'));
     ok('opens on the Box Scanner tab', vis('teamPanelBs') && !vis('teamPanelYs'));
@@ -296,7 +307,7 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     __db.scans.push({ id: 'ind1', scan_uid: 'ind1', user_id: 'u1', enterprise_id: null, remark: 'R', box_number: 'IB1', barcode: '123', qty: 2, box_status: 'Closed', scanned_at: new Date().toISOString() },
                     { id: 'oth1', scan_uid: 'oth1', user_id: 'u2', enterprise_id: null, remark: 'R', box_number: 'OB1', barcode: '999', qty: 1, box_status: 'Closed', scanned_at: new Date().toISOString() });
     await openDataManagement(); document.getElementById('helpCloseBtn').click();
-    ok('individual: title says "my data"', /Data Management — my data/.test(document.getElementById('teamModalTitle').textContent), document.getElementById('teamModalTitle').textContent);
+    ok('individual: title says "my data"', /Team & Data — my data/.test(document.getElementById('teamModalTitle').textContent), document.getElementById('teamModalTitle').textContent);
     ok('individual: sees only their own row', document.querySelectorAll('#teamMemberList .team-member-checkbox').length === 1);
     ok('individual: Reset is available', document.getElementById('resetTeamSelectedBtn').style.display !== 'none' && document.getElementById('resetTeamYsBtn').style.display !== 'none');
     selectedMemberIds.clear(); selectedMemberIds.add('u1'); written.length = 0;
@@ -316,11 +327,11 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     document.getElementById('closeTeamBtn').click();
     AppState.profile = { display_name: 'Admin', enterprise_id: 'E1', tier: 'enterprise_admin' };
     window.__me = { ...window.__me, tier: 'enterprise_admin', enterprise_id: 'E1' };
-    await openDataManagement(); document.getElementById('helpCloseBtn').click();
-    ok('admin again: Reset buttons are back', document.getElementById('resetTeamSelectedBtn').style.display !== 'none');
+    await openTeamModal(); document.getElementById('helpCloseBtn').click();
+    ok('admin in the older window: Reset buttons are there', document.getElementById('resetTeamSelectedBtn').style.display !== 'none');
     document.getElementById('closeTeamBtn').click();
     ok('photo capture is gone', !document.getElementById('photoCaptureApp') && !APPS.some(a => a.id === 'photoCapture') && typeof initPhotoCapture === 'undefined');
-    ok('6 tools + the Data Management tile', APPS.length === 7 && APPS.filter(a => a.modal).map(a => a.id).join() === 'dataManagement', APPS.map(a => a.id).join());
+    ok('6 tools + the Team & Data tile', APPS.length === 7 && APPS.filter(a => a.modal).map(a => a.id).join() === 'dataManagement', APPS.map(a => a.id).join());
     ok('NO content-security-policy violations during the whole run', window.__csp.length === 0, JSON.stringify(window.__csp));
 
     // ---------- usage statistics ----------

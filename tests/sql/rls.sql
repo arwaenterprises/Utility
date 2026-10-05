@@ -385,3 +385,99 @@ delete from auth.users where id = '00000000-0000-0000-0000-0000000000a6';
 delete from auth.users where id in ('00000000-0000-0000-0000-0000000000f1','00000000-0000-0000-0000-0000000000f2','00000000-0000-0000-0000-0000000000f3','00000000-0000-0000-0000-0000000000f4','00000000-0000-0000-0000-0000000000f5');
 delete from scans where box_number = 'FB';
 delete from team_links;
+
+-- ============ Team & Data workspace (admin screens) ============
+insert into auth.users(id,email) values
+  ('00000000-0000-0000-0000-0000000000a7', null),
+  ('00000000-0000-0000-0000-0000000000a8', null),
+  ('00000000-0000-0000-0000-0000000000a9', null);
+select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('boxScanner','WS A')$$);
+select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('boxScanner','WS B')$$);
+select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('yearSegregate','WS Y')$$);
+select token as tokwa from team_links where job_name = 'WS A' \gset
+select token as tokwb from team_links where job_name = 'WS B' \gset
+select token as tokwy from team_links where job_name = 'WS Y' \gset
+select _ta_do('00000000-0000-0000-0000-0000000000a7', format($$select join_team_link(%L,'Ravi')$$, :'tokwa'));
+select _ta_do('00000000-0000-0000-0000-0000000000a8', format($$select join_team_link(%L,'Sana')$$, :'tokwb'));
+select _ta_do('00000000-0000-0000-0000-0000000000a9', format($$select join_team_link(%L,'Joy')$$, :'tokwy'));
+-- team A: box W1 (3 items, closed), box W2 (2 items, open). team B reuses the box number W1 (2 items, closed).
+select _ta_do('00000000-0000-0000-0000-0000000000a7', $$insert into scans(user_id,box_number,barcode,box_status) values ('00000000-0000-0000-0000-0000000000a7','W1','a1','Closed'),('00000000-0000-0000-0000-0000000000a7','W1','a2','Closed'),('00000000-0000-0000-0000-0000000000a7','W1','a3','Closed'),('00000000-0000-0000-0000-0000000000a7','W2','a4','Open'),('00000000-0000-0000-0000-0000000000a7','W2','a5','Open')$$);
+select _ta_do('00000000-0000-0000-0000-0000000000a8', $$insert into scans(user_id,box_number,barcode,box_status) values ('00000000-0000-0000-0000-0000000000a8','W1','b1','Closed'),('00000000-0000-0000-0000-0000000000a8','W1','b2','Closed')$$);
+select _ta_do('00000000-0000-0000-0000-0000000000a9', $$insert into ys_scans(user_id,scan_uid,barcode,ptl_number,season,year,brand,box_barcode,box_status) values ('00000000-0000-0000-0000-0000000000a9',gen_random_uuid(),'y1','01','SS',2023,'Zed','YB1','Closed'),('00000000-0000-0000-0000-0000000000a9',gen_random_uuid(),'y2','01','SS',2023,'Zed','YB1','Closed')$$);
+
+-- Jobs
+select _t_eq('jobs: the admin lists all three jobs', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_jobs('', '', 'all')$$), 3);
+select _t_eq('jobs: units of a job', _t_val('00000000-0000-0000-0000-0000000000e1', $$select units from ws_jobs('WS A', '', 'all')$$), 5);
+select _t_eq('jobs: closed boxes of a job (the open box is not counted)', _t_val('00000000-0000-0000-0000-0000000000e1', $$select boxes from ws_jobs('WS A', '', 'all')$$), 1);
+select _t_eq('jobs: people of a job', _t_val('00000000-0000-0000-0000-0000000000e1', $$select people from ws_jobs('WS A', '', 'all')$$), 1);
+select _t_eq('jobs: a Year/Season job counts from its own table', _t_val('00000000-0000-0000-0000-0000000000e1', $$select units * 10 + boxes from ws_jobs('WS Y', '', 'all')$$), 21);
+select _t_eq('jobs: filter by tool', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_jobs('', 'boxScanner', 'all')$$), 2);
+select _t_eq('jobs: total_count is the whole match, not the page', _t_val('00000000-0000-0000-0000-0000000000e1', $$select max(total_count) from ws_jobs('', '', 'all', 'name', 1, 0)$$), 3);
+select _t_eq('jobs: a page holds only what was asked for', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_jobs('', '', 'all', 'name', 1, 1)$$), 1);
+select _t_eq('jobs: sorted by name the first is WS A', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from (select job_name from ws_jobs('', '', 'all', 'name', 1, 0)) q where job_name = 'WS A'$$), 1);
+select _t_eq('jobs: stopped filter shows none yet', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_jobs('', '', 'stopped')$$), 0);
+select _t_eq('jobs: a member sees nothing', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from ws_jobs('', '', 'all')$$), 0);
+select _t_eq('jobs: another team''s admin sees nothing of these', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from ws_jobs('', '', 'all')$$), 0);
+
+-- Job detail
+select _t_eq('job boxes: team A has two boxes', _t_val('00000000-0000-0000-0000-0000000000e1', format($$select count(*) from ws_job_boxes(%L)$$, (select id from team_links where job_name='WS A'))), 2);
+select _t_eq('job boxes: team B''s box W1 is not mixed into team A''s', _t_val('00000000-0000-0000-0000-0000000000e1', format($$select items from ws_job_boxes(%L) where box='W1'$$, (select id from team_links where job_name='WS A'))), 3);
+select _t_eq('job boxes: search by barcode', _t_val('00000000-0000-0000-0000-0000000000e1', format($$select count(*) from ws_job_boxes(%L, 'a4')$$, (select id from team_links where job_name='WS A'))), 1);
+select _t_eq('job boxes: another team''s admin cannot read them', _t_val('00000000-0000-0000-0000-0000000000e2', format($$select count(*) from ws_job_boxes(%L)$$, (select id from team_links where job_name='WS A'))), 0);
+select _t_eq('job people: the labourer with totals', _t_val('00000000-0000-0000-0000-0000000000e1', format($$select units * 10 + boxes from ws_job_people(%L) where name='Ravi'$$, (select id from team_links where job_name='WS A'))), 51);
+select _t_eq('job people: another team''s admin cannot read them', _t_val('00000000-0000-0000-0000-0000000000e2', format($$select count(*) from ws_job_people(%L)$$, (select id from team_links where job_name='WS A'))), 0);
+select _t_eq('job activity: 24 hourly buckets that add up to the units', _t_val('00000000-0000-0000-0000-0000000000e1', format($$select count(*) * 1000 + sum(units) from ws_job_activity(%L)$$, (select id from team_links where job_name='WS A'))), 24005);
+select _t_eq('job activity: another team''s admin gets nothing', _t_val('00000000-0000-0000-0000-0000000000e2', format($$select count(*) from ws_job_activity(%L)$$, (select id from team_links where job_name='WS A'))), 0);
+
+-- Data explorer
+select _t_eq('data: boxes of two teams with the same box number stay separate', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_data_boxes('boxScanner', null, null, null, null, null, null)$$), 3);
+select _t_eq('data: totals cover everything that matches', _t_val('00000000-0000-0000-0000-0000000000e1', $$select max(total_boxes) * 100 + max(total_units) from ws_data_boxes('boxScanner', null, null, null, null, null, null)$$), 307);
+select _t_eq('data: filter by job (capitals ignored)', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_data_boxes('boxScanner', array['ws a '], null, null, null, null, null)$$), 2);
+select _t_eq('data: filter by person', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_data_boxes('boxScanner', null, 'sana', null, null, null, null)$$), 1);
+select _t_eq('data: filter by box status', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_data_boxes('boxScanner', null, null, null, null, 'Open', null)$$), 1);
+select _t_eq('data: search', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_data_boxes('boxScanner', null, null, null, null, null, 'b2')$$), 1);
+select _t_eq('data: date range in the past matches nothing', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_data_boxes('boxScanner', null, null, null, now() - interval '1 day', null, null)$$), 0);
+select _t_eq('data: Year/Season is a tool of its own', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_data_boxes('yearSegregate', null, null, null, null, null, null)$$), 1);
+select _t_eq('data: paged', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_data_boxes('boxScanner', null, null, null, null, null, null, 2, 2)$$), 1);
+select _t_eq('data: a member sees nothing', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from ws_data_boxes('boxScanner', null, null, null, null, null, null)$$), 0);
+select _t_eq('data: another team''s admin sees nothing', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from ws_data_boxes('boxScanner', null, null, null, null, null, null)$$), 0);
+select _t_eq('rows: every scan of a filter', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_data_rows('boxScanner', array['WS A'], null, null, null, null, null)$$), 5);
+select _t_eq('rows: keyset paging gives the rest after the first page', _t_val('00000000-0000-0000-0000-0000000000e1', $$with f as (select * from ws_data_rows('boxScanner', array['WS A'], null, null, null, null, null, null, null, null, 2)), l as (select scanned_at, id from f order by scanned_at desc, id desc limit 1) select count(*) from ws_data_rows('boxScanner', array['WS A'], null, null, null, null, null, (select scanned_at from l), (select id from l), null, 1000)$$), 3);
+select _t_eq('rows: p_until leaves out later scans', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_data_rows('boxScanner', null, null, null, null, null, null, null, null, now() - interval '1 hour')$$), 0);
+select _t_eq('rows: Year/Season rows carry their extra columns', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_data_rows('yearSegregate', null, null, null, null, null, null) where extra->>'season' = 'SS' and extra->>'brand' = 'Zed'$$), 2);
+select _t_eq('facets: jobs with units', _t_val('00000000-0000-0000-0000-0000000000e1', $$select units from ws_facets('job', 'boxScanner', 'ws a')$$), 5);
+select _t_eq('facets: people', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_facets('person', 'boxScanner', '')$$), 2);
+select _t_eq('facets: another team''s admin sees none', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from ws_facets('job', 'boxScanner', '')$$), 0);
+
+-- Delete by filter
+select _t_err('delete: a member cannot', '00000000-0000-0000-0000-0000000000b1', $$select ws_data_delete('boxScanner', array['WS B'], null, null, null, null, null, now())$$, 'Only the enterprise admin');
+select _t_err('delete: needs the time the download started', '00000000-0000-0000-0000-0000000000e1', $$select ws_data_delete('boxScanner', array['WS B'], null, null, null, null, null, null)$$, 'download started');
+select _t_eq('delete: another team''s admin deletes nothing of ours', _t_val('00000000-0000-0000-0000-0000000000e2', $$select ws_data_delete('boxScanner', array['WS B'], null, null, null, null, null, now())$$), 0);
+select _t_eq('delete: scans after the download started are kept', _t_val('00000000-0000-0000-0000-0000000000e1', $$select ws_data_delete('boxScanner', array['WS B'], null, null, null, null, null, now() - interval '1 hour')$$), 0);
+select _t_eq('delete: the matching scans are removed and counted', _t_val('00000000-0000-0000-0000-0000000000e1', $$select ws_data_delete('boxScanner', array['WS B'], null, null, null, null, null, now() + interval '1 minute')$$), 2);
+select _t_eq('delete: other jobs are untouched', (select count(*) from scans where box_number in ('W1','W2')), 5);
+select _t_eq('delete: the other tool is untouched', (select count(*) from ys_scans where box_barcode = 'YB1'), 2);
+
+-- People and Overview
+select _t_eq('people: labourers and the admin in one list', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_people('', 'all')$$), 3 + (select count(*) from profiles where enterprise_id='11111111-1111-1111-1111-111111111111' and tier <> 'operator'));
+select _t_eq('people: labourer filter', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_people('', 'labourer')$$), 3);
+select _t_eq('people: Google filter', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_people('', 'google')$$), (select count(*) from profiles where enterprise_id='11111111-1111-1111-1111-111111111111' and tier <> 'operator'));
+select _t_eq('people: a labourer''s totals and job', _t_val('00000000-0000-0000-0000-0000000000e1', $$select units * 10 + boxes from ws_people('Ravi', 'all') where jobs = 'WS A'$$), 51);
+select _t_eq('people: search by job name', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_people('WS Y', 'all')$$), 1);
+select _t_eq('people: a member sees nothing', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from ws_people('', 'all')$$), 0);
+select _t_eq('people: another team''s admin sees none of them', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from ws_people('Ravi', 'all')$$), 0);
+select _t_eq('overview: units today', _t_val('00000000-0000-0000-0000-0000000000e1', $$select (ws_overview(now() - interval '1 day') ->> 'units_today')::bigint$$), 7);
+select _t_eq('overview: closed boxes today', _t_val('00000000-0000-0000-0000-0000000000e1', $$select (ws_overview(now() - interval '1 day') ->> 'boxes_today')::bigint$$), 2);
+select _t_eq('overview: people scanning now', _t_val('00000000-0000-0000-0000-0000000000e1', $$select (ws_overview(now() - interval '1 day') ->> 'people_now')::bigint$$), 2);
+select _t_eq('overview: active jobs', _t_val('00000000-0000-0000-0000-0000000000e1', $$select (ws_overview(now() - interval '1 day') ->> 'active_jobs')::bigint$$), 3);
+select _t_eq('overview: top jobs list', _t_val('00000000-0000-0000-0000-0000000000e1', $$select jsonb_array_length(ws_overview(now() - interval '1 day') -> 'top_jobs')$$), 2);
+select _t_eq('overview: nothing is idle yet', _t_val('00000000-0000-0000-0000-0000000000e1', $$select (ws_overview(now() - interval '1 day') ->> 'idle_total')::bigint$$), 0);
+update team_links set last_scan_at = now() - interval '3 days' where job_name = 'WS A';
+select _t_eq('overview: a job with no scan for 24 hours is idle', _t_val('00000000-0000-0000-0000-0000000000e1', $$select (ws_overview(now() - interval '1 day') ->> 'idle_total')::bigint$$), 1);
+select _t_err('overview: a member cannot open it', '00000000-0000-0000-0000-0000000000b1', $$select ws_overview(now())$$, 'Only the enterprise admin');
+select _t_eq('the API cannot call the internal filter directly', (select count(*) from information_schema.routine_privileges where routine_name = 'ws_filtered_scans' and grantee in ('anon','authenticated','PUBLIC')), 0);
+
+delete from scans where box_number in ('W1','W2');
+delete from ys_scans where box_barcode = 'YB1';
+delete from auth.users where id in ('00000000-0000-0000-0000-0000000000a7','00000000-0000-0000-0000-0000000000a8','00000000-0000-0000-0000-0000000000a9');
+delete from team_links;

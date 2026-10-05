@@ -32,7 +32,7 @@ const TIP_AR = {
     'Back to Home': 'العودة إلى الرئيسية',
     'Account': 'الحساب',
     'Language': 'اللغة',
-    'User management': 'إدارة المستخدمين',
+    'Team & Data': 'الفريق والبيانات',
     'App updates': 'تحديثات التطبيق',
     'Later': 'لاحقًا',
     'Close': 'إغلاق',

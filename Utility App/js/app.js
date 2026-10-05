@@ -121,19 +121,12 @@ function tierDisplayText(profile) {
 }
 
 async function openAccountModal() {
+    // An enterprise admin (every Google sign-in is its own team) gets the Team & Data workspace; members and
+    // individuals keep the small account window.
+    if (AppState.profile?.tier === 'enterprise_admin' && typeof openWorkspace === 'function') { openWorkspace(); return; }
     document.getElementById('accountEmailDisp').textContent = AppState.user?.email || '';
     document.getElementById('accountTierDisp').textContent = tierDisplayText(AppState.profile);
-
-    const isAdmin = AppState.profile?.tier === 'enterprise_admin';
-    document.getElementById('enterpriseAdminSection').style.display = isAdmin ? 'block' : 'none';
-
     document.getElementById('accountModal').classList.add('active');
-    if (isAdmin) {
-        document.getElementById('umMemberList').innerHTML = '<p style="font-size:13px; color: var(--ak-text-light);">Loading...</p>';
-        await loadTeamLinks();
-        await loadLabourers();
-        await loadUserMgmtMembers();
-    }
 }
 
 function closeAccountModal() {
@@ -280,13 +273,6 @@ async function openTeamModal() {   // = Data Management (the 7th tile)
     if (typeof helpAutoShowOnce === 'function') helpAutoShowOnce('dataManagement');
 }
 
-// User management: the enterprise name and how many people are in it (admin included).
-async function refreshTeamTitle() {
-    const { data } = await supabaseClient.from('enterprises').select('name').eq('id', AppState.profile.enterprise_id).maybeSingle();
-    const n = teamMemberStatsCache.filter(m => !m.is_operator).length;
-    document.getElementById('umEnterprise').textContent = ((data && data.name) || 'Team') + (n ? ` (${n} member${n === 1 ? '' : 's'})` : '');
-}
-
 // Data Management: the window title says whose data is shown.
 async function setDataTitle() {
     const ar = typeof AppLang !== 'undefined' && AppLang.get() === 'ar';
@@ -304,74 +290,6 @@ async function setDataTitle() {
 function scopeToMyEnterprise(query) {
     const eid = AppState.profile?.enterprise_id;
     return eid ? query.eq('enterprise_id', eid) : query.is('enterprise_id', null);
-}
-
-// User management: the member list with a remove button (data columns live in Data Management).
-async function loadUserMgmtMembers() {
-    const el = document.getElementById('umMemberList');
-    const { data, error } = await supabaseClient.rpc('team_member_stats');
-    if (error) { el.innerHTML = '<p style="font-size:13px;">Could not load the team.</p>'; return; }
-    teamMemberStatsCache = (data || []).sort((a, b) => teamMemberDisplayName(a).localeCompare(teamMemberDisplayName(b)));
-    const accounts = teamMemberStatsCache.filter(m => !m.is_operator);          // labourers have their own list below
-    el.innerHTML = accounts.length === 0 ? '<div class="team-table-empty">No team members yet</div>' : `
-        <table class="team-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
-            <tbody>${accounts.map(m => {
-                const isSelf = m.user_id === AppState.user?.id;
-                return `<tr class="team-row">
-                    <td>${escapeHtml(teamMemberDisplayName(m))}</td>
-                    <td>${escapeHtml(m.email || '')}</td>
-                    <td>${isSelf ? 'Admin (you)' : 'Member'}</td>
-                    <td style="width:36px;">${isSelf ? '' : `<button class="icon-btn icon-btn-danger" data-remove-member="${m.user_id}" title="Remove from team">✕</button>`}</td>
-                </tr>`;
-            }).join('')}</tbody>
-        </table>`;
-    await refreshTeamTitle();
-}
-
-// Labourers who joined by QR: the admin can fix a misspelt name (also changes it on their past scans) or remove
-// a person (their handheld stops accepting new scans; what they scanned stays).
-async function loadLabourers() {
-    const el = document.getElementById('umLabourList');
-    const { data, error } = await supabaseClient.rpc('list_team_operators');
-    if (error) { el.textContent = ''; return; }
-    const live = (data || []).filter(o => !o.removed_at);
-    el.innerHTML = live.length === 0 ? '<div class="team-table-empty">' + escapeHtml(qlT('noLabourers')) + '</div>' : `
-        <table class="team-table">
-            <thead><tr><th>${escapeHtml(qlT('name'))}</th><th>${escapeHtml(qlT('job'))}</th><th></th></tr></thead>
-            <tbody>${live.map(o => `<tr class="team-row">
-                <td>${escapeHtml(o.name)}</td>
-                <td>${escapeHtml(o.job_name)}<small class="person-jobs">${escapeHtml(opToolName(o.tool))}</small></td>
-                <td style="width:70px;"><button class="icon-btn" data-rename-labourer="${o.id}" data-name="${escapeHtml(o.name)}" aria-label="${escapeHtml(qlT('rename'))}">✏️</button>
-                    <button class="icon-btn icon-btn-danger" data-remove-labourer="${o.id}" aria-label="${escapeHtml(qlT('removeLabourer'))}">✕</button></td>
-            </tr>`).join('')}</tbody>
-        </table>`;
-}
-
-async function renameLabourer(id, current) {
-    const name = prompt(qlT('renamePrompt'), current);
-    if (name === null) return;
-    if (!name.trim() || name.trim().length > 40) { alert(qlT('nameBad')); return; }
-    const { error } = await supabaseClient.rpc('rename_team_operator', { p_operator_id: id, p_name: name.trim() });
-    if (error) { alert(error.message); return; }
-    await loadLabourers();
-}
-
-async function removeLabourer(id) {
-    if (!confirm(qlT('removeAsk'))) return;
-    const { error } = await supabaseClient.rpc('remove_team_operator', { p_operator_id: id });
-    if (error) { alert(error.message); return; }
-    await loadLabourers();
-}
-
-async function renameEnterprise() {
-    const { data } = await supabaseClient.from('enterprises').select('name').eq('id', AppState.profile.enterprise_id).maybeSingle();
-    const name = prompt('Enterprise name:', (data && data.name) || '');
-    if (name === null) return;
-    if (!name.trim()) { alert('Name cannot be empty.'); return; }
-    const { error } = await supabaseClient.rpc('rename_enterprise', { new_name: name });
-    if (error) { alert(error.message); return; }
-    await refreshTeamTitle();
 }
 
 // ---- Year/Season Sort scans (separate from Box Scanner scans) ----
@@ -451,7 +369,11 @@ async function resetSelectedTeamYs() {
     await refreshTeamYsStats();
 }
 
-function openDataManagement() { return openTeamModal(); }
+// The Data Management tile: admins get the Team & Data workspace on its Data section, others the older window.
+function openDataManagement() {
+    if (AppState.profile?.tier === 'enterprise_admin' && typeof openWorkspace === 'function') return openWorkspace('data');
+    return openTeamModal();
+}
 
 function closeTeamModal() {
     document.getElementById('teamModal').classList.remove('active');
@@ -750,7 +672,6 @@ async function removeMember(memberId) {
     selectedMemberIds.delete(memberId);
     expandedMemberIds.delete(memberId);
     teamMemberBoxesCache.delete(memberId);
-    await loadUserMgmtMembers();
 }
 
 // ============================================
@@ -900,16 +821,6 @@ function setupEventListeners() {
     document.getElementById('updateNowBtn').addEventListener('click', updateAppNow);
     document.getElementById('updateLaterBtn').addEventListener('click', () => { document.getElementById('updateModal').classList.remove('active'); });
     document.getElementById('dataHelpBtn').addEventListener('click', () => helpShow('dataManagement'));
-    document.getElementById('qlHelpBtn').addEventListener('click', () => helpShow('teamLinks'));
-    document.getElementById('umMemberList').addEventListener('click', (e) => {
-        const removeId = e.target.dataset.removeMember;
-        if (removeId) removeMember(removeId);
-    });
-    document.getElementById('umLabourList').addEventListener('click', (e) => {
-        const ren = e.target.dataset.renameLabourer, rem = e.target.dataset.removeLabourer;
-        if (ren) renameLabourer(ren, e.target.dataset.name || '');
-        if (rem) removeLabourer(rem);
-    });
     document.getElementById('closeTeamBtn').addEventListener('click', closeTeamModal);
     document.querySelectorAll('[data-team-tab]').forEach(t => t.addEventListener('click', () => showTeamTab(t.dataset.teamTab)));
     document.getElementById('teamYsSelectAll').addEventListener('change', (e) => {
@@ -924,7 +835,6 @@ function setupEventListeners() {
     document.getElementById('teamSelectAllCheckbox').addEventListener('change', (e) => toggleSelectAll(e.target.checked));
 
     document.getElementById('downloadTeamSelectedBtn').addEventListener('click', downloadSelectedTeamData);
-    document.getElementById('renameEnterpriseBtn').addEventListener('click', renameEnterprise);
     document.getElementById('teamYsList').addEventListener('change', (e) => {
         const id = e.target.dataset.ysMember;
         if (!id) return;

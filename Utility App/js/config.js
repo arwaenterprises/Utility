@@ -18,7 +18,7 @@ const APPS = [
     { id: 'priceCheck', name: 'Price Check', nameAr: 'التحقق من السعر', icon: '💰', description: 'Check item price by barcode', descAr: 'معرفة سعر القطعة بالباركود', sessionRequired: false, containerId: 'priceCheckApp' },
     { id: 'yearSegregate', name: 'Year/Season Sort', nameAr: 'الفرز حسب السنة والموسم', icon: '🗂️', description: 'Sort items by year & season into PTL boxes', descAr: 'فرز القطع حسب السنة والموسم في صناديق PTL', sessionRequired: true, containerId: 'yearSegregateApp' },
     // modal: true = opens a window (Data Management) instead of a tool screen
-    { id: 'dataManagement', name: 'Data Management', nameAr: 'إدارة البيانات', icon: '🗄️', iconImg: 'icons/ui-data.png', description: 'View, download or reset your scans', descAr: 'عرض عمليات المسح أو تحميلها أو إعادة ضبطها', sessionRequired: false, modal: true }
+    { id: 'dataManagement', name: 'Team & Data', nameAr: 'الفريق والبيانات', icon: '🗄️', iconImg: 'icons/ui-data.png', description: 'Jobs, QR links, people and data', descAr: 'المهام وروابط QR والأشخاص والبيانات', sessionRequired: false, modal: true }
 ];
 
 // A tool's name / one-line description in the app language (Arabic when the app is Arabic; see js/lang.js).

@@ -1400,3 +1400,425 @@ where tier = 'individual' and enterprise_id is null and coalesce(email, '') <> '
 -- delete_my_account() was added and then removed again (owner's decision). If an earlier version of this
 -- file was run on your database, this line removes the function; it does nothing otherwise.
 drop function if exists public.delete_my_account();
+
+
+-- ============================================
+-- TEAM & DATA WORKSPACE (admin screens: Overview, Jobs, People, Data)
+-- ============================================
+-- Everything here is for the enterprise ADMIN and works on summaries computed in the database, one page at a
+-- time, so the screens stay fast with many jobs, people and scans. Nothing here changes or removes the older
+-- functions (the older Data Management window still uses them for members and individuals).
+--  * "job" = one Team QR link. A scan's job name is its Remark, so unlinked (older) scans can be found by Remark too.
+--  * lists return at most 100 rows a page (the API itself returns at most about 1000 rows per request)
+--  * deletes are by filter, and only rows scanned up to the moment the download started are removed
+create index if not exists scans_link_id_idx on public.scans(link_id) where link_id is not null;
+create index if not exists ys_scans_link_id_idx on public.ys_scans(link_id) where link_id is not null;
+create index if not exists scans_ent_time_idx on public.scans(enterprise_id, scanned_at desc);
+create index if not exists ys_scans_ent_time_idx on public.ys_scans(enterprise_id, scanned_at desc);
+create index if not exists scans_ent_remark_idx on public.scans(enterprise_id, remark);
+create index if not exists ys_scans_ent_remark_idx on public.ys_scans(enterprise_id, remark);
+
+-- ---- Jobs ----
+
+drop function if exists public.ws_jobs(text, text, text, text, integer, integer);
+create or replace function public.ws_jobs(
+    p_search text default '', p_tool text default '', p_status text default 'active', p_sort text default 'last_scan',
+    p_limit integer default 25, p_offset integer default 0)
+returns table (id uuid, tool text, job_name text, token text, created_at timestamptz, stopped_at timestamptz,
+               last_scan_at timestamptz, state text, people bigint, boxes bigint, units bigint, total_count bigint)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    with page as (
+        select l.*, count(*) over () as total
+        from public.team_links l
+        where public.current_user_is_enterprise_admin()
+          and l.enterprise_id = public.current_user_enterprise_id()
+          and (coalesce(p_tool, '') = '' or l.tool = p_tool)
+          and (coalesce(p_status, 'active') = 'all'
+               or (coalesce(p_status, 'active') = 'active' and l.stopped_at is null)
+               or (p_status = 'stopped' and l.stopped_at is not null))
+          and (btrim(coalesce(p_search, '')) = '' or l.job_name ilike '%' || btrim(p_search) || '%')
+        order by (case when p_sort = 'name' then lower(l.job_name) end) asc,
+                 (case when p_sort = 'created' then l.created_at end) desc,
+                 coalesce(l.last_scan_at, l.created_at) desc, l.id
+        limit least(greatest(coalesce(p_limit, 25), 1), 100) offset greatest(coalesce(p_offset, 0), 0)
+    )
+    select pg.id, pg.tool, pg.job_name, pg.token, pg.created_at, pg.stopped_at, pg.last_scan_at,
+           public.team_link_state(pg.stopped_at, pg.last_scan_at, pg.created_at),
+           (select count(*) from public.team_operators o
+             where o.link_id = pg.id and o.removed_at is null
+               and o.joined_at = (select max(x.joined_at) from public.team_operators x where x.user_id = o.user_id and x.removed_at is null)),
+           coalesce(a.boxes, 0), coalesce(a.units, 0), pg.total
+    from page pg
+    left join lateral (
+        select count(distinct t.box) filter (where t.st = 'Closed') as boxes, sum(t.qty)::bigint as units
+        from (select s.box_number as box, s.box_status as st, s.qty from public.scans s where s.link_id = pg.id and pg.tool <> 'yearSegregate'
+              union all
+              select y.box_barcode, y.box_status, y.qty from public.ys_scans y where y.link_id = pg.id and pg.tool = 'yearSegregate') t
+    ) a on true
+    order by (case when p_sort = 'name' then lower(pg.job_name) end) asc,
+             (case when p_sort = 'created' then pg.created_at end) desc,
+             coalesce(pg.last_scan_at, pg.created_at) desc, pg.id;
+$$;
+
+-- the boxes of one job (paged), newest first
+drop function if exists public.ws_job_boxes(uuid, text, integer, integer);
+create or replace function public.ws_job_boxes(p_link_id uuid, p_search text default '', p_limit integer default 25, p_offset integer default 0)
+returns table (box text, status text, items bigint, scanned_by text, last_at timestamptz, total_count bigint)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    with lk as (
+        select * from public.team_links
+        where id = p_link_id and public.current_user_is_enterprise_admin() and enterprise_id = public.current_user_enterprise_id()
+    ),
+    r as (
+        select s.box_number as box, s.box_status as st, s.qty, s.operator_name as who, s.scanned_at, s.barcode
+        from public.scans s join lk on lk.id = s.link_id where lk.tool <> 'yearSegregate'
+        union all
+        select y.box_barcode, y.box_status, y.qty, y.operator_name, y.scanned_at, y.barcode
+        from public.ys_scans y join lk on lk.id = y.link_id where lk.tool = 'yearSegregate'
+    ),
+    f as (
+        select * from r
+        where btrim(coalesce(p_search, '')) = ''
+           or box ilike '%' || btrim(p_search) || '%' or barcode ilike '%' || btrim(p_search) || '%' or who ilike '%' || btrim(p_search) || '%'
+    ),
+    g as (
+        select box, case when bool_and(st = 'Closed') then 'Closed' else 'Open' end as status, sum(qty)::bigint as items,
+               (array_agg(who order by scanned_at desc))[1] as who, max(scanned_at) as last_at
+        from f group by box
+    )
+    select g.box, g.status, g.items, g.who, g.last_at, count(*) over ()
+    from g order by g.last_at desc, g.box
+    limit least(greatest(coalesce(p_limit, 25), 1), 100) offset greatest(coalesce(p_offset, 0), 0);
+$$;
+
+-- the people of one job with their own totals
+drop function if exists public.ws_job_people(uuid);
+create or replace function public.ws_job_people(p_link_id uuid)
+returns table (operator_id uuid, name text, joined_at timestamptz, removed_at timestamptz, boxes bigint, units bigint, last_at timestamptz)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select o.id, o.name, o.joined_at, o.removed_at, coalesce(a.boxes, 0), coalesce(a.units, 0), a.last_at
+    from public.team_operators o
+    join public.team_links l on l.id = o.link_id
+    left join lateral (
+        select count(distinct t.box) filter (where t.st = 'Closed') as boxes, sum(t.qty)::bigint as units, max(t.at) as last_at
+        from (select s.box_number as box, s.box_status as st, s.qty, s.scanned_at as at from public.scans s
+               where s.link_id = o.link_id and s.user_id = o.user_id and l.tool <> 'yearSegregate'
+              union all
+              select y.box_barcode, y.box_status, y.qty, y.scanned_at from public.ys_scans y
+               where y.link_id = o.link_id and y.user_id = o.user_id and l.tool = 'yearSegregate') t
+    ) a on true
+    where o.link_id = p_link_id
+      and public.current_user_is_enterprise_admin() and l.enterprise_id = public.current_user_enterprise_id()
+    order by (o.removed_at is not null), lower(o.name);
+$$;
+
+-- units per hour for the last p_hours hours (zero-filled), for the Activity tab
+drop function if exists public.ws_job_activity(uuid, integer);
+create or replace function public.ws_job_activity(p_link_id uuid, p_hours integer default 24)
+returns table (hour timestamptz, units bigint)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    with lk as (
+        select * from public.team_links
+        where id = p_link_id and public.current_user_is_enterprise_admin() and enterprise_id = public.current_user_enterprise_id()
+    ),
+    h as (
+        select generate_series(date_trunc('hour', now()) - make_interval(hours => least(greatest(coalesce(p_hours, 24), 1), 168) - 1),
+                               date_trunc('hour', now()), interval '1 hour') as hr
+    ),
+    s as (
+        select date_trunc('hour', x.at) as hr, sum(x.qty) as q
+        from (select sc.scanned_at as at, sc.qty from public.scans sc join lk on lk.id = sc.link_id where lk.tool <> 'yearSegregate'
+              union all
+              select ys.scanned_at, ys.qty from public.ys_scans ys join lk on lk.id = ys.link_id where lk.tool = 'yearSegregate') x
+        where x.at >= date_trunc('hour', now()) - make_interval(hours => least(greatest(coalesce(p_hours, 24), 1), 168) - 1)
+        group by 1
+    )
+    select h.hr, coalesce(s.q, 0)::bigint from h left join s on s.hr = h.hr
+    where exists (select 1 from lk)
+    order by h.hr;
+$$;
+
+-- ---- Data explorer: one filter, used by the list, the export and the delete ----
+-- Internal helper (not callable from the API): the scans of one enterprise that match the filters, from the table of
+-- the chosen tool. p_jobs holds Remarks (job names); capitals and end spaces do not matter.
+create or replace function public.ws_filtered_scans(
+    p_ent uuid, p_tool text, p_jobs text[], p_person text, p_from timestamptz, p_to timestamptz, p_status text, p_search text)
+returns table (id uuid, scanned_at timestamptz, user_id uuid, remark text, person text, box text, barcode text,
+               qty integer, status text, extra jsonb)
+language sql
+stable
+as $$
+    select s.id, s.scanned_at, s.user_id, s.remark, coalesce(nullif(s.operator_name, ''), nullif(p.display_name, ''), p.email, ''),
+           s.box_number, s.barcode, s.qty, s.box_status, null::jsonb
+    from public.scans s join public.profiles p on p.id = s.user_id
+    where p_tool = 'boxScanner' and s.enterprise_id = p_ent
+      and (p_jobs is null or lower(btrim(coalesce(s.remark, ''))) = any (array(select lower(btrim(j)) from unnest(p_jobs) j)))
+      and (coalesce(p_person, '') = '' or lower(coalesce(nullif(s.operator_name, ''), nullif(p.display_name, ''), p.email, '')) = lower(btrim(p_person)))
+      and (p_from is null or s.scanned_at >= p_from) and (p_to is null or s.scanned_at < p_to)
+      and (coalesce(p_status, '') = '' or s.box_status = p_status)
+      and (btrim(coalesce(p_search, '')) = '' or s.box_number ilike '%' || btrim(p_search) || '%' or s.barcode ilike '%' || btrim(p_search) || '%'
+           or s.remark ilike '%' || btrim(p_search) || '%' or s.operator_name ilike '%' || btrim(p_search) || '%' or p.display_name ilike '%' || btrim(p_search) || '%')
+    union all
+    select y.id, y.scanned_at, y.user_id, y.remark, coalesce(nullif(y.operator_name, ''), nullif(p.display_name, ''), p.email, ''),
+           y.box_barcode, y.barcode, y.qty, y.box_status,
+           jsonb_build_object('ptl', y.ptl_number, 'season', y.season, 'year', y.year, 'brand', y.brand, 'staff', y.staff_name, 'ts', y.scan_timestamp)
+    from public.ys_scans y join public.profiles p on p.id = y.user_id
+    where p_tool = 'yearSegregate' and y.enterprise_id = p_ent
+      and (p_jobs is null or lower(btrim(coalesce(y.remark, ''))) = any (array(select lower(btrim(j)) from unnest(p_jobs) j)))
+      and (coalesce(p_person, '') = '' or lower(coalesce(nullif(y.operator_name, ''), nullif(p.display_name, ''), p.email, '')) = lower(btrim(p_person)))
+      and (p_from is null or y.scanned_at >= p_from) and (p_to is null or y.scanned_at < p_to)
+      and (coalesce(p_status, '') = '' or y.box_status = p_status)
+      and (btrim(coalesce(p_search, '')) = '' or y.box_barcode ilike '%' || btrim(p_search) || '%' or y.barcode ilike '%' || btrim(p_search) || '%'
+           or y.remark ilike '%' || btrim(p_search) || '%' or y.operator_name ilike '%' || btrim(p_search) || '%' or p.display_name ilike '%' || btrim(p_search) || '%');
+$$;
+revoke execute on function public.ws_filtered_scans(uuid, text, text[], text, timestamptz, timestamptz, text, text) from public, anon, authenticated;
+
+-- a page of boxes that match, plus the totals of everything that matches
+drop function if exists public.ws_data_boxes(text, text[], text, timestamptz, timestamptz, text, text, integer, integer);
+create or replace function public.ws_data_boxes(
+    p_tool text, p_jobs text[], p_person text, p_from timestamptz, p_to timestamptz, p_status text, p_search text,
+    p_limit integer default 50, p_offset integer default 0)
+returns table (box text, job text, person text, status text, items bigint, last_at timestamptz, total_boxes bigint, total_units bigint, total_rows bigint)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    with f as (
+        select * from public.ws_filtered_scans(public.current_user_enterprise_id(), p_tool, p_jobs, p_person, p_from, p_to, p_status, p_search)
+        where public.current_user_is_enterprise_admin()
+    ),
+    g as (
+        select f.box, f.remark as job, (array_agg(f.person order by f.scanned_at desc))[1] as person,
+               case when bool_and(f.status = 'Closed') then 'Closed' else 'Open' end as status,
+               sum(f.qty)::bigint as items, max(f.scanned_at) as last_at, count(*)::bigint as n
+        from f group by f.box, f.remark
+    )
+    select g.box, g.job, g.person, g.status, g.items, g.last_at, count(*) over (), sum(g.items) over ()::bigint, sum(g.n) over ()::bigint
+    from g order by g.last_at desc, g.box, g.job
+    limit least(greatest(coalesce(p_limit, 50), 1), 100) offset greatest(coalesce(p_offset, 0), 0);
+$$;
+
+-- the scan rows behind a filter, for downloads: keyset-paged, at most 1000 per call
+drop function if exists public.ws_data_rows(text, text[], text, timestamptz, timestamptz, text, text, timestamptz, uuid, timestamptz, integer);
+create or replace function public.ws_data_rows(
+    p_tool text, p_jobs text[], p_person text, p_from timestamptz, p_to timestamptz, p_status text, p_search text,
+    p_after_at timestamptz default null, p_after_id uuid default null, p_until timestamptz default null, p_limit integer default 1000)
+returns table (id uuid, scanned_at timestamptz, person text, job text, box text, barcode text, qty integer, status text, extra jsonb)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select f.id, f.scanned_at, f.person, f.remark, f.box, f.barcode, f.qty, f.status, f.extra
+    from public.ws_filtered_scans(public.current_user_enterprise_id(), p_tool, p_jobs, p_person, p_from, p_to, p_status, p_search) f
+    where public.current_user_is_enterprise_admin()
+      and (p_until is null or f.scanned_at <= p_until)
+      and (p_after_at is null or (f.scanned_at, f.id) > (p_after_at, coalesce(p_after_id, '00000000-0000-0000-0000-000000000000'::uuid)))
+    order by f.scanned_at, f.id
+    limit least(greatest(coalesce(p_limit, 1000), 1), 1000);
+$$;
+
+-- deletes everything that matches the filter and was scanned up to p_until (the moment the download started)
+drop function if exists public.ws_data_delete(text, text[], text, timestamptz, timestamptz, text, text, timestamptz);
+create or replace function public.ws_data_delete(
+    p_tool text, p_jobs text[], p_person text, p_from timestamptz, p_to timestamptz, p_status text, p_search text, p_until timestamptz)
+returns bigint
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_eid uuid := public.current_user_enterprise_id();
+    n bigint := 0;
+begin
+    if not public.current_user_is_enterprise_admin() then
+        raise exception 'Only the enterprise admin can delete team data.';
+    end if;
+    if p_until is null then
+        raise exception 'Delete needs the time the download started.';
+    end if;
+    if p_tool = 'boxScanner' then
+        with d as (
+            delete from public.scans where id in (
+                select f.id from public.ws_filtered_scans(v_eid, p_tool, p_jobs, p_person, p_from, p_to, p_status, p_search) f where f.scanned_at <= p_until)
+            returning 1)
+        select count(*) into n from d;
+    elsif p_tool = 'yearSegregate' then
+        with d as (
+            delete from public.ys_scans where id in (
+                select f.id from public.ws_filtered_scans(v_eid, p_tool, p_jobs, p_person, p_from, p_to, p_status, p_search) f where f.scanned_at <= p_until)
+            returning 1)
+        select count(*) into n from d;
+    else
+        raise exception 'Please choose a tool.';
+    end if;
+    return n;
+end;
+$$;
+
+-- values for the Job and Person pickers (searchable, at most 50)
+drop function if exists public.ws_facets(text, text, text, integer);
+create or replace function public.ws_facets(p_kind text, p_tool text, p_search text default '', p_limit integer default 50)
+returns table (value text, units bigint)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select v, sum(q)::bigint from (
+        select case when p_kind = 'job' then coalesce(s.remark, '') else coalesce(nullif(s.operator_name, ''), nullif(p.display_name, ''), p.email, '') end as v, s.qty as q
+        from public.scans s join public.profiles p on p.id = s.user_id
+        where p_tool = 'boxScanner' and s.enterprise_id = public.current_user_enterprise_id()
+        union all
+        select case when p_kind = 'job' then coalesce(y.remark, '') else coalesce(nullif(y.operator_name, ''), nullif(p.display_name, ''), p.email, '') end, y.qty
+        from public.ys_scans y join public.profiles p on p.id = y.user_id
+        where p_tool = 'yearSegregate' and y.enterprise_id = public.current_user_enterprise_id()
+    ) t
+    where public.current_user_is_enterprise_admin() and p_kind in ('job', 'person') and v <> ''
+      and (btrim(coalesce(p_search, '')) = '' or v ilike '%' || btrim(p_search) || '%')
+    group by v order by sum(q) desc, v
+    limit least(greatest(coalesce(p_limit, 50), 1), 50);
+$$;
+
+-- ---- People ----
+-- Labourers (joined by QR) are one person per name, whatever handheld or job; Google accounts are one person each.
+-- Sorted by name, so only the people on the page need their scan totals worked out.
+create index if not exists scans_ent_op_idx on public.scans(enterprise_id, lower(btrim(operator_name))) where operator_name is not null;
+create index if not exists ys_scans_ent_op_idx on public.ys_scans(enterprise_id, lower(btrim(operator_name))) where operator_name is not null;
+drop function if exists public.ws_people(text, text, integer, integer);
+create or replace function public.ws_people(p_search text default '', p_type text default 'all', p_limit integer default 25, p_offset integer default 0)
+returns table (person_key text, name text, kind text, jobs text, boxes bigint, units bigint, last_at timestamptz,
+               operator_ids uuid[], user_id uuid, total_count bigint)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    with ent as (select public.current_user_enterprise_id() as id where public.current_user_is_enterprise_admin()),
+    lab as (
+        select 'o:' || lower(btrim(o.name)) as pk, (array_agg(o.name order by o.joined_at desc))[1] as nm, 'labourer'::text as kd,
+               string_agg(distinct l.job_name, ', ') as jobs, array_agg(o.id) as ops, null::uuid as uid, lower(btrim(o.name)) as k
+        from public.team_operators o join public.team_links l on l.id = o.link_id, ent
+        where o.enterprise_id = ent.id and o.removed_at is null
+        group by lower(btrim(o.name))
+    ),
+    acc as (
+        select 'u:' || p.id::text as pk, coalesce(nullif(p.display_name, ''), p.email) as nm, 'google'::text as kd,
+               null::text as jobs, null::uuid[] as ops, p.id as uid, null::text as k
+        from public.profiles p, ent where p.enterprise_id = ent.id and p.tier <> 'operator'
+    ),
+    allp as (select * from lab union all select * from acc),
+    pg as (
+        select a.*, count(*) over () as total from allp a
+        where (coalesce(p_type, 'all') = 'all' or a.kd = p_type)
+          and (btrim(coalesce(p_search, '')) = '' or a.nm ilike '%' || btrim(p_search) || '%' or coalesce(a.jobs, '') ilike '%' || btrim(p_search) || '%')
+        order by lower(a.nm), a.pk
+        limit least(greatest(coalesce(p_limit, 25), 1), 100) offset greatest(coalesce(p_offset, 0), 0)
+    )
+    select pg.pk, pg.nm, pg.kd, coalesce(pg.jobs, ag.jobs), coalesce(ag.boxes, 0), coalesce(ag.units, 0), ag.last_at, pg.ops, pg.uid, pg.total
+    from pg, ent
+    left join lateral (
+        select count(distinct (t.box, t.remark)) filter (where t.st = 'Closed') as boxes, sum(t.qty)::bigint as units, max(t.at) as last_at,
+               string_agg(distinct t.remark, ', ') as jobs
+        from (select s.box_number as box, s.remark, s.box_status as st, s.qty, s.scanned_at as at from public.scans s
+               where pg.kd = 'labourer' and s.enterprise_id = ent.id and lower(btrim(s.operator_name)) = pg.k
+              union all
+              select s.box_number, s.remark, s.box_status, s.qty, s.scanned_at from public.scans s
+               where pg.kd = 'google' and s.user_id = pg.uid and s.operator_name is null
+              union all
+              select y.box_barcode, y.remark, y.box_status, y.qty, y.scanned_at from public.ys_scans y
+               where pg.kd = 'labourer' and y.enterprise_id = ent.id and lower(btrim(y.operator_name)) = pg.k
+              union all
+              select y.box_barcode, y.remark, y.box_status, y.qty, y.scanned_at from public.ys_scans y
+               where pg.kd = 'google' and y.user_id = pg.uid and y.operator_name is null) t
+    ) ag on true
+    order by lower(pg.nm), pg.pk;
+$$;
+
+-- ---- Overview ----
+-- p_since = the start of "today" on the admin's device; p_idle_hours = after how long without a scan an active job counts as idle
+drop function if exists public.ws_overview(timestamptz, integer);
+create or replace function public.ws_overview(p_since timestamptz, p_idle_hours integer default 24)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+stable
+as $$
+declare
+    v_eid uuid := public.current_user_enterprise_id();
+    r jsonb;
+begin
+    if not public.current_user_is_enterprise_admin() then
+        raise exception 'Only the enterprise admin can open the overview.';
+    end if;
+    with t as (
+        select s.operator_name as who, s.user_id, s.remark, s.box_number as box, s.box_status as st, s.qty, s.scanned_at as at
+        from public.scans s where s.enterprise_id = v_eid and s.scanned_at >= least(p_since, now() - interval '30 minutes')
+        union all
+        select y.operator_name, y.user_id, y.remark, y.box_barcode, y.box_status, y.qty, y.scanned_at
+        from public.ys_scans y where y.enterprise_id = v_eid and y.scanned_at >= least(p_since, now() - interval '30 minutes')
+    ),
+    today as (select * from t where at >= p_since),
+    top as (select remark as job, sum(qty)::bigint as units from today group by remark order by sum(qty) desc, remark limit 8),
+    idle as (
+        select l.id, l.job_name, l.tool, l.last_scan_at, l.created_at from public.team_links l
+        where l.enterprise_id = v_eid and l.stopped_at is null
+          and coalesce(l.last_scan_at, l.created_at) < now() - make_interval(hours => greatest(coalesce(p_idle_hours, 24), 1))
+        order by coalesce(l.last_scan_at, l.created_at) limit 10
+    )
+    select jsonb_build_object(
+        'active_jobs', (select count(*) from public.team_links where enterprise_id = v_eid and stopped_at is null),
+        'stopped_jobs', (select count(*) from public.team_links where enterprise_id = v_eid and stopped_at is not null),
+        'people_now', (select count(distinct coalesce(lower(btrim(who)), user_id::text)) from t where at >= now() - interval '30 minutes'),
+        'units_today', coalesce((select sum(qty) from today), 0),
+        'boxes_today', (select count(distinct (box, remark)) filter (where st = 'Closed') from today),
+        'top_jobs', coalesce((select jsonb_agg(jsonb_build_object('job', job, 'units', units) order by units desc, job) from top), '[]'::jsonb),
+        'idle_jobs', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'job', job_name, 'tool', tool, 'last_scan_at', last_scan_at, 'created_at', created_at)) from idle), '[]'::jsonb),
+        'idle_total', (select count(*) from public.team_links l where l.enterprise_id = v_eid and l.stopped_at is null
+                        and coalesce(l.last_scan_at, l.created_at) < now() - make_interval(hours => greatest(coalesce(p_idle_hours, 24), 1))),
+        'quiet_people', (select count(*) from public.team_operators o where o.enterprise_id = v_eid and o.removed_at is null
+                          and not exists (select 1 from public.scans s where s.enterprise_id = v_eid and s.operator_name = o.name and s.scanned_at >= now() - interval '7 days')
+                          and not exists (select 1 from public.ys_scans y where y.enterprise_id = v_eid and y.operator_name = o.name and y.scanned_at >= now() - interval '7 days'))
+    ) into r;
+    return r;
+end;
+$$;
+
+revoke execute on function public.ws_jobs(text, text, text, text, integer, integer) from public, anon;
+revoke execute on function public.ws_job_boxes(uuid, text, integer, integer) from public, anon;
+revoke execute on function public.ws_job_people(uuid) from public, anon;
+revoke execute on function public.ws_job_activity(uuid, integer) from public, anon;
+revoke execute on function public.ws_data_boxes(text, text[], text, timestamptz, timestamptz, text, text, integer, integer) from public, anon;
+revoke execute on function public.ws_data_rows(text, text[], text, timestamptz, timestamptz, text, text, timestamptz, uuid, timestamptz, integer) from public, anon;
+revoke execute on function public.ws_data_delete(text, text[], text, timestamptz, timestamptz, text, text, timestamptz) from public, anon;
+revoke execute on function public.ws_facets(text, text, text, integer) from public, anon;
+revoke execute on function public.ws_people(text, text, integer, integer) from public, anon;
+revoke execute on function public.ws_overview(timestamptz, integer) from public, anon;
+grant execute on function public.ws_jobs(text, text, text, text, integer, integer) to authenticated;
+grant execute on function public.ws_job_boxes(uuid, text, integer, integer) to authenticated;
+grant execute on function public.ws_job_people(uuid) to authenticated;
+grant execute on function public.ws_job_activity(uuid, integer) to authenticated;
+grant execute on function public.ws_data_boxes(text, text[], text, timestamptz, timestamptz, text, text, integer, integer) to authenticated;
+grant execute on function public.ws_data_rows(text, text[], text, timestamptz, timestamptz, text, text, timestamptz, uuid, timestamptz, integer) to authenticated;
+grant execute on function public.ws_data_delete(text, text[], text, timestamptz, timestamptz, text, text, timestamptz) to authenticated;
+grant execute on function public.ws_facets(text, text, text, integer) to authenticated;
+grant execute on function public.ws_people(text, text, integer, integer) to authenticated;
+grant execute on function public.ws_overview(timestamptz, integer) to authenticated;
