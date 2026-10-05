@@ -1830,3 +1830,6 @@ grant execute on function public.ws_data_delete(text, text[], text, timestamptz,
 grant execute on function public.ws_facets(text, text, text, integer) to authenticated;
 grant execute on function public.ws_people(text, text, integer, integer) to authenticated;
 grant execute on function public.ws_overview(timestamptz, integer) to authenticated;
+
+-- Make the API (PostgREST) notice new or changed functions straight away (harmless if nothing changed).
+notify pgrst, 'reload schema';

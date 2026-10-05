@@ -160,7 +160,7 @@ const HELP = {
                 'Each labourer scans the QR with the phone&rsquo;s own camera or QR scanner, checks the names, types their name and taps <b>Join</b>. That handheld then shows only that one tool.',
                 'Tap a job&rsquo;s name to open it: see its boxes, who joined and their totals, and activity per hour. Tap <b>QR</b> to show its code again, or <b>Stop this link</b> to end the job.',
                 'Under <b>People</b> you see labourers and Google members with their jobs and totals. You can correct a name or remove a person, or tap <b>View data</b> for their scans.',
-                'Under <b>Data</b> filter by tool, job, person, dates and box status. <b>Download everything that matches</b> gives Excel files (large downloads are split into several files). <b>Download and delete</b> downloads first, then deletes exactly those scans after you type DELETE.'
+                'Under <b>Data</b> filter by tool, job, person, dates and box status. <b>Download everything that matches</b> gives Excel files (large downloads are split into several files). <b>Download and delete</b> downloads first, then deletes exactly those scans after you confirm.'
             ],
             tips: [
                 'Creating a link with the <b>same tool and same job name</b> replaces only that job&rsquo;s old link. Other jobs are not affected.',
@@ -180,7 +180,7 @@ const HELP = {
                 'يمسح كل عامل الرمز بكاميرا الهاتف أو ماسح QR، ويتأكد من الأسماء، ويكتب اسمه ثم يضغط <b>انضمام</b>. بعدها يعرض الجهاز تلك الأداة فقط.',
                 'اضغط على اسم المهمة لفتحها: ترى صناديقها ومن انضم وإجمالياتهم والنشاط في كل ساعة. اضغط <b>QR</b> لعرض رمزها مرة أخرى، أو <b>إيقاف هذا الرابط</b> لإنهاء المهمة.',
                 'تحت <b>الأشخاص</b> ترى العمال وأعضاء Google مع مهامهم وإجمالياتهم. يمكنك تصحيح اسم أو إزالة شخص، أو الضغط على <b>عرض البيانات</b> لرؤية عمليات مسحه.',
-                'تحت <b>البيانات</b> رشّح حسب الأداة والمهمة والشخص والتواريخ وحالة الصندوق. <b>تحميل كل ما يطابق</b> يعطيك ملفات Excel (التحميلات الكبيرة تُقسَّم إلى عدة ملفات). <b>تحميل ثم حذف</b> يحمّل أولًا ثم يحذف تلك العمليات تحديدًا بعد أن تكتب DELETE.'
+                'تحت <b>البيانات</b> رشّح حسب الأداة والمهمة والشخص والتواريخ وحالة الصندوق. <b>تحميل كل ما يطابق</b> يعطيك ملفات Excel (التحميلات الكبيرة تُقسَّم إلى عدة ملفات). <b>تحميل ثم حذف</b> يحمّل أولًا ثم يحذف تلك العمليات تحديدًا بعد أن تؤكد.'
             ],
             tips: [
                 'إنشاء رابط بنفس الأداة ونفس اسم المهمة يحلّ محل الرابط القديم لتلك المهمة فقط. المهام الأخرى لا تتأثر.',

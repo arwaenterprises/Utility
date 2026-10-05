@@ -228,15 +228,14 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   ok('Download all pages through the rows 1000 at a time and writes one Excel file', dlj.files.length === 1 && /^job_Inbound_7_/.test(dlj.files[0]) && dlj.pages === 3, JSON.stringify(dlj));
   ok('...asking for exactly this job, with a cut-off time', JSON.stringify(dlj.args.p_jobs) === '["Inbound 7"]' && dlj.args.p_tool === 'boxScanner' && !!dlj.args.p_until, JSON.stringify(dlj.args));
   ok('...and says how many scans were downloaded', /2,500/.test(dlj.status), dlj.status);
-  // delete: needs the typed word, downloads first, then deletes up to the cut-off
+  // delete: one confirmation, downloads first, then deletes up to the cut-off
   await page.evaluate(() => { window.__files.length = 0; window.__rpcLog = []; });
   await page.click('[data-ws="job-delete"]'); await wait(200);
-  ok('Download and delete opens a dialog that names the job and the counts', await page.evaluate(() => /Inbound 7/.test(document.getElementById('wsDialogBody').textContent) && /permanently/.test(document.getElementById('wsDialogBody').textContent) && !document.getElementById('wsDialogInput').hidden));
-  ok('...OK is disabled until DELETE is typed', await page.evaluate(() => document.getElementById('wsDialogOk').disabled));
-  await page.fill('#wsDialogInput', 'delete me'); ok('...a wrong word keeps it disabled', await page.evaluate(() => document.getElementById('wsDialogOk').disabled));
+  ok('Download and delete opens a dialog that names the job and the counts', await page.evaluate(() => /Inbound 7/.test(document.getElementById('wsDialogBody').textContent) && /permanently/.test(document.getElementById('wsDialogBody').textContent) && !/Type DELETE/.test(document.getElementById('wsDialogBody').textContent)));
+  ok('...there is nothing to type: the red button confirms', await page.evaluate(() => document.getElementById('wsDialogInput').hidden && !document.getElementById('wsDialogOk').disabled && document.getElementById('wsDialogOk').classList.contains('btn-danger')));
   await page.click('#wsDialogCancel'); await wait(200);
   ok('cancelling downloads and deletes nothing', (await page.evaluate(() => window.__files.length)) === 0 && !(await page.evaluate(() => window.__rpcLog.some(x => x.name === 'ws_data_delete'))));
-  await page.click('[data-ws="job-delete"]'); await page.fill('#wsDialogInput', 'delete'); await page.click('#wsDialogOk'); await wait(900);
+  await page.click('[data-ws="job-delete"]'); await page.click('#wsDialogOk'); await wait(900);
   const del = await page.evaluate(() => { const log = window.__rpcLog; const iDl = log.findIndex(x => x.name === 'ws_data_rows'), iDel = log.findIndex(x => x.name === 'ws_data_delete'); return { files: window.__files.length, order: iDl >= 0 && iDel > iDl, args: window.__wsDeleteArgs, status: document.getElementById('wsStatus').textContent }; });
   ok('the file is downloaded BEFORE the delete runs', del.files === 1 && del.order, JSON.stringify(del));
   ok('the delete is for this job only and only up to the moment the download started', JSON.stringify(del.args.p_jobs) === '["Inbound 7"]' && !!del.args.p_until && /Deleted 2,500/.test(del.status), JSON.stringify(del));
@@ -294,8 +293,8 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   await page.click('#wsDataList [data-ws-bsel]'); await wait(200);
   await page.evaluate(() => { window.__rpcLog = []; });
   await page.click('[data-ws="sel-delete"]'); await wait(200);
-  ok('Delete selected names the selected boxes and needs DELETE typed', await page.evaluate(() => /1 selected boxes/.test(document.getElementById('wsDialogBody').textContent) && /Inbound 9 \/ B2/.test(document.getElementById('wsDialogBody').textContent) && document.getElementById('wsDialogOk').disabled));
-  await page.fill('#wsDialogInput', 'DELETE'); await page.click('#wsDialogOk'); await wait(800);
+  ok('Delete selected names the selected boxes and asks for one confirmation', await page.evaluate(() => /1 selected boxes/.test(document.getElementById('wsDialogBody').textContent) && /Inbound 9 \/ B2/.test(document.getElementById('wsDialogBody').textContent) && !document.getElementById('wsDialogOk').disabled));
+  await page.click('#wsDialogOk'); await wait(800);
   const selDel = await page.evaluate(() => ({ args: window.__wsDeleteArgs, order: (() => { const l = window.__rpcLog; return l.findIndex(x => x.name === 'ws_data_rows') < l.findIndex(x => x.name === 'ws_data_delete'); })(), left: (window.__wsData || []).length }));
   ok('...it downloads first, then deletes only that box (the other stays)', selDel.order && JSON.stringify(selDel.args.p_boxes) === JSON.stringify(['inbound 9\u0001B2']) && selDel.left === 1, JSON.stringify(selDel));
   ok('...and the list shows the remaining box with nothing selected', /Inbound 8/.test(await page.textContent('#wsDataList')) && !/Inbound 9/.test(await page.textContent('#wsDataList')) && !/selected/.test(await page.textContent('#wsDataSel')));
@@ -311,7 +310,7 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   ok('Download everything that matches uses the same filters and writes the file', await page.evaluate(() => window.__files.length === 1 && /^team_data_/.test(window.__files[0])));
   await page.click('[data-ws="data-delete"]'); await wait(200);
   ok('Delete from Data names what will go, with the counts', await page.evaluate(() => /Box-Item Scan/.test(document.getElementById('wsDialogBody').textContent) && /2 boxes, 8 units/.test(document.getElementById('wsDialogBody').textContent)));
-  await page.fill('#wsDialogInput', 'DELETE'); await page.click('#wsDialogOk'); await wait(700);
+  await page.click('#wsDialogOk'); await wait(700);
   ok('...then it deletes and the list is empty', /Deleted 2/.test(await page.textContent('#wsStatus')) && /No data matches/.test(await page.textContent('#wsDataList')));
   // People
   await page.click('[data-ws-go="people"]:visible'); await wait(400);

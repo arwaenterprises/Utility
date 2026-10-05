@@ -47,7 +47,7 @@ const WS_T = {
         deleteMatches: 'Download and delete…', filesNote: 'Large downloads are split into several files of {n} rows.', clearFilters: 'Clear filters',
         // dialogs, progress
         deleteTitle: 'Download and delete', deleteLead: 'This will download the data first, then permanently delete it from the server.',
-        deleteScope: 'What will be deleted:', deleteCounts: '{b} boxes, {u} units', withScans: '({r} scans)', deleteTypeWord: 'Type DELETE to confirm.',
+        deleteScope: 'What will be deleted:', deleteCounts: '{b} boxes, {u} units', withScans: '({r} scans)',
         deleteNoData: 'Nothing matches, so there is nothing to delete.',
         preparing: 'Preparing download...', exporting: 'Downloading {n} of {t} scans ({p}%)...', deleting: 'Deleting...',
         downloaded: 'Downloaded {n} scans.', deleted: 'Deleted {n} scans. Scans made after the download started were kept.', noRows: 'There is nothing to download.',
@@ -88,7 +88,7 @@ const WS_T = {
         matches: '{b} صندوق، {u} قطعة مطابقة', selectedBoxes: 'تم تحديد {n} صندوق ({u} قطعة)', downloadSelected: 'تحميل المحدد', deleteSelected: 'تحميل ثم حذف المحدد…', clearSel: 'مسح التحديد', selectPage: 'تحديد كل ما في هذه الصفحة', selectBox: 'تحديد هذا الصندوق', selScope: '{n} صندوق محدد', noMatches: 'لا توجد بيانات مطابقة لهذه المرشحات.', downloadMatches: 'تحميل كل ما يطابق',
         deleteMatches: 'تحميل ثم حذف…', filesNote: 'التحميلات الكبيرة تُقسَّم إلى عدة ملفات، كل ملف {n} صف.', clearFilters: 'مسح المرشحات',
         deleteTitle: 'تحميل ثم حذف', deleteLead: 'سيتم تحميل البيانات أولًا ثم حذفها نهائيًا من الخادم.',
-        deleteScope: 'ما سيتم حذفه:', deleteCounts: '{b} صندوق، {u} قطعة', withScans: '({r} عملية مسح)', deleteTypeWord: 'اكتب DELETE للتأكيد.',
+        deleteScope: 'ما سيتم حذفه:', deleteCounts: '{b} صندوق، {u} قطعة', withScans: '({r} عملية مسح)',
         deleteNoData: 'لا شيء يطابق، لذا لا يوجد ما يُحذف.',
         preparing: 'جارٍ تجهيز التحميل...', exporting: 'جارٍ تحميل {n} من {t} عملية مسح ({p}%)...', deleting: 'جارٍ الحذف...',
         downloaded: 'تم تحميل {n} عملية مسح.', deleted: 'تم حذف {n} عملية مسح. عمليات المسح بعد بدء التحميل بقيت محفوظة.', noRows: 'لا يوجد ما يمكن تحميله.',
@@ -214,7 +214,7 @@ function wsStatus(text, opts) {
     if (opts && opts.hideAfter) wsStatusTimer = setTimeout(() => { el.hidden = true; }, opts.hideAfter);
 }
 
-// A confirmation window. With o.typed the OK button works only after that word is typed. Resolves true / false.
+// A confirmation window (with o.typed it would also ask for a word to be typed; the delete flows do not use it). Resolves true / false.
 function wsDialog(o) {
     return new Promise((resolve) => {
         const modal = wsEl('wsDialog'), input = wsEl('wsDialogInput'), ok = wsEl('wsDialogOk'), cancel = wsEl('wsDialogCancel');
@@ -754,8 +754,8 @@ async function wsDeleteFlow(o) {
     if (WS.busy) return;
     if (!o.totals || !o.totals.rows) { wsStatus(wsT('deleteNoData'), { hideAfter: 4000 }); return; }
     const ok = await wsDialog({
-        title: wsT('deleteTitle'), danger: true, ok: wsT('downloadDelete').replace('…', ''), typed: 'DELETE',
-        html: `<p>${wsEsc(wsT('deleteLead'))}</p><p><b>${wsEsc(wsT('deleteScope'))}</b><br>${o.scopeHtml}<br>${wsEsc(wsT('deleteCounts', { b: wsNum(o.totals.boxes), u: wsNum(o.totals.units) }) + (o.exact ? ' ' + wsT('withScans', { r: wsNum(o.totals.rows) }) : ''))}</p><p>${wsEsc(wsT('deleteTypeWord'))}</p>`
+        title: wsT('deleteTitle'), danger: true, ok: wsT('downloadDelete').replace('…', ''),
+        html: `<p>${wsEsc(wsT('deleteLead'))}</p><p><b>${wsEsc(wsT('deleteScope'))}</b><br>${o.scopeHtml}<br>${wsEsc(wsT('deleteCounts', { b: wsNum(o.totals.boxes), u: wsNum(o.totals.units) }) + (o.exact ? ' ' + wsT('withScans', { r: wsNum(o.totals.rows) }) : ''))}</p>`
     });
     if (!ok) return;
     WS.busy = true;
