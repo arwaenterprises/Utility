@@ -22,6 +22,7 @@ const TIP_AR = {
     'Remove from team': 'إزالة من الفريق',
     'Refresh Item Master & HU Config': 'تحديث Item Master وإعدادات HU',
     'Print a line of text above the barcode': 'اطبع سطرًا نصيًا فوق الباركود',
+    'Print a line of text above each code': 'اطبع سطرًا نصيًا فوق كل رمز',
     'Pallet mode: sort boxes by document / store': 'وضع الطبلية: فرز الصناديق حسب المستند / المتجر',
     'How to use this tool': 'طريقة استخدام هذه الأداة',
     "Download this member's data": 'تحميل بيانات هذا العضو',
