@@ -2378,7 +2378,7 @@ body.rtl .app-back-btn { transform: scaleX(-1); }
 .operator-bar .op-job { font-weight: 800; font-size: 16px; word-break: break-word; }
 .operator-bar .op-who { font-size: 12px; color: var(--ak-text-light); word-break: break-word; }
 .operator-bar .op-notice { margin-top: 6px; padding: 8px 10px; background: #fdecea; color: #8a1c10; border-radius: 6px; font-size: 13px; font-weight: 700; }
-body.operator-mode .app-back-btn, body.operator-mode #accountBtn { display: none !important; }
+body.operator-mode .app-back-btn { display: none !important; }
 
 /* ---------- Team QR links: admin list and QR sheet ---------- */
 .ql-hint, .ql-none { font-size: 13px; color: var(--ak-text-light); margin: 0 0 10px; }
@@ -2533,6 +2533,8 @@ body.rtl .ws-back { transform: scaleX(-1); }
     .ws-table td[data-label]::before { content: attr(data-label); color: var(--ak-text-light); font-size: 12px; text-align: start; flex: 0 0 auto; }
     .ws-table td:not([data-label]):not(.ws-chk):not(.ws-act) { display: block; text-align: start; }
     .ws-table td.ws-chk, .ws-table td.ws-act { justify-content: flex-start; width: auto; display: inline-flex; }
+    .ws-table tr.sel { background: #fbeff2; }
+    .ws-table tr.sel td { background: transparent; }
     .ws-table tr.ws-sub { padding: 4px; }
     .ws-table tr.ws-sub td { display: block; padding: 4px; }
     .ws-table .ws-mini tr { border: none; margin: 0; padding: 0; background: none; }

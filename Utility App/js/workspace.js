@@ -43,7 +43,7 @@ const WS_T = {
         sinceLast: 'since last scan', dataOfJob: 'Data of this job', downloadAll: 'Download all', downloadDelete: 'Download and delete…', thisBox: 'Download this box',
         // data
         tools: 'Tool', anyStatus: 'Any box status', anyJob: 'Type a job name to add it', anyPerson: 'Type a person to add them', searchData: 'Search box, barcode, person, job',
-        matches: '{b} boxes, {u} units match', noMatches: 'No data matches these filters.', downloadMatches: 'Download everything that matches',
+        matches: '{b} boxes, {u} units match', selectedBoxes: '{n} boxes selected ({u} units)', downloadSelected: 'Download selected', deleteSelected: 'Download and delete selected…', clearSel: 'Clear selection', selectPage: 'Select all on this page', selectBox: 'Select this box', selScope: '{n} selected boxes', noMatches: 'No data matches these filters.', downloadMatches: 'Download everything that matches',
         deleteMatches: 'Download and delete…', filesNote: 'Large downloads are split into several files of {n} rows.', clearFilters: 'Clear filters',
         // dialogs, progress
         deleteTitle: 'Download and delete', deleteLead: 'This will download the data first, then permanently delete it from the server.',
@@ -85,7 +85,7 @@ const WS_T = {
         noPeople: 'لم ينضم أحد إلى هذه المهمة بعد.', removed: 'تمت إزالته', rename: 'تغيير الاسم', remove: 'إزالة', unitsPerHour: 'القطع في الساعة، آخر 24 ساعة',
         sinceLast: 'منذ آخر مسح', dataOfJob: 'بيانات هذه المهمة', downloadAll: 'تحميل الكل', downloadDelete: 'تحميل ثم حذف…', thisBox: 'تحميل هذا الصندوق',
         tools: 'الأداة', anyStatus: 'أي حالة صندوق', anyJob: 'اكتب اسم مهمة لإضافتها', anyPerson: 'اكتب اسم شخص لإضافته', searchData: 'ابحث عن صندوق أو باركود أو شخص أو مهمة',
-        matches: '{b} صندوق، {u} قطعة مطابقة', noMatches: 'لا توجد بيانات مطابقة لهذه المرشحات.', downloadMatches: 'تحميل كل ما يطابق',
+        matches: '{b} صندوق، {u} قطعة مطابقة', selectedBoxes: 'تم تحديد {n} صندوق ({u} قطعة)', downloadSelected: 'تحميل المحدد', deleteSelected: 'تحميل ثم حذف المحدد…', clearSel: 'مسح التحديد', selectPage: 'تحديد كل ما في هذه الصفحة', selectBox: 'تحديد هذا الصندوق', selScope: '{n} صندوق محدد', noMatches: 'لا توجد بيانات مطابقة لهذه المرشحات.', downloadMatches: 'تحميل كل ما يطابق',
         deleteMatches: 'تحميل ثم حذف…', filesNote: 'التحميلات الكبيرة تُقسَّم إلى عدة ملفات، كل ملف {n} صف.', clearFilters: 'مسح المرشحات',
         deleteTitle: 'تحميل ثم حذف', deleteLead: 'سيتم تحميل البيانات أولًا ثم حذفها نهائيًا من الخادم.',
         deleteScope: 'ما سيتم حذفه:', deleteCounts: '{b} صندوق، {u} قطعة', withScans: '({r} عملية مسح)', deleteTypeWord: 'اكتب DELETE للتأكيد.',
@@ -152,7 +152,7 @@ const WS = {
     job: null,                       // the job open in the detail view
     jb: { tab: 'boxes', search: '', offset: 0, total: 0, rows: [], expanded: new Set(), items: new Map(), req: 0 },
     people: { search: '', type: 'all', offset: 0, total: 0, rows: [], req: 0 },
-    data: { tool: 'boxScanner', jobs: [], person: '', range: '7d', from: '', to: '', status: '', search: '', offset: 0, total: 0, totals: { boxes: 0, units: 0, rows: 0 }, rows: [], expanded: new Set(), items: new Map(), req: 0 },
+    data: { sel: new Map(), selSig: '', tool: 'boxScanner', jobs: [], person: '', range: '7d', from: '', to: '', status: '', search: '', offset: 0, total: 0, totals: { boxes: 0, units: 0, rows: 0 }, rows: [], expanded: new Set(), items: new Map(), req: 0 },
     overview: { req: 0 },
     busy: false
 };
@@ -466,12 +466,17 @@ function wsNormaliseRow(tool, s) {
     return { scanned_at: s.scanned_at, person, job: s.remark, box: s.box_number, barcode: s.barcode, qty: s.qty, status: s.box_status, extra: null };
 }
 
-function wsBoxesTable(rows, scope, expanded, items, tool, withJob) {
+function wsSelKey(b) { return String(b.job || '').trim().toLowerCase() + '\u0001' + b.box; }
+
+// sel (optional Map of selected boxes) adds a checkbox column: one per box and one in the header for the whole page.
+function wsBoxesTable(rows, scope, expanded, items, tool, withJob, sel) {
+    const extra = sel ? 1 : 0;
     const body = rows.map(b => {
         const key = scope + ':' + (b.job === null || b.job === undefined ? '' : b.job) + '\u0001' + b.box;
         const isOpen = expanded.has(key);
         const stat = `<span class="ws-pill ${b.status === 'Closed' ? 'ok' : 'warn'}">${wsEsc(b.status === 'Closed' ? wsT('closed') : wsT('open'))}</span>`;
-        let html = `<tr><td class="ws-chk"><button type="button" class="ws-exp" data-ws-exp="${wsEsc(key)}" aria-label="+">${isOpen ? '&minus;' : '+'}</button></td>
+        const picked = sel && sel.has(wsSelKey(b));
+        let html = `<tr class="${picked ? 'sel' : ''}">${sel ? `<td class="ws-chk"><input type="checkbox" data-ws-bsel="${wsEsc(wsSelKey(b))}" ${picked ? 'checked' : ''} aria-label="${wsEsc(wsT('selectBox'))}"></td>` : ''}<td class="ws-chk"><button type="button" class="ws-exp" data-ws-exp="${wsEsc(key)}" aria-label="+">${isOpen ? '&minus;' : '+'}</button></td>
             <td data-label="${wsEsc(wsT('box'))}"><b>${wsEsc(b.box)}</b></td>
             ${withJob ? `<td data-label="${wsEsc(wsT('job'))}">${wsEsc(b.job || '-')}</td>` : ''}
             <td data-label="${wsEsc(wsT('status'))}">${stat}</td>
@@ -481,11 +486,11 @@ function wsBoxesTable(rows, scope, expanded, items, tool, withJob) {
             <td class="ws-act"><button type="button" class="icon-btn" data-ws-boxdl="${wsEsc(key)}" title="${wsEsc(wsT('thisBox'))}" aria-label="${wsEsc(wsT('thisBox'))}">&#11015;</button></td></tr>`;
         if (isOpen) {
             const it = items.get(key);
-            html += `<tr class="ws-sub"><td colspan="${withJob ? 8 : 7}">${!it ? `<p class="ws-muted">${wsEsc(wsT('loading'))}</p>` : `<div class="ws-scroll"><table class="ws-table ws-mini"><thead><tr><th>Barcode</th><th>${wsEsc(wsT('by'))}</th><th>${wsEsc(wsT('when'))}</th></tr></thead><tbody>${it.map(s => `<tr><td>${wsEsc(s.barcode)}${Number(s.qty) > 1 ? ' &times;' + wsNum(s.qty) : ''}</td><td>${wsEsc(s.operator_name || s.profiles?.display_name || s.profiles?.email || '')}</td><td>${wsEsc(new Date(s.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</td></tr>`).join('')}</tbody></table></div>`}</td></tr>`;
+            html += `<tr class="ws-sub"><td colspan="${(withJob ? 8 : 7) + extra}">${!it ? `<p class="ws-muted">${wsEsc(wsT('loading'))}</p>` : `<div class="ws-scroll"><table class="ws-table ws-mini"><thead><tr><th>Barcode</th><th>${wsEsc(wsT('by'))}</th><th>${wsEsc(wsT('when'))}</th></tr></thead><tbody>${it.map(s => `<tr><td>${wsEsc(s.barcode)}${Number(s.qty) > 1 ? ' &times;' + wsNum(s.qty) : ''}</td><td>${wsEsc(s.operator_name || s.profiles?.display_name || s.profiles?.email || '')}</td><td>${wsEsc(new Date(s.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</td></tr>`).join('')}</tbody></table></div>`}</td></tr>`;
         }
         return html;
     }).join('');
-    return `<div class="ws-scroll"><table class="ws-table"><thead><tr><th class="ws-chk"></th><th>${wsEsc(wsT('box'))}</th>${withJob ? `<th>${wsEsc(wsT('job'))}</th>` : ''}<th>${wsEsc(wsT('status'))}</th><th class="n">${wsEsc(wsT('items'))}</th><th>${wsEsc(wsT('by'))}</th><th>${wsEsc(wsT('when'))}</th><th></th></tr></thead><tbody>${body}</tbody></table></div>`;
+    return `<div class="ws-scroll"><table class="ws-table"><thead><tr>${sel ? '<th class="ws-chk"></th>' : ''}<th class="ws-chk"></th><th>${wsEsc(wsT('box'))}</th>${withJob ? `<th>${wsEsc(wsT('job'))}</th>` : ''}<th>${wsEsc(wsT('status'))}</th><th class="n">${wsEsc(wsT('items'))}</th><th>${wsEsc(wsT('by'))}</th><th>${wsEsc(wsT('when'))}</th><th></th></tr></thead><tbody>${body}</tbody></table></div>`;
 }
 
 async function wsLoadJobBoxes() {
@@ -622,6 +627,7 @@ function wsRenderData() {
             <span class="ws-pick"><input type="text" id="wsDataPersonIn" class="form-input" list="wsPersonOpts" placeholder="${wsEsc(wsT('anyPerson'))}" autocomplete="off"><datalist id="wsPersonOpts"></datalist></span>
         </div>
         <div class="ws-chips" id="wsDataChips"></div>
+        <div id="wsDataSel"></div>
         <div id="wsDataList"><p class="ws-muted">${wsEsc(wsT('loading'))}</p></div>
         <div id="wsDataPager"></div>
         <div class="ws-danger" id="wsDataActions" hidden></div>`;
@@ -645,18 +651,39 @@ async function wsLoadData() {
     if (req !== D.req || WS.section !== 'data' || !el) return;
     if (error) { wsFail(el, 'data-retry'); return; }
     D.rows = data || [];
+    const sig = JSON.stringify([D.tool, wsDataArgs()]);
+    if (sig !== D.selSig) { D.sel.clear(); D.selSig = sig; }          // a different filter is a different set of boxes
     const first = D.rows[0];
     D.total = first ? Number(first.total_boxes) : 0;
     D.totals = first ? { boxes: Number(first.total_boxes), units: Number(first.total_units), rows: Number(first.total_rows) } : { boxes: 0, units: 0, rows: 0 };
     wsEl('wsDataTotals').textContent = first ? wsT('matches', { b: wsNum(D.totals.boxes), u: wsNum(D.totals.units) }) : '';
-    el.innerHTML = D.rows.length ? wsBoxesTable(D.rows, 'data', D.expanded, D.items, D.tool, true) : `<div class="ws-empty">${wsEsc(wsT('noMatches'))}</div>`;
+    el.innerHTML = D.rows.length ? wsBoxesTable(D.rows, 'data', D.expanded, D.items, D.tool, true, D.sel) : `<div class="ws-empty">${wsEsc(wsT('noMatches'))}</div>`;
     wsEl('wsDataPager').innerHTML = wsPager('data', D.offset, D.total, WS_DATA_PAGE);
+    wsRenderDataSel();
     const actions = wsEl('wsDataActions');
     actions.hidden = !first;
     actions.innerHTML = first ? `<span><b>${wsEsc(wsT('deleteCounts', { b: wsNum(D.totals.boxes), u: wsNum(D.totals.units) }) + ' ' + wsT('withScans', { r: wsNum(D.totals.rows) }))}</b>${D.totals.rows > WS_FILE_ROWS ? ` <small class="ws-muted">${wsEsc(wsT('filesNote', { n: wsNum(WS_FILE_ROWS) }))}</small>` : ''}</span>
         <span><button type="button" class="btn btn-secondary btn-sm" data-ws="data-download">${wsEsc(wsT('downloadMatches'))}</button>
         <button type="button" class="btn btn-secondary btn-sm btn-danger-text" data-ws="data-delete">${wsEsc(wsT('deleteMatches'))}</button></span>` : '';
 }
+
+// The bar above the table: "select all on this page" (outside the table, so it also works on a phone where the table
+// header is hidden) and, once something is ticked, what is selected and what can be done with it.
+function wsRenderDataSel() {
+    const el = wsEl('wsDataSel'), D = WS.data;
+    if (!el) return;
+    if (!D.rows.length) { el.innerHTML = ''; return; }
+    const n = D.sel.size;
+    const units = [...D.sel.values()].reduce((a, b) => a + Number(b.items || 0), 0);
+    const pageAll = D.rows.every(b => D.sel.has(wsSelKey(b)));
+    el.innerHTML = `<div class="ws-bulk ws-selbar"><label class="ws-lbl"><input type="checkbox" id="wsDataSelAll" ${pageAll ? 'checked' : ''}> <span>${wsEsc(wsT('selectPage'))}</span></label>` + (n ? `
+        <span>${wsEsc(wsT('selectedBoxes', { n: wsNum(n), u: wsNum(units) }))}</span>
+        <button type="button" class="btn btn-secondary btn-sm" data-ws="sel-download">${wsEsc(wsT('downloadSelected'))}</button>
+        <button type="button" class="btn btn-secondary btn-sm btn-danger-text" data-ws="sel-delete">${wsEsc(wsT('deleteSelected'))}</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-ws="sel-clear">${wsEsc(wsT('clearSel'))}</button>` : '') + '</div>';
+}
+// the selected boxes as the server expects them: "job (lower case)" + character 1 + "box"
+function wsSelArgs() { return { ...wsDataArgs(), p_boxes: [...WS.data.sel.keys()] }; }
 
 const wsLoadFacets = wsDebounce(async (kind, text) => {
     const { data } = await supabaseClient.rpc('ws_facets', { p_kind: kind, p_tool: WS.data.tool, p_search: text, p_limit: 30 });
@@ -776,7 +803,7 @@ function wsRenderJobBoxesOnly() {
 }
 function wsRenderDataOnly() {
     const el = wsEl('wsDataList');
-    if (el && WS.data.rows.length) el.innerHTML = wsBoxesTable(WS.data.rows, 'data', WS.data.expanded, WS.data.items, WS.data.tool, true);
+    if (el && WS.data.rows.length) el.innerHTML = wsBoxesTable(WS.data.rows, 'data', WS.data.expanded, WS.data.items, WS.data.tool, true, WS.data.sel);
 }
 
 // ============================================
@@ -859,6 +886,20 @@ async function wsOnClick(e) {
             }
             return;
         }
+        case 'sel-clear': WS.data.sel.clear(); wsRenderDataOnly(); wsRenderDataSel(); return;
+        case 'sel-download': {
+            const rows = [...WS.data.sel.values()].reduce((a, b) => a + Number(b.items || 0), 0);
+            wsDownloadFlow({ tool: WS.data.tool, args: wsSelArgs(), total: rows, prefix: 'team_data_selected' });
+            return;
+        }
+        case 'sel-delete': {
+            const D = WS.data, picked = [...D.sel.values()];
+            const units = picked.reduce((a, b) => a + Number(b.items || 0), 0);
+            const names = picked.slice(0, 5).map(b => wsEsc((b.job || '-') + ' / ' + b.box)).join('<br>') + (picked.length > 5 ? '<br>...' : '');
+            wsDeleteFlow({ tool: D.tool, args: wsSelArgs(), totals: { boxes: picked.length, units, rows: units }, scopeHtml: `<b>${wsEsc(wsToolName(D.tool))}</b><br>${wsEsc(wsT('selScope', { n: wsNum(picked.length) }))}<br>${names}`, prefix: 'team_data_deleted',
+                after: async () => { D.sel.clear(); D.offset = 0; D.expanded.clear(); D.items.clear(); await wsLoadData(); } });
+            return;
+        }
         case 'data-clear': Object.assign(WS.data, { jobs: [], person: '', search: '', status: '', offset: 0 }); wsRenderData(); return;
         case 'data-download': wsDownloadFlow({ tool: WS.data.tool, args: wsDataArgs(), total: WS.data.totals.rows, prefix: 'team_data' }); return;
         case 'data-delete': {
@@ -882,6 +923,17 @@ function wsOnChange(e) {
         if (t.checked) WS.jobs.sel.add(t.dataset.wsSel); else WS.jobs.sel.delete(t.dataset.wsSel);
         t.closest('tr').classList.toggle('sel', t.checked);
         wsRenderJobsBulk();
+        return;
+    }
+    if (t.dataset.wsBsel !== undefined) {
+        const row = WS.data.rows.find(b => wsSelKey(b) === t.dataset.wsBsel);
+        if (row) { if (t.checked) WS.data.sel.set(t.dataset.wsBsel, row); else WS.data.sel.delete(t.dataset.wsBsel); }
+        wsRenderDataOnly(); wsRenderDataSel();
+        return;
+    }
+    if (t.id === 'wsDataSelAll') {
+        WS.data.rows.forEach(b => { if (t.checked) WS.data.sel.set(wsSelKey(b), b); else WS.data.sel.delete(wsSelKey(b)); });
+        wsRenderDataOnly(); wsRenderDataSel();
         return;
     }
     switch (t.id) {

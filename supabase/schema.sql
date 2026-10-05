@@ -1557,8 +1557,10 @@ $$;
 -- ---- Data explorer: one filter, used by the list, the export and the delete ----
 -- Internal helper (not callable from the API): the scans of one enterprise that match the filters, from the table of
 -- the chosen tool. p_jobs holds Remarks (job names); capitals and end spaces do not matter.
+drop function if exists public.ws_filtered_scans(uuid, text, text[], text, timestamptz, timestamptz, text, text);
 create or replace function public.ws_filtered_scans(
-    p_ent uuid, p_tool text, p_jobs text[], p_person text, p_from timestamptz, p_to timestamptz, p_status text, p_search text)
+    p_ent uuid, p_tool text, p_jobs text[], p_person text, p_from timestamptz, p_to timestamptz, p_status text, p_search text,
+    p_boxes text[] default null)
 returns table (id uuid, scanned_at timestamptz, user_id uuid, remark text, person text, box text, barcode text,
                qty integer, status text, extra jsonb)
 language sql
@@ -1572,6 +1574,7 @@ as $$
       and (coalesce(p_person, '') = '' or lower(coalesce(nullif(s.operator_name, ''), nullif(p.display_name, ''), p.email, '')) = lower(btrim(p_person)))
       and (p_from is null or s.scanned_at >= p_from) and (p_to is null or s.scanned_at < p_to)
       and (coalesce(p_status, '') = '' or s.box_status = p_status)
+      and (p_boxes is null or (lower(btrim(coalesce(s.remark, ''))) || chr(1) || s.box_number) = any (p_boxes))
       and (btrim(coalesce(p_search, '')) = '' or s.box_number ilike '%' || btrim(p_search) || '%' or s.barcode ilike '%' || btrim(p_search) || '%'
            or s.remark ilike '%' || btrim(p_search) || '%' or s.operator_name ilike '%' || btrim(p_search) || '%' or p.display_name ilike '%' || btrim(p_search) || '%')
     union all
@@ -1584,10 +1587,11 @@ as $$
       and (coalesce(p_person, '') = '' or lower(coalesce(nullif(y.operator_name, ''), nullif(p.display_name, ''), p.email, '')) = lower(btrim(p_person)))
       and (p_from is null or y.scanned_at >= p_from) and (p_to is null or y.scanned_at < p_to)
       and (coalesce(p_status, '') = '' or y.box_status = p_status)
+      and (p_boxes is null or (lower(btrim(coalesce(y.remark, ''))) || chr(1) || y.box_barcode) = any (p_boxes))
       and (btrim(coalesce(p_search, '')) = '' or y.box_barcode ilike '%' || btrim(p_search) || '%' or y.barcode ilike '%' || btrim(p_search) || '%'
            or y.remark ilike '%' || btrim(p_search) || '%' or y.operator_name ilike '%' || btrim(p_search) || '%' or p.display_name ilike '%' || btrim(p_search) || '%');
 $$;
-revoke execute on function public.ws_filtered_scans(uuid, text, text[], text, timestamptz, timestamptz, text, text) from public, anon, authenticated;
+revoke execute on function public.ws_filtered_scans(uuid, text, text[], text, timestamptz, timestamptz, text, text, text[]) from public, anon, authenticated;
 
 -- a page of boxes that match, plus the totals of everything that matches
 drop function if exists public.ws_data_boxes(text, text[], text, timestamptz, timestamptz, text, text, integer, integer);
@@ -1617,9 +1621,11 @@ $$;
 
 -- the scan rows behind a filter, for downloads: keyset-paged, at most 1000 per call
 drop function if exists public.ws_data_rows(text, text[], text, timestamptz, timestamptz, text, text, timestamptz, uuid, timestamptz, integer);
+drop function if exists public.ws_data_rows(text, text[], text, timestamptz, timestamptz, text, text, timestamptz, uuid, timestamptz, integer, text[]);
 create or replace function public.ws_data_rows(
     p_tool text, p_jobs text[], p_person text, p_from timestamptz, p_to timestamptz, p_status text, p_search text,
-    p_after_at timestamptz default null, p_after_id uuid default null, p_until timestamptz default null, p_limit integer default 1000)
+    p_after_at timestamptz default null, p_after_id uuid default null, p_until timestamptz default null, p_limit integer default 1000,
+    p_boxes text[] default null)
 returns table (id uuid, scanned_at timestamptz, person text, job text, box text, barcode text, qty integer, status text, extra jsonb)
 language sql
 security definer
@@ -1627,7 +1633,7 @@ set search_path = public
 stable
 as $$
     select f.id, f.scanned_at, f.person, f.remark, f.box, f.barcode, f.qty, f.status, f.extra
-    from public.ws_filtered_scans(public.current_user_enterprise_id(), p_tool, p_jobs, p_person, p_from, p_to, p_status, p_search) f
+    from public.ws_filtered_scans(public.current_user_enterprise_id(), p_tool, p_jobs, p_person, p_from, p_to, p_status, p_search, p_boxes) f
     where public.current_user_is_enterprise_admin()
       and (p_until is null or f.scanned_at <= p_until)
       and (p_after_at is null or (f.scanned_at, f.id) > (p_after_at, coalesce(p_after_id, '00000000-0000-0000-0000-000000000000'::uuid)))
@@ -1637,8 +1643,10 @@ $$;
 
 -- deletes everything that matches the filter and was scanned up to p_until (the moment the download started)
 drop function if exists public.ws_data_delete(text, text[], text, timestamptz, timestamptz, text, text, timestamptz);
+drop function if exists public.ws_data_delete(text, text[], text, timestamptz, timestamptz, text, text, timestamptz, text[]);
 create or replace function public.ws_data_delete(
-    p_tool text, p_jobs text[], p_person text, p_from timestamptz, p_to timestamptz, p_status text, p_search text, p_until timestamptz)
+    p_tool text, p_jobs text[], p_person text, p_from timestamptz, p_to timestamptz, p_status text, p_search text, p_until timestamptz,
+    p_boxes text[] default null)
 returns bigint
 language plpgsql
 security definer
@@ -1657,13 +1665,13 @@ begin
     if p_tool = 'boxScanner' then
         with d as (
             delete from public.scans where id in (
-                select f.id from public.ws_filtered_scans(v_eid, p_tool, p_jobs, p_person, p_from, p_to, p_status, p_search) f where f.scanned_at <= p_until)
+                select f.id from public.ws_filtered_scans(v_eid, p_tool, p_jobs, p_person, p_from, p_to, p_status, p_search, p_boxes) f where f.scanned_at <= p_until)
             returning 1)
         select count(*) into n from d;
     elsif p_tool = 'yearSegregate' then
         with d as (
             delete from public.ys_scans where id in (
-                select f.id from public.ws_filtered_scans(v_eid, p_tool, p_jobs, p_person, p_from, p_to, p_status, p_search) f where f.scanned_at <= p_until)
+                select f.id from public.ws_filtered_scans(v_eid, p_tool, p_jobs, p_person, p_from, p_to, p_status, p_search, p_boxes) f where f.scanned_at <= p_until)
             returning 1)
         select count(*) into n from d;
     else
@@ -1807,8 +1815,8 @@ revoke execute on function public.ws_job_boxes(uuid, text, integer, integer) fro
 revoke execute on function public.ws_job_people(uuid) from public, anon;
 revoke execute on function public.ws_job_activity(uuid, integer) from public, anon;
 revoke execute on function public.ws_data_boxes(text, text[], text, timestamptz, timestamptz, text, text, integer, integer) from public, anon;
-revoke execute on function public.ws_data_rows(text, text[], text, timestamptz, timestamptz, text, text, timestamptz, uuid, timestamptz, integer) from public, anon;
-revoke execute on function public.ws_data_delete(text, text[], text, timestamptz, timestamptz, text, text, timestamptz) from public, anon;
+revoke execute on function public.ws_data_rows(text, text[], text, timestamptz, timestamptz, text, text, timestamptz, uuid, timestamptz, integer, text[]) from public, anon;
+revoke execute on function public.ws_data_delete(text, text[], text, timestamptz, timestamptz, text, text, timestamptz, text[]) from public, anon;
 revoke execute on function public.ws_facets(text, text, text, integer) from public, anon;
 revoke execute on function public.ws_people(text, text, integer, integer) from public, anon;
 revoke execute on function public.ws_overview(timestamptz, integer) from public, anon;
@@ -1817,8 +1825,8 @@ grant execute on function public.ws_job_boxes(uuid, text, integer, integer) to a
 grant execute on function public.ws_job_people(uuid) to authenticated;
 grant execute on function public.ws_job_activity(uuid, integer) to authenticated;
 grant execute on function public.ws_data_boxes(text, text[], text, timestamptz, timestamptz, text, text, integer, integer) to authenticated;
-grant execute on function public.ws_data_rows(text, text[], text, timestamptz, timestamptz, text, text, timestamptz, uuid, timestamptz, integer) to authenticated;
-grant execute on function public.ws_data_delete(text, text[], text, timestamptz, timestamptz, text, text, timestamptz) to authenticated;
+grant execute on function public.ws_data_rows(text, text[], text, timestamptz, timestamptz, text, text, timestamptz, uuid, timestamptz, integer, text[]) to authenticated;
+grant execute on function public.ws_data_delete(text, text[], text, timestamptz, timestamptz, text, text, timestamptz, text[]) to authenticated;
 grant execute on function public.ws_facets(text, text, text, integer) to authenticated;
 grant execute on function public.ws_people(text, text, integer, integer) to authenticated;
 grant execute on function public.ws_overview(timestamptz, integer) to authenticated;

@@ -20,7 +20,7 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   const joinShown = () => page.evaluate(() => ({
     screen: AppState.currentScreen, ent: document.getElementById('joinEnterprise').textContent, adm: document.getElementById('joinAdmin').textContent,
     tool: document.getElementById('joinTool').textContent, job: document.getElementById('joinJob').textContent,
-    form: document.getElementById('joinForm').style.display, msg: document.getElementById('joinMsg').textContent, accounts: document.getElementById('accountBtn').classList.contains('show')
+    form: document.getElementById('joinForm').style.display, msg: document.getElementById('joinMsg').textContent
   }));
   let j = await joinShown();
   ok('QR address opens the join page', j.screen === 'joinScreen', j.screen);
@@ -38,13 +38,13 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   const s = await page.evaluate(() => ({
     screen: AppState.currentScreen, app: AppState.currentApp, op: AppState.operator && AppState.operator.name, remark: document.getElementById('scannerRemarkInput').value,
     body: document.body.classList.contains('operator-mode'), url: location.search, joined: window.__joined,
-    back: getComputedStyle(document.getElementById('appBackBtn')).display, acct: getComputedStyle(document.getElementById('accountBtn')).display,
+    back: getComputedStyle(document.getElementById('appBackBtn')).display,
     bar: document.getElementById('opBarJob').textContent, who: document.getElementById('opBarWho').textContent,
     remarkCard: document.getElementById('scannerRemarkCard').style.display, header: document.getElementById('headerUser').textContent
   }));
   ok('joining signed in anonymously (once) and joined with the trimmed name', s.joined && s.joined.name.trim() === 'Ravi' && s.joined.user === 'anon1', JSON.stringify(s.joined));
   ok('the device now shows only the Box-Item Scan tool', s.screen === 'appScreen' && s.app === 'boxScanner', s.screen + ' ' + s.app);
-  ok('no back button and no user-management button', s.back === 'none' && s.acct === 'none', s.back + ' ' + s.acct);
+  ok('no back button and no user icon in the top bar (the icon is gone for everybody)', s.back === 'none' && (await page.evaluate(() => !document.getElementById('accountBtn'))), s.back);
   ok('the token is removed from the address', s.url === '', s.url);
   ok('the job name is the Remark and the Remark card is hidden', s.remark === 'Inbound 7' && s.remarkCard === 'none', s.remark + ' ' + s.remarkCard);
   ok('the top bar shows job, name, enterprise and admin', s.bar === 'Inbound 7' && /Ravi/.test(s.who) && /Acme/.test(s.who) && /Akhtar/.test(s.who), s.who);
@@ -268,6 +268,43 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   await page.selectOption('#wsDataRange', 'custom'); await page.fill('#wsDataFrom', '2026-01-01'); await page.fill('#wsDataTo', '2026-01-31'); await wait(300);
   ok('custom dates include the last day', await page.evaluate(() => { const a = window.__rpcLog.filter(x => x.name === 'ws_data_boxes').pop().args; return new Date(a.p_to) - new Date(a.p_from) === 31 * 86400000; }));
   await page.click('[data-ws="data-clear"]'); await wait(300);
+  await page.selectOption('#wsDataRange', 'all'); await page.selectOption('#wsDataStatus', ''); await wait(400);
+  // selecting boxes with check boxes
+  ok('Data has a check box on every box and a "Select all on this page" box above the list', (await page.$$('#wsDataList [data-ws-bsel]')).length === 2 && !!(await page.$('#wsDataSelAll')));
+  ok('nothing is ticked at first, so no selection buttons', !/selected/.test(await page.textContent('#wsDataSel')) && !(await page.$('[data-ws="sel-download"]')));
+  await page.click('#wsDataList [data-ws-bsel]'); await wait(200);
+  ok('ticking a box shows how many boxes and units are selected', /1 boxes selected \(5 units\)/.test(await page.textContent('#wsDataSel')), await page.textContent('#wsDataSel'));
+  ok('...and highlights the row', (await page.$$('#wsDataList tr.sel')).length === 1);
+  await page.click('#wsDataSelAll'); await wait(200);
+  ok('the header check box selects every box on the page', /2 boxes selected \(8 units\)/.test(await page.textContent('#wsDataSel')) && (await page.$$('#wsDataList [data-ws-bsel]:checked')).length === 2);
+  await page.click('#wsDataSelAll'); await wait(200);
+  ok('...and un-ticks them again', !/selected/.test(await page.textContent('#wsDataSel')));
+  await page.click('#wsDataList [data-ws-bsel]'); await wait(200);
+  await page.evaluate(() => { window.__files.length = 0; window.__rpcLog = []; });
+  await page.click('[data-ws="sel-download"]'); await wait(600);
+  const selDl = await page.evaluate(() => ({ files: window.__files.slice(), args: window.__rpcLog.find(x => x.name === 'ws_data_rows').args }));
+  ok('Download selected asks only for the ticked box (job + box) and writes the file', selDl.files.length === 1 && /^team_data_selected_/.test(selDl.files[0]) && JSON.stringify(selDl.args.p_boxes) === JSON.stringify(['inbound 9\u0001B2']), JSON.stringify(selDl));
+  await page.selectOption('#wsDataStatus', 'Closed'); await wait(400);
+  ok('changing a filter clears the selection (it is a different set of boxes)', !/selected/.test(await page.textContent('#wsDataSel')));
+  await page.selectOption('#wsDataStatus', ''); await wait(300);
+  await page.click('#wsDataList [data-ws-bsel]'); await wait(200);
+  await page.click('[data-ws-page="data:next"]').catch(() => {});
+  await page.click('[data-ws="sel-clear"]'); await wait(200);
+  ok('Clear selection empties it', !/selected/.test(await page.textContent('#wsDataSel')) && (await page.$$('#wsDataList [data-ws-bsel]:checked')).length === 0);
+  await page.click('#wsDataList [data-ws-bsel]'); await wait(200);
+  await page.evaluate(() => { window.__rpcLog = []; });
+  await page.click('[data-ws="sel-delete"]'); await wait(200);
+  ok('Delete selected names the selected boxes and needs DELETE typed', await page.evaluate(() => /1 selected boxes/.test(document.getElementById('wsDialogBody').textContent) && /Inbound 9 \/ B2/.test(document.getElementById('wsDialogBody').textContent) && document.getElementById('wsDialogOk').disabled));
+  await page.fill('#wsDialogInput', 'DELETE'); await page.click('#wsDialogOk'); await wait(800);
+  const selDel = await page.evaluate(() => ({ args: window.__wsDeleteArgs, order: (() => { const l = window.__rpcLog; return l.findIndex(x => x.name === 'ws_data_rows') < l.findIndex(x => x.name === 'ws_data_delete'); })(), left: (window.__wsData || []).length }));
+  ok('...it downloads first, then deletes only that box (the other stays)', selDel.order && JSON.stringify(selDel.args.p_boxes) === JSON.stringify(['inbound 9\u0001B2']) && selDel.left === 1, JSON.stringify(selDel));
+  ok('...and the list shows the remaining box with nothing selected', /Inbound 8/.test(await page.textContent('#wsDataList')) && !/Inbound 9/.test(await page.textContent('#wsDataList')) && !/selected/.test(await page.textContent('#wsDataSel')));
+  await page.evaluate(() => {
+    const at = (m) => new Date(Date.now() - m * 60000).toISOString();
+    window.__wsData = [{ box: 'B2', job: 'Inbound 9', person: 'Ravi', status: 'Closed', items: 5, last_at: at(4) }, { box: 'B1', job: 'Inbound 8', person: 'Sana', status: 'Open', items: 3, last_at: at(9) }];
+    window.__wsRows = [{ id: 'a1', scanned_at: at(9), person: 'Sana', job: 'Inbound 8', box: 'B1', barcode: '1', qty: 3, status: 'Open', extra: null }, { id: 'a2', scanned_at: at(4), person: 'Ravi', job: 'Inbound 9', box: 'B2', barcode: '2', qty: 5, status: 'Closed', extra: null }];
+  });
+  await page.selectOption('#wsDataRange', '30d'); await page.selectOption('#wsDataRange', 'all'); await wait(400);
   await page.selectOption('#wsDataRange', 'all'); await wait(300);
   await page.evaluate(() => { window.__files.length = 0; });
   await page.click('[data-ws="data-download"]'); await wait(600);

@@ -92,21 +92,17 @@ function showError(element, message) {
 function updateHeaderUser() {
     const el = document.getElementById('headerUser');
     const signOutBtn = document.getElementById('signOutBtn');
-    const accountBtn = document.getElementById('accountBtn');
     if (AppState.user && AppState.operator) {          // a labourer: name and "leave this job" only
         el.textContent = AppState.operator.name;
         el.classList.add('show');
         signOutBtn.classList.add('show');
-        accountBtn.classList.remove('show');
     } else if (AppState.user) {
         el.textContent = AppState.profile?.display_name || AppState.user.email;
         el.classList.add('show');
         signOutBtn.classList.add('show');
-        accountBtn.classList.add('show');
     } else {
         el.classList.remove('show');
         signOutBtn.classList.remove('show');
-        accountBtn.classList.remove('show');
     }
 }
 
@@ -815,7 +811,6 @@ function setupEventListeners() {
     document.getElementById('joinSignOutBtn').addEventListener('click', async () => { await signOut(); const t = operatorTokenFromUrl(); if (t) operatorShowJoin(t, null); });
     document.getElementById('appBackBtn').addEventListener('click', goToHome);
     document.getElementById('goToSessionBtn').addEventListener('click', () => { if (AppState.activeSessionApp) openApp(AppState.activeSessionApp); });
-    document.getElementById('accountBtn').addEventListener('click', openAccountModal);
     document.getElementById('closeAccountBtn').addEventListener('click', closeAccountModal);
     document.getElementById('updateBtn').addEventListener('click', onUpdateIconTap);
     document.getElementById('updateNowBtn').addEventListener('click', updateAppNow);

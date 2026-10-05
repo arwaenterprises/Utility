@@ -132,11 +132,20 @@ window.__rpcCalls = [];
     ws_people: ({ p_search, p_type }) => (window.__wsPeople || []).filter(p => (p_type === 'all' || p.kind === p_type) && (!p_search || p.name.toLowerCase().includes(String(p_search).toLowerCase()))).map(p => ({ ...p, total_count: (window.__wsPeople || []).length })),
     ws_data_boxes: (a) => { const rows = window.__wsData || []; return rows.map(r => ({ ...r, total_boxes: rows.length, total_units: rows.reduce((n, x) => n + x.items, 0), total_rows: rows.reduce((n, x) => n + x.items, 0) })).slice(a.p_offset || 0, (a.p_offset || 0) + (a.p_limit || 50)); },
     ws_data_rows: (a) => {
-      const all = window.__wsRows || [];
+      const key = (r) => String(r.job || '').trim().toLowerCase() + '\u0001' + r.box;
+      const all = (window.__wsRows || []).filter(r => !a.p_boxes || a.p_boxes.includes(key(r)));
       const i = a.p_after_id ? all.findIndex(r => r.id === a.p_after_id) + 1 : 0;
       return all.slice(i, i + (a.p_limit || 1000));
     },
-    ws_data_delete: (a) => { window.__wsDeleteArgs = a; const n = (window.__wsRows || []).length; window.__wsRows = []; window.__wsData = []; return n; },
+    ws_data_delete: (a) => {
+      window.__wsDeleteArgs = a;
+      const key = (r) => String(r.job || '').trim().toLowerCase() + '\u0001' + r.box;
+      const hit = (r) => !a.p_boxes || a.p_boxes.includes(key(r));
+      const n = (window.__wsRows || []).filter(hit).length;
+      window.__wsRows = (window.__wsRows || []).filter(r => !hit(r));
+      window.__wsData = (window.__wsData || []).filter(r => !hit(r));
+      return n;
+    },
     ws_facets: ({ p_kind }) => (window.__wsFacets || {})[p_kind] || [],
     rename_enterprise: ({ new_name }) => { db.enterprises[0].name = new_name.trim(); },
     // like the real functions: an enterprise admin gets everyone, anybody else only their own row
