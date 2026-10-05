@@ -76,13 +76,11 @@ const Storage = {
 function updateOnlineStatus() {
     AppState.isOnline = navigator.onLine;
     const el = document.getElementById('onlineStatus');
-    if (AppState.isOnline) {
-        el.textContent = 'Online';
-        el.className = 'online-status online';
-    } else {
-        el.textContent = 'Offline';
-        el.className = 'online-status offline';
-    }
+    // a small round light (green = online, amber = offline); the words are only for screen readers and the hover hint
+    const word = AppState.isOnline ? 'Online' : 'Offline';
+    el.className = 'online-status ' + (AppState.isOnline ? 'online' : 'offline');
+    el.title = word;
+    el.setAttribute('aria-label', word);
 }
 
 window.addEventListener('online', updateOnlineStatus);

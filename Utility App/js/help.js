@@ -154,18 +154,18 @@ const HELP = {
             intro: 'Manage your jobs (QR links), your people and all scanned data from one place.',
             before: 'You must be signed in with your Google account. One <b>job</b> is one QR link: a tool plus a job name. Make one job per team, even on the same tool.',
             steps: [
-                'Open <b>Team &amp; Data</b> from the people icon at the top or from the home screen tile.',
-                '<b>Overview</b> shows today&rsquo;s totals, units by job, and anything that needs attention, such as a job with no scans for 24 hours.',
-                'Under <b>Jobs</b> tap <b>+ New job</b>, choose the tool, type a <b>job name</b> (it becomes the Remark on every scan) and tap <b>Create QR link</b>. The QR sheet shows your enterprise, your name, the tool and the job. Tap <b>Print</b>, <b>Share</b> or <b>Copy link</b> and give it to the team.',
+                'Open <b>Team &amp; Data</b> from the home screen tile. Tap <b>your name</b> at the top of the home page for your account details and to rename your team.',
+                'There are two tabs: <b>Jobs &amp; People</b> and <b>Data</b>. In Jobs &amp; People, each job shows its status (Active, Idle, Stopped), people, boxes, units and last scan. Search finds a job <b>or a person</b>.',
+                'In <b>Jobs &amp; People</b> tap <b>+ New job</b>, choose the tool, type a <b>job name</b> (it becomes the Remark on every scan) and tap <b>Create QR link</b>. The QR sheet shows your enterprise, your name, the tool and the job. Tap <b>Print</b>, <b>Share</b> or <b>Copy link</b> and give it to the team.',
                 'Each labourer scans the QR with the phone&rsquo;s own camera or QR scanner, checks the names, types their name and taps <b>Join</b>. That handheld then shows only that one tool.',
                 'Tap a job&rsquo;s name to open it: see its boxes, who joined and their totals, and activity per hour. Tap <b>QR</b> to show its code again, or <b>Stop this link</b> to end the job.',
-                'Under <b>People</b> you see labourers and Google members with their jobs and totals. You can correct a name or remove a person, or tap <b>View data</b> for their scans.',
-                'Under <b>Data</b> filter by tool, job, person, dates and box status. <b>Download everything that matches</b> gives Excel files (large downloads are split into several files). <b>Download and delete</b> downloads first, then deletes exactly those scans after you confirm.'
+                'Tap the number in the <b>People</b> column to see who joined that job, with their totals. You can correct a name or remove a person there.',
+                'Under <b>Data</b> search or filter by tool, job and person, and tick boxes to select them. <b>Download everything that matches</b> gives Excel files (large downloads are split into several files). <b>Download and delete</b> downloads first, then deletes exactly those scans after you confirm.'
             ],
             tips: [
                 'Creating a link with the <b>same tool and same job name</b> replaces only that job&rsquo;s old link. Other jobs are not affected.',
-                'A link <b>never expires by itself</b>. It works until you stop it. An <b>Idle</b> label only warns you; it never stops anything.',
-                'A <b>Box-Item Scan or Year/Season</b> job with <b>no scans for 30 days</b> is deleted automatically with its QR link and its data. A red date shows 7 days before; download the data first, or scan again to keep the job. <b>Price Check and Box Segregate</b> links are never deleted automatically.',
+                'A link keeps working while it is in use. An <b>Idle</b> label only warns you; it never stops anything. The automatic switch-off and clean-up rules are in the next tip.',
+                'A <b>Box-Item Scan or Year/Season</b> job with <b>no scans for 30 days</b> is deleted automatically with its QR link and its data. A red date shows 7 days before; download the data first, or scan again to keep the job. <b>Price Check, Box Segregate and the print tools</b> keep no data, so their link simply <b>switches itself off after 10 days with nobody using it</b> (a red "Expires" date shows 3 days before; make a new QR if needed).',
                 'Scans stay on the server until <b>you</b> delete them (or the 30-day clean-up above removes an idle job). A labourer&rsquo;s <b>Reset</b> only clears their own handheld.',
                 'Give each team its own box-number range or prefix. Two teams using the same box number stay separate in Data, but are easy to confuse on the floor.',
                 'Anyone who gets a QR can join, so share it only with your team and stop it when the job is done.'
@@ -175,18 +175,18 @@ const HELP = {
             intro: 'أدر مهامك (روابط QR) وأشخاصك وكل البيانات الممسوحة من مكان واحد.',
             before: 'يجب أن تكون مسجّل الدخول بحساب Google. <b>المهمة</b> الواحدة هي رابط QR واحد: أداة مع اسم مهمة. أنشئ مهمة لكل فريق حتى على الأداة نفسها.',
             steps: [
-                'افتح <b>الفريق والبيانات</b> من أيقونة الأشخاص في الأعلى أو من بطاقة الشاشة الرئيسية.',
-                'تعرض <b>نظرة عامة</b> إجماليات اليوم والقطع حسب المهمة وأي شيء يحتاج إلى انتباه، مثل مهمة بلا مسح منذ 24 ساعة.',
-                'تحت <b>المهام</b> اضغط <b>+ مهمة جديدة</b> واختر الأداة واكتب <b>اسم المهمة</b> (يصبح الملاحظة في كل عملية مسح) ثم اضغط <b>إنشاء رابط QR</b>. تعرض ورقة QR اسم مؤسستك واسمك والأداة والمهمة. اضغط <b>طباعة</b> أو <b>مشاركة</b> أو <b>نسخ الرابط</b> وسلّمها للفريق.',
+                'افتح <b>الفريق والبيانات</b> من بطاقة الشاشة الرئيسية. اضغط على <b>اسمك</b> في أعلى الصفحة الرئيسية لرؤية تفاصيل حسابك وتغيير اسم فريقك.',
+                'هناك تبويبان: <b>المهام والأشخاص</b> و<b>البيانات</b>. في المهام والأشخاص تعرض كل مهمة حالتها (نشطة أو خاملة أو متوقفة) وأشخاصها وصناديقها وقطعها وآخر مسح. يبحث البحث عن مهمة <b>أو شخص</b>.',
+                'في <b>المهام والأشخاص</b> اضغط <b>+ مهمة جديدة</b> واختر الأداة واكتب <b>اسم المهمة</b> (يصبح الملاحظة في كل عملية مسح) ثم اضغط <b>إنشاء رابط QR</b>. تعرض ورقة QR اسم مؤسستك واسمك والأداة والمهمة. اضغط <b>طباعة</b> أو <b>مشاركة</b> أو <b>نسخ الرابط</b> وسلّمها للفريق.',
                 'يمسح كل عامل الرمز بكاميرا الهاتف أو ماسح QR، ويتأكد من الأسماء، ويكتب اسمه ثم يضغط <b>انضمام</b>. بعدها يعرض الجهاز تلك الأداة فقط.',
                 'اضغط على اسم المهمة لفتحها: ترى صناديقها ومن انضم وإجمالياتهم والنشاط في كل ساعة. اضغط <b>QR</b> لعرض رمزها مرة أخرى، أو <b>إيقاف هذا الرابط</b> لإنهاء المهمة.',
-                'تحت <b>الأشخاص</b> ترى العمال وأعضاء Google مع مهامهم وإجمالياتهم. يمكنك تصحيح اسم أو إزالة شخص، أو الضغط على <b>عرض البيانات</b> لرؤية عمليات مسحه.',
-                'تحت <b>البيانات</b> رشّح حسب الأداة والمهمة والشخص والتواريخ وحالة الصندوق. <b>تحميل كل ما يطابق</b> يعطيك ملفات Excel (التحميلات الكبيرة تُقسَّم إلى عدة ملفات). <b>تحميل ثم حذف</b> يحمّل أولًا ثم يحذف تلك العمليات تحديدًا بعد أن تؤكد.'
+                'اضغط على الرقم في عمود <b>الأشخاص</b> لترى من انضم إلى تلك المهمة مع إجمالياتهم. يمكنك هناك تصحيح اسم أو إزالة شخص.',
+                'تحت <b>البيانات</b> ابحث أو رشّح حسب الأداة والمهمة والشخص، وحدّد الصناديق بعلامة. <b>تحميل كل ما يطابق</b> يعطيك ملفات Excel (التحميلات الكبيرة تُقسَّم إلى عدة ملفات). <b>تحميل ثم حذف</b> يحمّل أولًا ثم يحذف تلك العمليات تحديدًا بعد أن تؤكد.'
             ],
             tips: [
                 'إنشاء رابط بنفس الأداة ونفس اسم المهمة يحلّ محل الرابط القديم لتلك المهمة فقط. المهام الأخرى لا تتأثر.',
-                'لا تنتهي صلاحية الرابط تلقائيًا. يبقى يعمل حتى توقفه. علامة <b>خامل</b> تنبّهك فقط ولا توقف أي شيء.',
-                'تُحذف مهمة <b>مسح الصناديق والقطع أو الفرز حسب السنة والموسم</b> التي <b>لا مسح فيها لمدة 30 يومًا</b> تلقائيًا مع رابط QR وبياناتها. يظهر تاريخ أحمر قبل 7 أيام؛ حمّل البيانات أولًا، أو امسح مرة أخرى للإبقاء على المهمة. أما روابط <b>التحقق من السعر وفرز الصناديق</b> فلا تُحذف تلقائيًا.',
+                'يبقى الرابط يعمل ما دام مستخدمًا. علامة <b>خامل</b> تنبّهك فقط ولا توقف أي شيء. قواعد الإيقاف والتنظيف التلقائي في النصيحة التالية.',
+                'تُحذف مهمة <b>مسح الصناديق والقطع أو الفرز حسب السنة والموسم</b> التي <b>لا مسح فيها لمدة 30 يومًا</b> تلقائيًا مع رابط QR وبياناتها. يظهر تاريخ أحمر قبل 7 أيام؛ حمّل البيانات أولًا، أو امسح مرة أخرى للإبقاء على المهمة. أما <b>التحقق من السعر وفرز الصناديق وأدوات الطباعة</b> فلا تحفظ بيانات، لذا يتوقف رابطها تلقائيًا <b>بعد 10 أيام دون استخدام</b> (يظهر تاريخ "ينتهي" بالأحمر قبل 3 أيام؛ أنشئ رمز QR جديدًا عند الحاجة).',
                 'تبقى عمليات المسح على الخادم حتى <b>تحذفها أنت</b> (أو يحذف التنظيف بعد 30 يومًا مهمة خاملة). زر <b>Reset</b> عند العامل يمسح جهازه فقط.',
                 'أعطِ كل فريق نطاق أرقام صناديق أو بادئة خاصة به. الفريقان اللذان يستخدمان رقم الصندوق نفسه يبقيان منفصلين في البيانات، لكن يسهل الخلط بينهما في الميدان.',
                 'يستطيع أي شخص يحصل على الرمز الانضمام، فشاركه مع فريقك فقط وأوقفه عند انتهاء المهمة.'

@@ -37,6 +37,8 @@ const TIP_AR = {
     'App updates': 'تحديثات التطبيق',
     'Later': 'لاحقًا',
     'Close': 'إغلاق',
+    'Online': 'متصل',
+    'Offline': 'غير متصل',
     'Complete or reset session to go back': 'أكمل الجلسة أو أعدها للرجوع',
     'Delete this scan': 'حذف هذا المسح',
     'Show / hide details': 'إظهار / إخفاء التفاصيل',

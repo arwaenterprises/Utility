@@ -94,16 +94,55 @@ function updateHeaderUser() {
     const signOutBtn = document.getElementById('signOutBtn');
     if (AppState.user && AppState.operator) {          // a labourer: name and "leave this job" only
         el.textContent = AppState.operator.name;
+        el.disabled = true;
         el.classList.add('show');
         signOutBtn.classList.add('show');
-    } else if (AppState.user) {
+    } else if (AppState.user) {                        // the name opens the Account window
         el.textContent = AppState.profile?.display_name || AppState.user.email;
+        el.disabled = false;
         el.classList.add('show');
         signOutBtn.classList.add('show');
     } else {
         el.classList.remove('show');
         signOutBtn.classList.remove('show');
     }
+}
+
+// ---------- Account window (tap your name in the top bar) ----------
+const ACC_T = {
+    en: { title: 'Account', email: 'Signed in as', role: 'Role', team: 'Team', rename: 'Rename', close: 'Close',
+          admin: 'Enterprise Admin', member: 'Member', ask: 'Team name:', empty: 'Name cannot be empty.' },
+    ar: { title: 'الحساب', email: 'تم تسجيل الدخول باسم', role: 'الدور', team: 'الفريق', rename: 'تغيير الاسم', close: 'إغلاق',
+          admin: 'مسؤول المؤسسة', member: 'عضو', ask: 'اسم الفريق:', empty: 'لا يمكن أن يكون الاسم فارغًا.' }
+};
+function accT(k) { return (ACC_T[(typeof AppLang !== 'undefined' && AppLang.get() === 'ar') ? 'ar' : 'en'])[k]; }
+
+async function openAccount() {
+    if (!AppState.user || AppState.operator) return;
+    const isAdmin = AppState.profile?.tier === 'enterprise_admin';
+    const set = (id, t) => { document.getElementById(id).textContent = t; };
+    set('accountTitle', accT('title')); set('accEmailLbl', accT('email')); set('accRoleLbl', accT('role')); set('accEntLbl', accT('team'));
+    set('renameEnterpriseBtn', accT('rename')); set('closeAccountBtn', accT('close'));
+    set('accountEmailDisp', AppState.user.email || '');
+    set('accountRoleDisp', isAdmin ? accT('admin') : accT('member'));
+    set('accountEntDisp', '...');
+    document.getElementById('renameEnterpriseBtn').hidden = !isAdmin;
+    document.getElementById('accountModal').classList.add('active');
+    if (AppState.profile?.enterprise_id) {
+        const { data } = await supabaseClient.from('enterprises').select('name').eq('id', AppState.profile.enterprise_id).maybeSingle();
+        AppState.enterpriseName = (data && data.name) || '';
+    }
+    set('accountEntDisp', AppState.enterpriseName || '-');
+}
+async function renameEnterprise() {
+    const name = prompt(accT('ask'), AppState.enterpriseName || '');
+    if (name === null) return;
+    if (!name.trim()) { alert(accT('empty')); return; }
+    const { error } = await supabaseClient.rpc('rename_enterprise', { new_name: name });
+    if (error) { alert(error.message); return; }
+    AppState.enterpriseName = name.trim();
+    document.getElementById('accountEntDisp').textContent = AppState.enterpriseName;
+    if (typeof WS !== 'undefined') { WS.enterprise = AppState.enterpriseName; const e = document.getElementById('wsEnterprise'); if (e) e.textContent = WS.enterprise; }
 }
 
 // ============================================
@@ -261,6 +300,9 @@ function initializeApp(appId) {
 // ============================================
 function setupEventListeners() {
     document.getElementById('googleSignInBtn').addEventListener('click', signInWithGoogle);
+    document.getElementById('headerUser').addEventListener('click', openAccount);
+    document.getElementById('closeAccountBtn').addEventListener('click', () => document.getElementById('accountModal').classList.remove('active'));
+    document.getElementById('renameEnterpriseBtn').addEventListener('click', renameEnterprise);
     document.getElementById('signOutBtn').addEventListener('click', () => { if (AppState.operator) operatorLeave(); else signOut(); });
     document.getElementById('joinBtn').addEventListener('click', operatorSubmitJoin);
     document.getElementById('joinNameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') operatorSubmitJoin(); });

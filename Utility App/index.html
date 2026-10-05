@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=74"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=74"></script>
-    <script src="vendor/qrcode.min.js?v=74"></script>
-    <script src="vendor/html5-qrcode.min.js?v=74"></script>
-    <script src="vendor/supabase.js?v=74"></script>
+    <script src="vendor/xlsx.full.min.js?v=75"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=75"></script>
+    <script src="vendor/qrcode.min.js?v=75"></script>
+    <script src="vendor/html5-qrcode.min.js?v=75"></script>
+    <script src="vendor/supabase.js?v=75"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -33,11 +33,11 @@
     <header class="header">
         <div class="header-logo"><img src="icons/logo-light.svg" alt="Utility" width="32" height="32"></div>
         <h1 class="header-title">Utility</h1>
-        <div class="header-store" id="headerUser"></div>
+        <button class="header-store" id="headerUser" type="button" title="Account" aria-label="Account"></button>
         <button class="hdr-circle" id="langBtn" type="button" title="Language" aria-label="Language">EN</button>
         <button class="btn-signout" id="signOutBtn" type="button" title="Sign out" aria-label="Sign out"><img src="icons/ui-logout.png" alt=""></button>
         <button class="hdr-btn" id="updateBtn" type="button" title="App updates" aria-label="App updates"><img src="icons/ui-update.png" alt=""><span class="hdr-dot" id="updateDot" hidden></span></button>
-        <div class="online-status online" id="onlineStatus">Online</div>
+        <div class="online-status online" id="onlineStatus" role="status" title="Online" aria-label="Online"></div>
     </header>
 
     <!-- QR SHEET: the code with the names a labourer must check (enterprise, admin, tool, job) -->
@@ -64,24 +64,35 @@
         </div>
     </div>
 
-    <!-- TEAM & DATA WORKSPACE (enterprise admin): Overview, Jobs (one job = one QR link), People, Data, Account. Built by js/workspace.js. -->
+    <!-- TEAM & DATA WORKSPACE (enterprise admin): two tabs - Jobs & People (one job = one QR link) and Data. Built by js/workspace.js. -->
     <div class="ws" id="wsRoot" role="dialog" aria-modal="true" aria-labelledby="wsTitle">
-        <aside class="ws-side">
-            <div class="ws-brand"><strong id="wsEnterprise">Team</strong><small id="wsAdmin"></small></div>
-            <nav class="ws-nav" id="wsNav" aria-label="Team & Data"></nav>
-        </aside>
         <div class="ws-body">
             <header class="ws-top">
-                <h2 id="wsTitle">Team &amp; Data</h2>
+                <h2 id="wsTitle">Team &amp; Data</h2><small class="ws-ent" id="wsEnterprise"></small>
                 <span class="ws-top-actions">
                     <button class="icon-btn" id="wsHelpBtn" type="button" title="How to use this tool" aria-label="How to use this tool">?</button>
                     <button class="team-close-x" id="wsCloseBtn" type="button" title="Close" aria-label="Close">&#10005;</button>
                 </span>
             </header>
+            <nav class="ws-tabbar" id="wsNav" aria-label="Team & Data"></nav>
             <div class="ws-status" id="wsStatus" hidden></div>
             <main class="ws-main" id="wsMain"></main>
         </div>
-        <nav class="ws-bottom" id="wsBottomNav" aria-label="Team & Data"></nav>
+    </div>
+
+    <!-- ACCOUNT (tap your name in the top bar): who is signed in, and the team's name -->
+    <div class="modal-overlay" id="accountModal">
+        <div class="modal" style="max-width: 420px;">
+            <h3 class="modal-title" id="accountTitle">Account</h3>
+            <div class="modal-body" style="text-align:left;">
+                <dl class="ws-kv-dl">
+                    <dt id="accEmailLbl">Signed in as</dt><dd id="accountEmailDisp"></dd>
+                    <dt id="accRoleLbl">Role</dt><dd id="accountRoleDisp"></dd>
+                    <dt id="accEntLbl">Team</dt><dd><span id="accountEntDisp"></span> <button class="btn btn-secondary btn-sm" id="renameEnterpriseBtn" type="button">Rename</button></dd>
+                </dl>
+            </div>
+            <div class="modal-buttons"><button class="btn btn-primary" id="closeAccountBtn" type="button">Close</button></div>
+        </div>
     </div>
 
     <!-- WORKSPACE DIALOG: a confirmation that can ask for a typed word (used before anything is deleted) -->
@@ -1051,24 +1062,24 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=74"></script>
-    <script src="js/lang.js?v=74"></script>
-    <script src="js/supabaseClient.js?v=74"></script>
-    <script src="js/camera.js?v=74"></script>
-    <script src="js/lists.js?v=74"></script>
-    <script src="js/usage.js?v=74"></script>
-    <script src="js/syncstatus.js?v=74"></script>
-    <script src="js/help.js?v=74"></script>
-    <script src="js/tooltip.js?v=74"></script>
-    <script src="js/operator.js?v=74"></script>
-    <script src="js/teamlinks.js?v=74"></script>
-    <script src="js/workspace.js?v=74"></script>
-    <script src="js/app.js?v=74"></script>
-    <script src="js/boxScanner.js?v=74"></script>
-    <script src="js/itemBarcode.js?v=74"></script>
-    <script src="js/boxCode.js?v=74"></script>
-    <script src="js/boxSegregate.js?v=74"></script>
-    <script src="js/priceCheck.js?v=74"></script>
-    <script src="js/yearSegregate.js?v=74"></script>
+    <script src="js/config.js?v=75"></script>
+    <script src="js/lang.js?v=75"></script>
+    <script src="js/supabaseClient.js?v=75"></script>
+    <script src="js/camera.js?v=75"></script>
+    <script src="js/lists.js?v=75"></script>
+    <script src="js/usage.js?v=75"></script>
+    <script src="js/syncstatus.js?v=75"></script>
+    <script src="js/help.js?v=75"></script>
+    <script src="js/tooltip.js?v=75"></script>
+    <script src="js/operator.js?v=75"></script>
+    <script src="js/teamlinks.js?v=75"></script>
+    <script src="js/workspace.js?v=75"></script>
+    <script src="js/app.js?v=75"></script>
+    <script src="js/boxScanner.js?v=75"></script>
+    <script src="js/itemBarcode.js?v=75"></script>
+    <script src="js/boxCode.js?v=75"></script>
+    <script src="js/boxSegregate.js?v=75"></script>
+    <script src="js/priceCheck.js?v=75"></script>
+    <script src="js/yearSegregate.js?v=75"></script>
 </body>
 </html>

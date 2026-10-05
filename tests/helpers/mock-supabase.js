@@ -85,7 +85,6 @@ window.__rpcCalls = [];
     remove_team_operator: ({ p_operator_id }) => { window.__labourers.forEach(o => { if (o.id === p_operator_id) o.removed_at = new Date().toISOString(); }); },
     ensure_own_team: () => { window.__me.tier = 'enterprise_admin'; window.__me.enterprise_id = 'E1'; return 'E1'; },
     leave_team_link: () => { window.__left = true; localStorage.removeItem('mock_operator'); },
-    remove_enterprise_member: ({ member_user_id }) => { window.__removedMember = member_user_id; return true; },
     begin_list_upload: ({ p_list_type }) => { db.reference_chunks = db.reference_chunks.filter(r => !(r.list_type === p_list_type && !r.is_active && owned(r))); },
     append_list_chunk: ({ p_list_type, p_seq, p_rows }) => {
       if (window.__failSeq === p_seq) throw { message: 'chunk failed (test)' };
@@ -112,8 +111,8 @@ window.__rpcCalls = [];
       if (!r) { r = { user_id: window.__me.id, day: p_day, tool: p_tool, action: p_action, event_count: 0, qty: 0 }; db.usage_daily.push(r); }
       r.event_count += p_count; r.qty += p_qty;
     },
-    // ---- Team & Data workspace (admin). Tests can set window.__wsOverview / __wsBoxes / __wsPeople / __wsData / __wsRows / __wsFacets ----
-    ws_overview: () => window.__wsOverview || { active_jobs: 2, stopped_jobs: 1, people_now: 3, units_today: 120, boxes_today: 7, top_jobs: [{ job: 'Inbound 7', units: 80 }, { job: 'Inbound 8', units: 40 }], idle_jobs: [], idle_total: 0, quiet_people: 0 },
+    // ---- Team & Data workspace (admin). Tests can set window.__wsPurgeLog / __wsBoxes / __wsJobPeople / __wsData / __wsRows / __wsFacets ----
+    ws_purge_log: () => window.__wsPurgeLog || [],
     ws_jobs: ({ p_search, p_tool, p_status, p_sort, p_limit, p_offset }) => {
       const now = new Date().toISOString();
       let rows = (window.__links = window.__links || []).filter(l =>
@@ -127,7 +126,6 @@ window.__rpcCalls = [];
     ws_job_boxes: ({ p_link_id, p_search }) => ((window.__wsBoxes || {})[p_link_id] || []).filter(b => !p_search || b.box.includes(p_search)).map(b => ({ ...b, total_count: ((window.__wsBoxes || {})[p_link_id] || []).length })),
     ws_job_people: ({ p_link_id }) => (window.__wsJobPeople || {})[p_link_id] || [],
     ws_job_activity: () => Array.from({ length: 24 }, (_, i) => ({ hour: new Date(Date.now() - (23 - i) * 3600000).toISOString(), units: i === 23 ? 5 : 0 })),
-    ws_people: ({ p_search, p_type }) => (window.__wsPeople || []).filter(p => (p_type === 'all' || p.kind === p_type) && (!p_search || p.name.toLowerCase().includes(String(p_search).toLowerCase()))).map(p => ({ ...p, total_count: (window.__wsPeople || []).length })),
     ws_data_boxes: (a) => { const rows = window.__wsData || []; return rows.map(r => ({ ...r, total_boxes: rows.length, total_units: rows.reduce((n, x) => n + x.items, 0), total_rows: rows.reduce((n, x) => n + x.items, 0) })).slice(a.p_offset || 0, (a.p_offset || 0) + (a.p_limit || 50)); },
     ws_data_rows: (a) => {
       const key = (r) => String(r.job || '').trim().toLowerCase() + '\u0001' + r.box;

@@ -247,10 +247,10 @@ select _t_eq('a normal (Google) user cannot fake an operator name on their own s
 
 -- the admin's views and tools
 select _t_eq('admin: the job list shows state and the number of people who joined', _t_val('00000000-0000-0000-0000-0000000000e1', $$select people from ws_jobs('Inbound 8', '', 'all') where state='active'$$), 2);
-select _t_eq('admin: list of people', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_people('', 'labourer') where name in ('Ravi','Sana')$$), 2);
+select _t_eq('admin: the people of a job', _t_val('00000000-0000-0000-0000-0000000000e1', format($$select count(*) from ws_job_people(%L) where name in ('Ravi','Sana')$$, (select id from team_links where job_name = 'Inbound 8'))), 2);
 select _t_eq('a member cannot list jobs', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from ws_jobs('', '', 'all')$$), 0);
 select _t_eq('another team''s admin sees none of these jobs', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from ws_jobs('', '', 'all')$$), 0);
-select _t_eq('another team''s admin sees none of these people', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from ws_people('', 'labourer')$$), 0);
+select _t_eq('another team''s admin sees none of these people', _t_val('00000000-0000-0000-0000-0000000000e2', format($$select count(*) from ws_job_people(%L)$$, (select id from team_links where job_name = 'Inbound 8'))), 0);
 select id as op_ravi from team_operators where name = 'Ravi' \gset
 select _t_do('00000000-0000-0000-0000-0000000000e2', format($$select stop_team_link(%L)$$, (select id from team_links where job_name='Inbound 8')));
 select _t_eq('another team''s admin cannot stop this link', (select count(*) from team_links where job_name='Inbound 8' and stopped_at is null), 1);
@@ -318,7 +318,7 @@ insert into auth.users(id,email) values ('00000000-0000-0000-0000-0000000000a1',
 select _t_eq('a brand-new Google sign-in gets its own team and is its admin', (select count(*) from profiles p join enterprises e on e.id = p.enterprise_id where p.email='newbie@x.com' and p.tier='enterprise_admin' and e.admin_user_id = p.id), 1);
 select _t_do('00000000-0000-0000-0000-0000000000a1', $$select create_team_link('boxScanner','Solo job')$$);
 select _t_eq('...so a solo user can make Team QR links straight away', (select count(*) from team_links l join profiles p on p.enterprise_id = l.enterprise_id where p.email='newbie@x.com'), 1);
-select _t_eq('...and still sees none of the other teams', _t_val('00000000-0000-0000-0000-0000000000a1', $$select count(*) from ws_people('', 'labourer')$$), 0);
+select _t_eq('...and still sees none of the other teams', _t_val('00000000-0000-0000-0000-0000000000a1', $$select count(*) from ws_jobs('Inbound 8', '', 'all')$$), 0);
 -- a labourer (anonymous, no e-mail) never gets a team of its own
 insert into auth.users(id,email) values ('00000000-0000-0000-0000-0000000000a2', null);
 select _t_eq('an anonymous labourer does not get a team', (select count(*) from profiles where id='00000000-0000-0000-0000-0000000000a2' and enterprise_id is null and tier='individual'), 1);
@@ -353,7 +353,7 @@ select _ta_do('00000000-0000-0000-0000-0000000000a6', $$insert into scans(user_i
 select _t_eq('before leaving the admin counts the labourer on the link', _t_val('00000000-0000-0000-0000-0000000000e1', $$select people from ws_jobs('Leave test', '', 'all')$$), 1);
 select _ta_do('00000000-0000-0000-0000-0000000000a6', $$select leave_team_link()$$);
 select _t_eq('after leaving the link no longer counts them', _t_val('00000000-0000-0000-0000-0000000000e1', $$select people from ws_jobs('Leave test', '', 'all')$$), 0);
-select _t_eq('...and the admin''s people list drops them', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_people('', 'labourer') where name='Lea'$$), 0);
+select _t_eq('...and the people of that job drop them', _t_val('00000000-0000-0000-0000-0000000000e1', format($$select count(*) from ws_job_people(%L) where name = 'Lea' and removed_at is null$$, (select id from team_links where job_name = 'Leave test'))), 0);
 select _t_eq('...but what they scanned stays', (select count(*) from scans where box_number='LV1' and operator_name='Lea'), 1);
 select _t_err('...and that old identity can no longer add scans', '00000000-0000-0000-0000-0000000000a6', $$insert into scans(user_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000a6','LV2','2')$$, 'has ended');
 delete from scans where box_number = 'LV1';
@@ -444,22 +444,8 @@ select _t_eq('delete: other jobs are untouched', (select count(*) from scans whe
 select _t_eq('delete: the other tool is untouched', (select count(*) from ys_scans where box_barcode = 'YB1'), 2);
 
 -- People and Overview
-select _t_eq('people: labourers and the admin in one list', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_people('', 'all')$$), 3 + (select count(*) from profiles where enterprise_id='11111111-1111-1111-1111-111111111111' and tier <> 'operator'));
-select _t_eq('people: labourer filter', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_people('', 'labourer')$$), 3);
-select _t_eq('people: Google filter', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_people('', 'google')$$), (select count(*) from profiles where enterprise_id='11111111-1111-1111-1111-111111111111' and tier <> 'operator'));
-select _t_eq('people: a labourer''s totals and job', _t_val('00000000-0000-0000-0000-0000000000e1', $$select units * 10 + boxes from ws_people('Ravi', 'all') where jobs = 'WS A'$$), 51);
-select _t_eq('people: search by job name', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_people('WS Y', 'all')$$), 1);
-select _t_eq('people: a member sees nothing', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from ws_people('', 'all')$$), 0);
-select _t_eq('people: another team''s admin sees none of them', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from ws_people('Ravi', 'all')$$), 0);
-select _t_eq('overview: units today', _t_val('00000000-0000-0000-0000-0000000000e1', $$select (ws_overview(now() - interval '1 day') ->> 'units_today')::bigint$$), 7);
-select _t_eq('overview: closed boxes today', _t_val('00000000-0000-0000-0000-0000000000e1', $$select (ws_overview(now() - interval '1 day') ->> 'boxes_today')::bigint$$), 2);
-select _t_eq('overview: people scanning now', _t_val('00000000-0000-0000-0000-0000000000e1', $$select (ws_overview(now() - interval '1 day') ->> 'people_now')::bigint$$), 2);
-select _t_eq('overview: active jobs', _t_val('00000000-0000-0000-0000-0000000000e1', $$select (ws_overview(now() - interval '1 day') ->> 'active_jobs')::bigint$$), 3);
-select _t_eq('overview: top jobs list', _t_val('00000000-0000-0000-0000-0000000000e1', $$select jsonb_array_length(ws_overview(now() - interval '1 day') -> 'top_jobs')$$), 2);
-select _t_eq('overview: nothing is idle yet', _t_val('00000000-0000-0000-0000-0000000000e1', $$select (ws_overview(now() - interval '1 day') ->> 'idle_total')::bigint$$), 0);
-update team_links set last_scan_at = now() - interval '3 days' where job_name = 'WS A';
-select _t_eq('overview: a job with no scan for 24 hours is idle', _t_val('00000000-0000-0000-0000-0000000000e1', $$select (ws_overview(now() - interval '1 day') ->> 'idle_total')::bigint$$), 1);
-select _t_err('overview: a member cannot open it', '00000000-0000-0000-0000-0000000000b1', $$select ws_overview(now())$$, 'Only the enterprise admin');
+select _t_eq('the job list finds a job by the name of a person in it', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_jobs('Ravi', '', 'all')$$), 1);
+select _t_eq('...and not for another team', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from ws_jobs('Ravi', '', 'all')$$), 0);
 select _t_eq('the API cannot call the internal filter directly', (select count(*) from information_schema.routine_privileges where routine_name = 'ws_filtered_scans' and grantee in ('anon','authenticated','PUBLIC')), 0);
 
 delete from scans where box_number in ('W1','W2');
@@ -486,18 +472,28 @@ insert into scans(user_id, enterprise_id, link_id, remark, box_number, barcode, 
   ('00000000-0000-0000-0000-0000000000e1', '11111111-1111-1111-1111-111111111111', 'c0000000-0000-0000-0000-000000000006', 'PG fresh',   'P3', 'z1', 1, 'Closed', now() - interval '2 days');
 insert into ys_scans(user_id, scan_uid, enterprise_id, link_id, remark, barcode, ptl_number, box_barcode, box_status, qty, scanned_at) values
   ('00000000-0000-0000-0000-0000000000e1', gen_random_uuid(), '11111111-1111-1111-1111-111111111111', 'c0000000-0000-0000-0000-000000000003', 'PG ys idle 40', 'q1', '01', 'YP1', 'Closed', 4, now() - interval '40 days');
+insert into team_links(id, enterprise_id, tool, job_name, created_at, last_scan_at) values
+  ('c0000000-0000-0000-0000-000000000009', '11111111-1111-1111-1111-111111111111', 'priceCheck', 'PG price used',   now() - interval '200 days', null),
+  ('c0000000-0000-0000-0000-00000000000a', '11111111-1111-1111-1111-111111111111', 'itemBarcode', 'PG print joined', now() - interval '200 days', null);
+insert into team_operators(enterprise_id, link_id, user_id, name, joined_at) values
+  ('11111111-1111-1111-1111-111111111111', 'c0000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-0000000000e1', 'Used', now() - interval '150 days'),
+  ('11111111-1111-1111-1111-111111111111', 'c0000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000b1', 'Joiner', now() - interval '3 days');
+insert into usage_daily(user_id, day, tool, action, enterprise_id, event_count, qty) values
+  ('00000000-0000-0000-0000-0000000000e1', current_date - 3, 'price_check', 'lookup_found', '11111111-1111-1111-1111-111111111111', 5, 0);
 alter table scans enable trigger scans_stamp_operator;
 alter table ys_scans enable trigger ys_scans_stamp_operator;
 
 select _t_eq('purge look-only: idle jobs of Box-Item Scan and Year/Season would be marked (idle 23+ days), nothing else', (select count(*) from purge_inactive_jobs(true) where action = 'warn' and job_name like 'PG%'), 4);
-select _t_eq('...Price Check and Box Segregate links are never touched, however old', (select count(*) from purge_inactive_jobs(true) where job_name in ('PG price 100', 'PG segr 100')), 0);
+select _t_eq('...Price Check and Box Segregate links are never deleted or marked - they only expire', (select count(*) from purge_inactive_jobs(true) where job_name in ('PG price 100', 'PG segr 100') and action in ('warn', 'delete')), 0);
+select _t_eq('...a Price Check / Box Segregate link nobody used for 10 days would expire (2 of them)', (select count(*) from purge_inactive_jobs(true) where action = 'expire' and job_name like 'PG%'), 2);
+select _t_eq('...but not one used 3 days ago (usage count), nor a print link someone joined 3 days ago', (select count(*) from purge_inactive_jobs(true) where job_name in ('PG price used', 'PG print joined')), 0);
 select _t_eq('...a job stopped yesterday is not touched (stopping restarts its clock)', (select count(*) from purge_inactive_jobs(true) where job_name = 'PG stopped'), 0);
 select _t_eq('...a job with a recent scan is not touched', (select count(*) from purge_inactive_jobs(true) where job_name = 'PG fresh'), 0);
 select _t_eq('...nothing can be deleted yet: nobody has been warned', (select count(*) from purge_inactive_jobs(true) where action = 'delete'), 0);
 select _t_eq('look-only changes nothing', (select count(*) from team_links where purge_warned_at is not null), 0);
 select _t_eq('the admin sees the deletion date: a job idle 40 days shows about 7 days (full warning, even though it is already old)', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_jobs('PG idle 40', '', 'all') where purge_at > now() + interval '6 days' and purge_at < now() + interval '8 days'$$), 1);
 select _t_eq('...a job idle 2 days shows a date about 28 days away', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_jobs('PG fresh', '', 'all') where purge_at > now() + interval '27 days' and purge_at < now() + interval '29 days'$$), 1);
-select _t_eq('...Price Check and Box Segregate jobs show no date at all', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_jobs('PG price', '', 'all') where purge_at is null$$) + _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_jobs('PG segr', '', 'all') where purge_at is null$$), 2);
+select _t_eq('...a Price Check link used 3 days ago shows its expiry about 8 days away', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_jobs('PG price used', '', 'all') where purge_at > now() + interval '7 days' and purge_at < now() + interval '9 days'$$), 1);
 select _t_err('only the scheduled run (not the API) can start the clean-up', '00000000-0000-0000-0000-0000000000e1', $$select count(*) from purge_inactive_jobs(false)$$, 'permission denied');
 
 -- day 1: the daily run marks them
@@ -510,12 +506,15 @@ select _t_eq('after the 7 days: only jobs idle 30+ days are deleted (idle 40 and
 select _t_eq('...the idle job, its link and its scans are gone', (select count(*) from team_links where job_name = 'PG idle 40') + (select count(*) from scans where link_id = 'c0000000-0000-0000-0000-000000000002'), 0);
 select _t_eq('...the Year/Season job and its scans are gone', (select count(*) from team_links where job_name = 'PG ys idle 40') + (select count(*) from ys_scans where link_id = 'c0000000-0000-0000-0000-000000000003'), 0);
 select _t_eq('...a job idle only 24 days is still there, with its scans', (select count(*) from team_links where job_name = 'PG idle 24') + (select count(*) from scans where link_id = 'c0000000-0000-0000-0000-000000000001'), 2);
-select _t_eq('...the other jobs are untouched (fresh, stopped, price, segregate)', (select count(*) from team_links where job_name in ('PG fresh', 'PG stopped', 'PG price 100', 'PG segr 100')), 4);
+select _t_eq('...the other jobs are untouched (fresh, stopped, and the Price Check / Box Segregate links still exist)', (select count(*) from team_links where job_name in ('PG fresh', 'PG stopped', 'PG price 100', 'PG segr 100')), 4);
+select _t_eq('...the unused Price Check and Box Segregate links were switched off (not deleted)', (select count(*) from team_links where job_name in ('PG price 100', 'PG segr 100') and stopped_at is not null), 2);
+select _t_eq('...a used one and a recently joined one were not', (select count(*) from team_links where job_name in ('PG price used', 'PG print joined') and stopped_at is null), 2);
+select _t_eq('...and the expired links show no date any more', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_jobs('PG price 100', '', 'all') where purge_at is null$$), 1);
 select _t_eq('...what was deleted is written to the log (3 units in the idle job)', (select units from job_purge_log where job_name = 'PG idle 40'), 3);
 select _t_eq('...and for Year/Season (4 units, 1 closed box)', (select units * 10 + boxes from job_purge_log where job_name = 'PG ys idle 40'), 41);
-select _t_eq('the admin sees one job about to be deleted (idle 24, date within 7 days)', _t_val('00000000-0000-0000-0000-0000000000e1', $$select (ws_overview(now() - interval '1 day') ->> 'purge_soon_total')::bigint$$), 1);
-select _t_eq('...and the two deleted ones in "deleted automatically"', _t_val('00000000-0000-0000-0000-0000000000e1', $$select jsonb_array_length(ws_overview(now() - interval '1 day') -> 'purged_recent')$$), 2);
-select _t_eq('another team does not see our log', _t_val('00000000-0000-0000-0000-0000000000e2', $$select jsonb_array_length(ws_overview(now() - interval '1 day') -> 'purged_recent')$$), 0);
+select _t_eq('the admin sees the date: a job idle 24 days is within 7 days of deletion', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_jobs('PG idle 24', '', 'all') where purge_at <= now() + interval '7 days'$$), 1);
+select _t_eq('...and the two deleted ones in the log of what was deleted automatically', _t_val('00000000-0000-0000-0000-0000000000e1', $$select count(*) from ws_purge_log()$$), 2);
+select _t_eq('another team does not see our log', _t_val('00000000-0000-0000-0000-0000000000e2', $$select count(*) from ws_purge_log()$$), 0);
 -- a new scan keeps a job alive and clears the mark
 update team_links set last_scan_at = now() - interval '1 day' where job_name = 'PG idle 24';
 do $$ begin perform count(*) from purge_inactive_jobs(false); end $$;
@@ -530,5 +529,7 @@ select _t_eq('a labourer''s scan clears the mark at once', (select count(*) from
 
 delete from scans where box_number in ('P1','P2','P3','PL1');
 delete from auth.users where id = '00000000-0000-0000-0000-0000000000b9';
+delete from team_operators where link_id in ('c0000000-0000-0000-0000-000000000009', 'c0000000-0000-0000-0000-00000000000a');
+delete from usage_daily where user_id = '00000000-0000-0000-0000-0000000000e1' and tool = 'price_check' and day = current_date - 3 and event_count = 5;
 delete from team_links where job_name like 'PG%';
 delete from job_purge_log;

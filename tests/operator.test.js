@@ -166,7 +166,7 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   ok('searching by name narrows the list', (await page.$$('#wsJobsList tbody tr')).length === 1 && /Inbound 7/.test(await page.textContent('#wsJobsList')));
   await page.fill('#wsJobSearch', ''); await wait(500);
   await page.evaluate(() => { const t = Date.now(); for (let i = 1; i <= 30; i++) window.__links.push({ id: 'X' + i, token: 'x'.repeat(31) + i, tool: i % 2 ? 'yearSegregate' : 'boxScanner', job_name: 'Job ' + String(i).padStart(2, '0'), state: 'active', operators: i, boxes: i * 2, units: i * 10 }); });
-  await page.selectOption('#wsJobSort', 'name'); await wait(400);
+  await page.evaluate(() => wsLoadJobs()); await wait(400);
   ok('a long list shows one page (25) with a pager', (await page.$$('#wsJobsList tbody tr')).length === 25 && /1-25 of 32/.test(await page.textContent('#wsJobsPager')), await page.textContent('#wsJobsPager'));
   await page.click('[data-ws-page="jobs:next"]'); await wait(400);
   ok('Next shows the rest', (await page.$$('#wsJobsList tbody tr')).length === 7 && /26-32 of 32/.test(await page.textContent('#wsJobsPager')));
@@ -199,7 +199,7 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
                        { id: 'PG2', token: 'q'.repeat(31) + '1', tool: 'priceCheck', job_name: 'Price counter', state: 'active', operators: 1, boxes: 0, units: 0, purge_at: null },
                        { id: 'PG3', token: 'r'.repeat(31) + '1', tool: 'boxScanner', job_name: 'Recent job', state: 'active', operators: 1, boxes: 1, units: 5, purge_at: new Date(Date.now() + 25 * day).toISOString() });
   });
-  await page.fill('#wsJobSearch', ''); await page.selectOption('#wsJobSort', 'name'); await page.click('[data-ws-status="all"]'); await wait(500);
+  await page.fill('#wsJobSearch', ''); await page.click('[data-ws-status="all"]'); await wait(500);
   await page.fill('#wsJobSearch', 'Old stock'); await wait(500);
   ok('a job within 7 days of its automatic deletion shows the date in red instead of its status', /Deletes \d+ \w+ \d{4}/.test(await page.textContent('#wsJobsList')) && (await page.$$('#wsJobsList .ws-pill.bad')).length === 1, await page.textContent('#wsJobsList'));
   await page.fill('#wsJobSearch', 'Recent job'); await wait(500);
@@ -221,7 +221,7 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
                   { id: 'd2', enterprise_id: 'E1', link_id: 'LD', user_id: 'u9', operator_name: 'Ravi', remark: 'Inbound 7', box_number: 'B1', barcode: '222', qty: 2, box_status: 'Closed', scanned_at: new Date().toISOString() }];
     window.__wsRows = Array.from({ length: 2500 }, (_, i) => ({ id: 'r' + String(i).padStart(5, '0'), scanned_at: new Date(Date.now() - (3000 - i) * 1000).toISOString(), person: 'Ravi', job: 'Inbound 7', box: 'B' + (i % 7), barcode: 'bc' + i, qty: 1, status: 'Closed', extra: null }));
   });
-  await page.fill('#wsJobSearch', 'Inbound 7'); await page.selectOption('#wsJobSort', 'last_scan'); await page.click('[data-ws-status="all"]'); await wait(500);
+  await page.fill('#wsJobSearch', 'Inbound 7'); await page.click('[data-ws-status="all"]'); await wait(500);
   await page.click('[data-ws-open="LD"]'); await wait(500);
   const jd = await page.evaluate(() => ({ h: document.querySelector('.ws-head h3').textContent, tiles: [...document.querySelectorAll('.ws-tile b')].map(x => x.textContent).join('|'), idle: /Idle/.test(document.querySelector('.ws-head h3').textContent) }));
   ok('opening a job shows its name, status and four totals', /Inbound 7/.test(jd.h) && jd.tiles.startsWith('5|2|2|'), JSON.stringify(jd));
@@ -264,7 +264,7 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   await page.click('[data-ws="job-back"]'); await wait(300);
   ok('Back returns to the Jobs list', /Inbound/.test(await page.textContent('#wsJobsList')));
 
-  // --- 9. Data explorer, People, Overview ---
+  // --- 9. Data explorer, Jobs & People ---
   await page.evaluate(() => {
     const at = (m) => new Date(Date.now() - m * 60000).toISOString();
     window.__wsData = [{ box: 'B2', job: 'Inbound 9', person: 'Ravi', status: 'Closed', items: 5, last_at: at(4) }, { box: 'B1', job: 'Inbound 8', person: 'Sana', status: 'Open', items: 3, last_at: at(9) }];
@@ -277,16 +277,12 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   await wait(500);
   ok('the workspace opens on the Data section', await page.evaluate(() => WS.section === 'data'));
   ok('Data shows the matching boxes with their job, person, status and totals', /Inbound 9/.test(await page.textContent('#wsDataList')) && /Sana/.test(await page.textContent('#wsDataList')) && /2 boxes, 8 units match/.test(await page.textContent('#wsDataTotals')), await page.textContent('#wsDataTotals'));
-  ok('it opens on the last 7 days of Box-Item Scan', await page.evaluate(() => { const a = window.__rpcLog.find(x => x.name === 'ws_data_boxes').args; return a.p_tool === 'boxScanner' && !!a.p_from && !a.p_to && a.p_jobs === null; }));
+  ok('it opens on Box-Item Scan with no date or status filter (everything)', await page.evaluate(() => { const a = window.__rpcLog.find(x => x.name === 'ws_data_boxes').args; return a.p_tool === 'boxScanner' && !a.p_from && !a.p_to && !a.p_status && a.p_jobs === null; }) && !(await page.$('#wsDataRange')) && !(await page.$('#wsDataStatus')));
   await page.fill('#wsDataJobIn', 'Inbound 9'); await page.dispatchEvent('#wsDataJobIn', 'change'); await wait(400);
   ok('adding a job filter adds a chip and asks the server for that job', /Inbound 9/.test(await page.textContent('#wsDataChips')) && await page.evaluate(() => JSON.stringify(window.__rpcLog.filter(x => x.name === 'ws_data_boxes').pop().args.p_jobs) === '["Inbound 9"]'));
   await page.fill('#wsDataPersonIn', 'Ravi'); await page.dispatchEvent('#wsDataPersonIn', 'change'); await wait(300);
-  await page.selectOption('#wsDataRange', 'all'); await page.selectOption('#wsDataStatus', 'Closed'); await wait(300);
-  ok('person, date range and box status are sent too', await page.evaluate(() => { const a = window.__rpcLog.filter(x => x.name === 'ws_data_boxes').pop().args; return a.p_person === 'Ravi' && a.p_from === null && a.p_status === 'Closed'; }));
-  await page.selectOption('#wsDataRange', 'custom'); await page.fill('#wsDataFrom', '2026-01-01'); await page.fill('#wsDataTo', '2026-01-31'); await wait(300);
-  ok('custom dates include the last day', await page.evaluate(() => { const a = window.__rpcLog.filter(x => x.name === 'ws_data_boxes').pop().args; return new Date(a.p_to) - new Date(a.p_from) === 31 * 86400000; }));
-  await page.click('[data-ws="data-clear"]'); await wait(300);
-  await page.selectOption('#wsDataRange', 'all'); await page.selectOption('#wsDataStatus', ''); await wait(400);
+  ok('the person filter is sent too', await page.evaluate(() => { const a = window.__rpcLog.filter(x => x.name === 'ws_data_boxes').pop().args; return a.p_person === 'Ravi' && a.p_from === null; }));
+  await page.click('[data-ws="data-clear"]'); await wait(400);
   // selecting boxes with check boxes
   ok('Data has a check box on every box and a "Select all on this page" box above the list', (await page.$$('#wsDataList [data-ws-bsel]')).length === 2 && !!(await page.$('#wsDataSelAll')));
   ok('nothing is ticked at first, so no selection buttons', !/selected/.test(await page.textContent('#wsDataSel')) && !(await page.$('[data-ws="sel-download"]')));
@@ -302,9 +298,9 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   await page.click('[data-ws="sel-download"]'); await wait(600);
   const selDl = await page.evaluate(() => ({ files: window.__files.slice(), args: window.__rpcLog.find(x => x.name === 'ws_data_rows').args }));
   ok('Download selected asks only for the ticked box (job + box) and writes the file', selDl.files.length === 1 && /^team_data_selected_/.test(selDl.files[0]) && JSON.stringify(selDl.args.p_boxes) === JSON.stringify(['inbound 9\u0001B2']), JSON.stringify(selDl));
-  await page.selectOption('#wsDataStatus', 'Closed'); await wait(400);
+  await page.fill('#wsDataSearch', 'zz'); await wait(500);
   ok('changing a filter clears the selection (it is a different set of boxes)', !/selected/.test(await page.textContent('#wsDataSel')));
-  await page.selectOption('#wsDataStatus', ''); await wait(300);
+  await page.fill('#wsDataSearch', ''); await wait(500);
   await page.click('#wsDataList [data-ws-bsel]'); await wait(200);
   await page.click('[data-ws-page="data:next"]').catch(() => {});
   await page.click('[data-ws="sel-clear"]'); await wait(200);
@@ -322,8 +318,7 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
     window.__wsData = [{ box: 'B2', job: 'Inbound 9', person: 'Ravi', status: 'Closed', items: 5, last_at: at(4) }, { box: 'B1', job: 'Inbound 8', person: 'Sana', status: 'Open', items: 3, last_at: at(9) }];
     window.__wsRows = [{ id: 'a1', scanned_at: at(9), person: 'Sana', job: 'Inbound 8', box: 'B1', barcode: '1', qty: 3, status: 'Open', extra: null }, { id: 'a2', scanned_at: at(4), person: 'Ravi', job: 'Inbound 9', box: 'B2', barcode: '2', qty: 5, status: 'Closed', extra: null }];
   });
-  await page.selectOption('#wsDataRange', '30d'); await page.selectOption('#wsDataRange', 'all'); await wait(400);
-  await page.selectOption('#wsDataRange', 'all'); await wait(300);
+  await page.evaluate(() => wsLoadData()); await wait(400);
   await page.evaluate(() => { window.__files.length = 0; });
   await page.click('[data-ws="data-download"]'); await wait(600);
   ok('Download everything that matches uses the same filters and writes the file', await page.evaluate(() => window.__files.length === 1 && /^team_data_/.test(window.__files[0])));
@@ -331,29 +326,36 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   ok('Delete from Data names what will go, with the counts', await page.evaluate(() => /Box-Item Scan/.test(document.getElementById('wsDialogBody').textContent) && /2 boxes, 8 units/.test(document.getElementById('wsDialogBody').textContent)));
   await page.click('#wsDialogOk'); await wait(700);
   ok('...then it deletes and the list is empty', /Deleted 2/.test(await page.textContent('#wsStatus')) && /No data matches/.test(await page.textContent('#wsDataList')));
-  // People
-  await page.click('[data-ws-go="people"]:visible'); await wait(400);
-  ok('People lists labourers and Google members together with jobs and totals', /Ravi/.test(await page.textContent('#wsPeopleList')) && /Priya/.test(await page.textContent('#wsPeopleList')) && /Inbound 9/.test(await page.textContent('#wsPeopleList')));
-  ok('a Google member can be removed, yourself cannot', (await page.$$('[data-ws-pmember]')).length === 1);
-  await page.click('[data-ws-ptype="labourer"]'); await wait(300);
-  ok('the type filter works', !/Priya/.test(await page.textContent('#wsPeopleList')) && /Ravi/.test(await page.textContent('#wsPeopleList')));
-  await page.evaluate(() => { window.__renamed = []; const rpc = supabaseClient.rpc.bind(supabaseClient); });
-  await page.evaluate(() => { window.prompt = () => 'Ravi K'; window.__labourers = [{ id: 'op1', name: 'Ravi' }, { id: 'op1b', name: 'ravi' }]; });
-  await page.click('[data-ws-prename="0"]'); await wait(300);
-  ok('renaming a labourer renames every handheld of that person', await page.evaluate(() => window.__labourers.every(o => o.name === 'Ravi K')));
-  await page.click('[data-ws-pdata="0"]'); await wait(500);
-  ok('View data jumps to Data filtered to that person', await page.evaluate(() => WS.section === 'data' && WS.data.person === 'Ravi') && /Ravi/.test(await page.textContent('#wsDataChips')));
-  // Overview
-  await page.evaluate(() => { window.__wsOverview = { active_jobs: 14, stopped_jobs: 52, people_now: 22, units_today: 18420, boxes_today: 312, top_jobs: [{ job: 'Team A', units: 9640 }, { job: 'Team B', units: 7310 }], idle_jobs: [{ id: 'LD', job: 'Inbound 7', tool: 'boxScanner', last_scan_at: new Date(Date.now() - 50 * 3600000).toISOString(), created_at: new Date(Date.now() - 80 * 3600000).toISOString() }], idle_total: 3, quiet_people: 2, purge_soon: [{ id: 'PG1', job: 'Old stock job', tool: 'boxScanner', purge_at: new Date(Date.now() + 5 * 86400000).toISOString() }], purge_soon_total: 3, purged_recent: [{ job: 'Last season A', tool: 'boxScanner', units: 1200, purged_at: new Date(Date.now() - 2 * 86400000).toISOString() }] }; });
-  await page.click('[data-ws-go="overview"]:visible'); await wait(500);
-  const ov = await page.textContent('#wsOv');
-  ok('Overview shows today\'s totals', /14/.test(ov) && /22/.test(ov) && /18,420/.test(ov) && /312/.test(ov) && /Team A/.test(ov) && /9,640/.test(ov), ov.slice(0, 200));
-  ok('...and what needs attention: idle jobs (with how long), more idle jobs, quiet people, stopped jobs', /Inbound 7 has had no scans for 2 days/.test(ov) && /2 more idle jobs/.test(ov) && /2 labourer/.test(ov) && /52 stopped/.test(ov), ov);
-  ok('Overview warns about jobs to be deleted automatically (date, name, and how many more)', /Old stock job will be deleted with its data on/.test(ov) && /2 more jobs will be deleted within 7 days/.test(ov), ov);
-  ok('...and lists what was deleted automatically in the last 30 days', /Deleted automatically in the last 30 days/.test(ov) && /Last season A: 1,200 units/.test(ov), ov);
-  await page.click('.ws-alert [data-ws-open="LD"]'); await wait(500);
-  ok('an idle job in the alerts opens that job', /Inbound 7/.test(await page.textContent('.ws-head h3')));
-  ok('the Jobs count shows in the navigation', /14/.test(await page.textContent('#wsNav')));
+  // Jobs & People: the people of a job open inside the Jobs list
+  await page.evaluate(() => {
+    window.__labourers = [{ id: 'op1', name: 'Ravi' }];
+    window.__wsJobPeople = { LD: [{ operator_id: 'op1', name: 'Ravi', boxes: 1, units: 5, last_at: new Date().toISOString(), removed_at: null }, { operator_id: 'op2', name: 'Sana', boxes: 0, units: 0, last_at: null, removed_at: null }] };
+    window.__links.length = 0; window.__links.push({ id: 'LD', token: 'l'.repeat(31) + '1', tool: 'boxScanner', job_name: 'Inbound 7', state: 'active', operators: 2, boxes: 1, units: 5 });
+    window.prompt = () => 'Ravi K';
+  });
+  await page.evaluate(() => { openWorkspace('jobs'); }); await wait(500);
+  await page.click('[data-ws-go="jobs"]'); await wait(400);
+  ok('Jobs & People: the number of people opens them inside the list, with totals', await (async () => { await page.click('[data-ws-people="LD"]'); await wait(400); const t = await page.textContent('#wsJobsList'); return /Ravi/.test(t) && /Sana/.test(t); })());
+  await page.evaluate(() => { window.__renamed = true; });
+  await page.click('#wsJobsList [data-ws-rename="op1"]'); await wait(500);
+  ok('renaming a person there changes the name', await page.evaluate(() => window.__labourers.every(o => o.name === 'Ravi K')));
+  await page.evaluate(() => { window.confirm = () => true; });
+  await page.click('#wsJobsList [data-ws-remove="op1"]'); await wait(500);
+  ok('removing a person there marks them removed', await page.evaluate(() => !!window.__labourers[0].removed_at));
+  await page.click('[data-ws-people="LD"]'); await wait(200);
+  ok('the number toggles the people closed again', !(await page.$('#wsJobsList [data-ws-rename]')));
+  ok('searching "job or person" is sent to the server as one search', await (async () => { await page.fill('#wsJobSearch', 'Sana'); await wait(500); return page.evaluate(() => window.__rpcLog.filter(x => x.name === 'ws_jobs').pop().args.p_search === 'Sana'); })());
+  await page.fill('#wsJobSearch', ''); await wait(400);
+  ok('no Sort, date or People/Overview/Account tabs in the workspace', !(await page.$('#wsJobSort')) && !(await page.$('#wsBottomNav')) && !(await page.$('.ws-side')) && (await page.$$('#wsNav [data-ws-go]')).length === 2);
+  // expiry of jobs that keep no data, and the automatic-deletion log
+  await page.evaluate(() => { const day = 86400000; window.__links.push({ id: 'EX1', token: 'e'.repeat(31) + '1', tool: 'priceCheck', job_name: 'Price counter', state: 'active', operators: 1, boxes: 0, units: 0, purge_at: new Date(Date.now() + 2 * day).toISOString() }, { id: 'EX2', token: 'f'.repeat(31) + '1', tool: 'boxSegregate', job_name: 'Segregate far', state: 'active', operators: 1, boxes: 0, units: 0, purge_at: new Date(Date.now() + 8 * day).toISOString() }); window.__wsPurgeLog = [{ job: 'Last season A', tool: 'boxScanner', units: 1200, purged_at: new Date(Date.now() - 2 * day).toISOString() }]; });
+  await page.evaluate(() => wsGo('jobs')); await wait(500);
+  const exl = await page.textContent('#wsJobsList');
+  ok('a Price Check / Segregate link close to expiry says "Expires <date>" (not "Deletes"), one far away shows nothing special', /Expires \d+ \w+ \d{4}/.test(exl) && !/Deletes/.test(exl) && (await page.$$('#wsJobsList .ws-pill.bad')).length === 1, exl);
+  ok('...and lists what was deleted automatically in the last 30 days', /Deleted automatically in the last 30 days/.test(await page.textContent('#wsPurgeLog')) && /Last season A: 1,200 units/.test(await page.textContent('#wsPurgeLog')));
+  await page.click('[data-ws-open="EX1"]'); await wait(500);
+  ok('opening it shows an expiry banner that says the link switches itself off', /switch itself off/.test(await page.textContent('.ws-banner')));
+  await page.evaluate(() => { WS.job = null; });
   await page.click('#wsCloseBtn');
   ok('the ✕ closes the workspace', await page.evaluate(() => !document.getElementById('wsRoot').classList.contains('active') && !document.body.classList.contains('ws-open')));
 

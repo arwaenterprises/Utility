@@ -2,7 +2,7 @@
 // TEAM & DATA WORKSPACE (enterprise admin)
 // ============================================
 // One full-screen window that replaces User management and Data Management for an admin:
-//   Overview | Jobs | People | Data | Account
+//   Jobs & People | Data      (account details: the small Account window under your name in the top bar)
 // A JOB is one Team QR link (a tool + a job name). It owns its QR code, its people, its boxes and its scans; People
 // and Data are views of the same jobs. Everything is shown a page at a time from summaries computed in the database
 // (the ws_* functions in supabase/schema.sql), so it stays fast with many jobs, people and scans.
@@ -12,28 +12,25 @@ const WS_DATA_PAGE = 50;          // boxes per page in Data and in a job
 const WS_IDLE_HOURS = 24;         // an active job with no scan for this long shows "Idle" (it is never stopped by itself)
 const WS_FETCH_ROWS = 1000;       // rows per request when downloading (the API returns at most about 1000)
 const WS_FILE_ROWS = 50000;       // rows per Excel file; bigger downloads are split into several files
-const WS_SECTIONS = ['overview', 'jobs', 'people', 'data', 'account'];
+const WS_SECTIONS = ['jobs', 'data'];
+const WS_DATA_TOOLS = ['boxScanner', 'yearSegregate'];   // tools that keep scans; the others keep none, their link just expires
+const WS_EXPIRE_WARN_DAYS = 3;       // a link that expires (no data kept) is flagged this many days ahead
 
 const WS_T = {
     en: {
-        title: 'Team & Data', overview: 'Overview', jobs: 'Jobs', people: 'People', data: 'Data', account: 'Account',
+        title: 'Team & Data', jobs: 'Jobs & People', data: 'Data',
         loading: 'Loading...', none: 'Nothing here yet.', failed: 'Could not load this. Please try again.', retry: 'Try again',
         prev: 'Previous', next: 'Next', range: '{a}-{b} of {n}', cancel: 'Cancel', ok: 'OK', back: 'Back',
-        all: 'All', allTools: 'All tools', allTime: 'All time', today: 'Today', last7: 'Last 7 days', last30: 'Last 30 days', custom: 'Custom dates',
-        from: 'From', to: 'To', units: 'Units', boxes: 'Boxes', peopleCol: 'People', lastScan: 'Last scan', status: 'Status', tool: 'Tool', job: 'Job',
+        all: 'All', allTools: 'All tools', units: 'Units', boxes: 'Boxes', peopleCol: 'People', lastScan: 'Last scan', status: 'Status', tool: 'Tool', job: 'Job',
         person: 'Person', items: 'Items', by: 'Scanned by', when: 'When', box: 'Box', type: 'Type', name: 'Name', jobsCol: 'Jobs',
         never: 'No scans yet', justNow: 'just now', minAgo: '{n} min ago', hAgo: '{n} h ago', dAgo: '{n} days ago',
         active: 'Active', stopped: 'Stopped', idle: 'Idle', open: 'Open', closed: 'Closed',
-        // overview
-        todayHead: 'Today', activeJobs: 'active jobs', peopleNow: 'scanning in the last 30 minutes', unitsToday: 'units today', boxesToday: 'boxes closed today',
-        topJobs: 'Units today by job', attention: 'Needs attention', allGood: 'Nothing needs attention.',
-        idleJob: '{job} has had no scans for {t}', idleMore: '{n} more idle jobs', quietPeople: '{n} labourer(s) have not scanned in 7 days',
-        stoppedInfo: '{n} stopped job(s) still keep their data. Open Jobs, choose Stopped.',
-        deletesOn: 'Deletes {d}', purgeSoon: '{job} will be deleted with its data on {d}', purgeSoonMore: '{n} more jobs will be deleted within 7 days', purgedRecent: 'Deleted automatically in the last 30 days', purgedLine: '{job}: {u} units, {d}',
+        deletesOn: 'Deletes {d}', expiresOn: 'Expires {d}', purgedRecent: 'Deleted automatically in the last 30 days', purgedLine: '{job}: {u} units, {d}',
+        expireBanner: 'Nobody has used this link for a while. It will switch itself off on {d}. Scan or open it again to keep it.',
         purgeBanner: 'No scans for a long time. This job, its QR link and its data will be deleted automatically on {d}. Download the data first, or scan again to keep the job.',
         // jobs
         newJob: '+ New job', chooseTool: 'Choose a tool', jobPlaceholder: 'Job name (becomes the Remark)', createJob: 'Create QR link',
-        searchJobs: 'Search job name', sortLast: 'Sort: last scan', sortNewest: 'Sort: newest', sortName: 'Sort: name',
+        searchJobs: 'Search job or person', showPeople: 'Show people', hidePeople: 'Hide people',
         noJobs: 'No jobs match. Create one with + New job.', selected: '{n} selected', downloadSel: 'Download', stopSel: 'Stop links',
         showQr: 'Show QR', stopLink: 'Stop this link', stopAsk: 'Stop this link? Nobody can start new work on it. Scans already made are kept.',
         stopManyAsk: 'Stop {n} links? Nobody can start new work on them. Scans already made are kept.',
@@ -44,7 +41,7 @@ const WS_T = {
         noPeople: 'Nobody has joined this job yet.', removed: 'removed', rename: 'Rename', remove: 'Remove', unitsPerHour: 'Units per hour, last 24 hours',
         sinceLast: 'since last scan', dataOfJob: 'Data of this job', downloadAll: 'Download all', downloadDelete: 'Download and delete…', thisBox: 'Download this box',
         // data
-        tools: 'Tool', anyStatus: 'Any box status', anyJob: 'Type a job name to add it', anyPerson: 'Type a person to add them', searchData: 'Search box, barcode, person, job',
+        tools: 'Tool', anyJob: 'Type a job name to add it', anyPerson: 'Type a person to add them', searchData: 'Search box, barcode, person, job',
         matches: '{b} boxes, {u} units match', selectedBoxes: '{n} boxes selected ({u} units)', downloadSelected: 'Download selected', deleteSelected: 'Download and delete selected…', clearSel: 'Clear selection', selectPage: 'Select all on this page', selectBox: 'Select this box', selScope: '{n} selected boxes', noMatches: 'No data matches these filters.', downloadMatches: 'Download everything that matches',
         deleteMatches: 'Download and delete…', filesNote: 'Large downloads are split into several files of {n} rows.', clearFilters: 'Clear filters',
         // dialogs, progress
@@ -55,31 +52,21 @@ const WS_T = {
         downloaded: 'Downloaded {n} scans.', deleted: 'Deleted {n} scans. Scans made after the download started were kept.', noRows: 'There is nothing to download.',
         exportFailed: 'The download failed, so nothing was deleted.', deleteFailed: 'Could not delete: ',
         // people
-        searchPeople: 'Search name or job', labourers: 'Labourers', google: 'Google members', labourer: 'labourer', member: 'Google', viewData: 'View data',
-        renamePrompt: 'Correct name (also changed on their earlier scans):', nameBad: 'Please type a name of 1 to 40 characters.',
-        removeAsk: 'Remove this person? Their handheld stops accepting new scans. What they scanned stays.',
-        removeMemberAsk: 'Remove this teammate from your enterprise?',
-        // account
-        email: 'Signed in as', role: 'Role', enterprise: 'Enterprise', renameEnterprise: 'Rename', enterpriseName: 'Enterprise name:', nameEmpty: 'Name cannot be empty.',
-        adminRole: 'Enterprise Admin', you: 'you'
+                renamePrompt: 'Correct name (also changed on their earlier scans):', nameBad: 'Please type a name of 1 to 40 characters.',
+        removeAsk: 'Remove this person? Their handheld stops accepting new scans. What they scanned stays.'
     },
     ar: {
-        title: 'الفريق والبيانات', overview: 'نظرة عامة', jobs: 'المهام', people: 'الأشخاص', data: 'البيانات', account: 'الحساب',
+        title: 'الفريق والبيانات', jobs: 'المهام والأشخاص', data: 'البيانات',
         loading: 'جارٍ التحميل...', none: 'لا يوجد شيء هنا بعد.', failed: 'تعذّر التحميل. حاول مرة أخرى.', retry: 'حاول مرة أخرى',
         prev: 'السابق', next: 'التالي', range: '\u200E{a}-{b}\u200E من {n}', cancel: 'إلغاء', ok: 'موافق', back: 'رجوع',
-        all: 'الكل', allTools: 'كل الأدوات', allTime: 'كل الأوقات', today: 'اليوم', last7: 'آخر 7 أيام', last30: 'آخر 30 يومًا', custom: 'تواريخ مخصصة',
-        from: 'من', to: 'إلى', units: 'القطع', boxes: 'الصناديق', peopleCol: 'الأشخاص', lastScan: 'آخر مسح', status: 'الحالة', tool: 'الأداة', job: 'المهمة',
+        all: 'الكل', allTools: 'كل الأدوات', units: 'القطع', boxes: 'الصناديق', peopleCol: 'الأشخاص', lastScan: 'آخر مسح', status: 'الحالة', tool: 'الأداة', job: 'المهمة',
         person: 'الشخص', items: 'القطع', by: 'بواسطة', when: 'الوقت', box: 'الصندوق', type: 'النوع', name: 'الاسم', jobsCol: 'المهام',
         never: 'لا يوجد مسح بعد', justNow: 'الآن', minAgo: 'قبل {n} دقيقة', hAgo: 'قبل {n} ساعة', dAgo: 'قبل {n} يومًا',
         active: 'نشط', stopped: 'متوقف', idle: 'خامل', open: 'مفتوح', closed: 'مغلق',
-        todayHead: 'اليوم', activeJobs: 'مهام نشطة', peopleNow: 'يمسحون خلال آخر 30 دقيقة', unitsToday: 'قطعة اليوم', boxesToday: 'صندوق مغلق اليوم',
-        topJobs: 'قطع اليوم حسب المهمة', attention: 'يحتاج إلى انتباه', allGood: 'لا شيء يحتاج إلى انتباه.',
-        idleJob: 'لا مسح في {job} منذ {t}', idleMore: '{n} مهام خاملة أخرى', quietPeople: '{n} عامل لم يمسحوا خلال 7 أيام',
-        stoppedInfo: '{n} مهمة متوقفة ما زالت بياناتها محفوظة. افتح المهام واختر المتوقفة.',
-        deletesOn: 'تُحذف {d}', purgeSoon: 'ستُحذف {job} مع بياناتها في {d}', purgeSoonMore: 'سيتم حذف {n} مهام أخرى خلال 7 أيام', purgedRecent: 'حُذف تلقائيًا خلال آخر 30 يومًا', purgedLine: '{job}: {u} قطعة، {d}',
+        deletesOn: 'تُحذف {d}', expiresOn: 'ينتهي {d}', expireBanner: 'لم يستخدم أحد هذا الرابط منذ مدة. سيتوقف تلقائيًا في {d}. امسح أو افتحه مرة أخرى للإبقاء عليه.', purgedRecent: 'حُذف تلقائيًا خلال آخر 30 يومًا', purgedLine: '{job}: {u} قطعة، {d}',
         purgeBanner: 'لا يوجد مسح منذ مدة طويلة. ستُحذف هذه المهمة ورابط QR وبياناتها تلقائيًا في {d}. حمّل البيانات أولًا، أو امسح مرة أخرى للإبقاء على المهمة.',
         newJob: '+ مهمة جديدة', chooseTool: 'اختر أداة', jobPlaceholder: 'اسم المهمة (يصبح الملاحظة)', createJob: 'إنشاء رابط QR',
-        searchJobs: 'ابحث باسم المهمة', sortLast: 'الترتيب: آخر مسح', sortNewest: 'الترتيب: الأحدث', sortName: 'الترتيب: الاسم',
+        searchJobs: 'ابحث عن مهمة أو شخص', showPeople: 'عرض الأشخاص', hidePeople: 'إخفاء الأشخاص',
         noJobs: 'لا توجد مهام مطابقة. أنشئ واحدة بزر + مهمة جديدة.', selected: 'تم تحديد {n}', downloadSel: 'تحميل', stopSel: 'إيقاف الروابط',
         showQr: 'عرض QR', stopLink: 'إيقاف هذا الرابط', stopAsk: 'هل تريد إيقاف هذا الرابط؟ لن يستطيع أحد بدء عمل جديد عليه. عمليات المسح التي تمت تبقى محفوظة.',
         stopManyAsk: 'هل تريد إيقاف {n} روابط؟ لن يستطيع أحد بدء عمل جديد عليها. عمليات المسح التي تمت تبقى محفوظة.',
@@ -88,7 +75,7 @@ const WS_T = {
         tabBoxes: 'الصناديق', tabPeople: 'الأشخاص', tabActivity: 'النشاط', searchBox: 'ابحث عن صندوق أو باركود أو شخص', noBoxes: 'لا توجد صناديق بعد.',
         noPeople: 'لم ينضم أحد إلى هذه المهمة بعد.', removed: 'تمت إزالته', rename: 'تغيير الاسم', remove: 'إزالة', unitsPerHour: 'القطع في الساعة، آخر 24 ساعة',
         sinceLast: 'منذ آخر مسح', dataOfJob: 'بيانات هذه المهمة', downloadAll: 'تحميل الكل', downloadDelete: 'تحميل ثم حذف…', thisBox: 'تحميل هذا الصندوق',
-        tools: 'الأداة', anyStatus: 'أي حالة صندوق', anyJob: 'اكتب اسم مهمة لإضافتها', anyPerson: 'اكتب اسم شخص لإضافته', searchData: 'ابحث عن صندوق أو باركود أو شخص أو مهمة',
+        tools: 'الأداة', anyJob: 'اكتب اسم مهمة لإضافتها', anyPerson: 'اكتب اسم شخص لإضافته', searchData: 'ابحث عن صندوق أو باركود أو شخص أو مهمة',
         matches: '{b} صندوق، {u} قطعة مطابقة', selectedBoxes: 'تم تحديد {n} صندوق ({u} قطعة)', downloadSelected: 'تحميل المحدد', deleteSelected: 'تحميل ثم حذف المحدد…', clearSel: 'مسح التحديد', selectPage: 'تحديد كل ما في هذه الصفحة', selectBox: 'تحديد هذا الصندوق', selScope: '{n} صندوق محدد', noMatches: 'لا توجد بيانات مطابقة لهذه المرشحات.', downloadMatches: 'تحميل كل ما يطابق',
         deleteMatches: 'تحميل ثم حذف…', filesNote: 'التحميلات الكبيرة تُقسَّم إلى عدة ملفات، كل ملف {n} صف.', clearFilters: 'مسح المرشحات',
         deleteTitle: 'تحميل ثم حذف', deleteLead: 'سيتم تحميل البيانات أولًا ثم حذفها نهائيًا من الخادم.',
@@ -97,12 +84,8 @@ const WS_T = {
         preparing: 'جارٍ تجهيز التحميل...', exporting: 'جارٍ تحميل {n} من {t} عملية مسح ({p}%)...', deleting: 'جارٍ الحذف...',
         downloaded: 'تم تحميل {n} عملية مسح.', deleted: 'تم حذف {n} عملية مسح. عمليات المسح بعد بدء التحميل بقيت محفوظة.', noRows: 'لا يوجد ما يمكن تحميله.',
         exportFailed: 'فشل التحميل، لذا لم يُحذف شيء.', deleteFailed: 'تعذّر الحذف: ',
-        searchPeople: 'ابحث بالاسم أو المهمة', labourers: 'العمال', google: 'أعضاء Google', labourer: 'عامل', member: 'Google', viewData: 'عرض البيانات',
-        renamePrompt: 'الاسم الصحيح (يتغير أيضًا في عمليات المسح السابقة):', nameBad: 'الرجاء كتابة اسم من 1 إلى 40 حرفًا.',
-        removeAsk: 'هل تريد إزالة هذا الشخص؟ سيتوقف جهازه عن قبول عمليات مسح جديدة. ما مسحه يبقى محفوظًا.',
-        removeMemberAsk: 'هل تريد إزالة هذا العضو من مؤسستك؟',
-        email: 'تم تسجيل الدخول باسم', role: 'الدور', enterprise: 'المؤسسة', renameEnterprise: 'تغيير الاسم', enterpriseName: 'اسم المؤسسة:', nameEmpty: 'لا يمكن أن يكون الاسم فارغًا.',
-        adminRole: 'مسؤول المؤسسة', you: 'أنت'
+                renamePrompt: 'الاسم الصحيح (يتغير أيضًا في عمليات المسح السابقة):', nameBad: 'الرجاء كتابة اسم من 1 إلى 40 حرفًا.',
+        removeAsk: 'هل تريد إزالة هذا الشخص؟ سيتوقف جهازه عن قبول عمليات مسح جديدة. ما مسحه يبقى محفوظًا.'
     }
 };
 
@@ -137,16 +120,24 @@ function wsToolName(tool) {
     return a ? appName(a) : tool;
 }
 function wsTools() { return APPS.filter(a => !a.modal); }
+function wsIsDataTool(t) { return WS_DATA_TOOLS.includes(t); }
 function wsIsIdle(j) {
     return j.state === 'active' && (Date.now() - new Date(j.last_scan_at || j.created_at).getTime()) > WS_IDLE_HOURS * 3600000;
 }
-// Within 7 days of its automatic deletion (a job with no scan for 30 days): the date, in red.
-function wsPurgeSoon(j) {
-    return !!j.purge_at && (new Date(j.purge_at).getTime() - Date.now()) <= 7 * 86400000;
+// What happens by itself soon: 'delete' (a data job, within 7 days of deletion with its data), 'expire' (a job that keeps
+// no data, within 3 days of its link switching off) or null.
+function wsPurgeKind(j) {
+    if (!j.purge_at) return null;
+    const left = new Date(j.purge_at).getTime() - Date.now();
+    if (wsIsDataTool(j.tool)) return left <= 7 * 86400000 ? 'delete' : null;
+    return left <= WS_EXPIRE_WARN_DAYS * 86400000 ? 'expire' : null;
 }
+function wsPurgeSoon(j) { return wsPurgeKind(j) !== null; }
+function wsPurgeBanner(j) { return wsT(wsPurgeKind(j) === 'expire' ? 'expireBanner' : 'purgeBanner', { d: wsDate(j.purge_at) }); }
 function wsDate(iso) { return new Date(iso).toLocaleDateString(wsLang() === 'ar' ? 'ar' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 function wsPill(j) {
-    if (wsPurgeSoon(j)) return `<span class="ws-pill bad" title="${wsEsc(wsT('purgeBanner', { d: wsDate(j.purge_at) }))}">${wsEsc(wsT('deletesOn', { d: wsDate(j.purge_at) }))}</span>`;
+    const k = wsPurgeKind(j);
+    if (k) return `<span class="ws-pill bad" title="${wsEsc(wsPurgeBanner(j))}">${wsEsc(wsT(k === 'expire' ? 'expiresOn' : 'deletesOn', { d: wsDate(j.purge_at) }))}</span>`;
     if (j.state !== 'active') return `<span class="ws-pill off">${wsEsc(wsT('stopped'))}</span>`;
     if (wsIsIdle(j)) return `<span class="ws-pill warn">${wsEsc(wsT('idle'))}</span>`;
     return `<span class="ws-pill ok">${wsEsc(wsT('active'))}</span>`;
@@ -155,15 +146,12 @@ function wsDebounce(fn, ms) { let t = null; return (...a) => { clearTimeout(t); 
 
 const WS = {
     open: false,
-    section: 'overview',
+    section: 'jobs',
     enterprise: '',
-    counts: { jobs: null, people: null },
-    jobs: { search: '', tool: '', status: 'active', sort: 'last_scan', offset: 0, total: 0, rows: [], sel: new Set(), cache: new Map(), req: 0, formOpen: false },
+    jobs: { search: '', tool: '', status: 'active', offset: 0, total: 0, rows: [], sel: new Set(), cache: new Map(), req: 0, formOpen: false, open: new Set(), people: new Map() },
     job: null,                       // the job open in the detail view
     jb: { tab: 'boxes', search: '', offset: 0, total: 0, rows: [], expanded: new Set(), items: new Map(), req: 0 },
-    people: { search: '', type: 'all', offset: 0, total: 0, rows: [], req: 0 },
-    data: { sel: new Map(), selSig: '', tool: 'boxScanner', jobs: [], person: '', range: '7d', from: '', to: '', status: '', search: '', offset: 0, total: 0, totals: { boxes: 0, units: 0, rows: 0 }, rows: [], expanded: new Set(), items: new Map(), req: 0 },
-    overview: { req: 0 },
+    data: { sel: new Map(), selSig: '', tool: 'boxScanner', jobs: [], person: '', search: '', offset: 0, total: 0, totals: { boxes: 0, units: 0, rows: 0 }, rows: [], expanded: new Set(), items: new Map(), req: 0 },
     busy: false
 };
 
@@ -172,12 +160,11 @@ async function openWorkspace(section) {
     WS.open = true;
     wsEl('wsRoot').classList.add('active');
     document.body.classList.add('ws-open');
-    wsEl('wsAdmin').textContent = AppState.profile?.display_name || AppState.user?.email || '';
     wsEl('wsEnterprise').textContent = WS.enterprise || '...';
     wsLoadEnterpriseName();
     let start = section;
     if (!start) { try { start = Storage.get('ws_section'); } catch (e) { start = null; } }
-    wsGo(WS_SECTIONS.includes(start) ? start : 'overview');
+    wsGo(WS_SECTIONS.includes(start) ? start : 'jobs');
 }
 
 function closeWorkspace() {
@@ -190,7 +177,6 @@ async function wsLoadEnterpriseName() {
     const { data } = await supabaseClient.from('enterprises').select('name').eq('id', AppState.profile.enterprise_id).maybeSingle();
     WS.enterprise = (data && data.name) || 'Team';
     wsEl('wsEnterprise').textContent = WS.enterprise;
-    if (WS.section === 'account') wsRenderAccount();
 }
 
 function wsGo(section, keepJob) {
@@ -199,15 +185,12 @@ function wsGo(section, keepJob) {
     try { Storage.set('ws_section', section); } catch (e) { /* storage blocked: fine */ }
     wsRenderNav();
     wsEl('wsTitle').textContent = wsT('title');
-    ({ overview: wsRenderOverview, jobs: wsRenderJobs, people: wsRenderPeople, data: wsRenderData, account: wsRenderAccount })[section]();
+    ({ jobs: wsRenderJobs, data: wsRenderData })[section]();
     wsEl('wsMain').scrollTop = 0;
 }
 
 function wsRenderNav() {
-    const badge = (s) => (s === 'jobs' && WS.counts.jobs != null) ? `<em>${wsNum(WS.counts.jobs)}</em>` : (s === 'people' && WS.counts.people != null) ? `<em>${wsNum(WS.counts.people)}</em>` : '';
-    const html = WS_SECTIONS.map(s => `<button type="button" class="ws-nav-btn${WS.section === s ? ' on' : ''}" data-ws-go="${s}"><span>${wsEsc(wsT(s))}</span>${badge(s)}</button>`).join('');
-    wsEl('wsNav').innerHTML = html;
-    wsEl('wsBottomNav').innerHTML = WS_SECTIONS.map(s => `<button type="button" class="ws-nav-btn${WS.section === s ? ' on' : ''}" data-ws-go="${s}">${wsEsc(wsT(s))}</button>`).join('');
+    wsEl('wsNav').innerHTML = WS_SECTIONS.map(x => `<button type="button" class="ws-tab-btn${WS.section === x ? ' on' : ''}" data-ws-go="${x}">${wsEsc(wsT(x))}</button>`).join('');
 }
 
 // ---------- status line, dialog, progress ----------
@@ -267,40 +250,6 @@ function wsFail(el, retryAction) {
 }
 
 // ============================================
-// OVERVIEW
-// ============================================
-async function wsRenderOverview() {
-    const main = wsEl('wsMain');
-    main.innerHTML = `<div class="ws-head"><h3>${wsEsc(wsT('todayHead'))}</h3></div><div id="wsOv"><p class="ws-muted">${wsEsc(wsT('loading'))}</p></div>`;
-    const req = ++WS.overview.req;
-    const since = new Date(); since.setHours(0, 0, 0, 0);
-    const { data, error } = await supabaseClient.rpc('ws_overview', { p_since: since.toISOString(), p_idle_hours: WS_IDLE_HOURS });
-    if (req !== WS.overview.req || WS.section !== 'overview') return;
-    const box = wsEl('wsOv');
-    if (error || !data) { wsFail(box, 'ov-retry'); return; }
-    WS.counts.jobs = Number(data.active_jobs) || 0;
-    wsRenderNav();
-    const tile = (n, label) => `<div class="ws-tile"><b>${wsNum(n)}</b><span>${wsEsc(label)}</span></div>`;
-    const top = data.top_jobs || [];
-    const max = Math.max(1, ...top.map(t => Number(t.units)));
-    const alerts = [];
-    const idleShown = (data.idle_jobs || []).slice(0, 5);
-    idleShown.forEach(j => alerts.push(`<div class="ws-alert"><span class="ws-pill warn">${wsEsc(wsT('idle'))}</span><button type="button" class="ws-link" data-ws-open="${j.id}" data-ws-name="${wsEsc(j.job)}" data-ws-tool="${wsEsc(j.tool)}">${wsEsc(wsT('idleJob', { job: j.job, t: wsDuration(j.last_scan_at || j.created_at) }))}</button></div>`));
-    if (Number(data.idle_total) > idleShown.length) alerts.push(`<div class="ws-alert"><span class="ws-pill off">+</span><span>${wsEsc(wsT('idleMore', { n: Number(data.idle_total) - idleShown.length }))}</span></div>`);
-    (data.purge_soon || []).slice(0, 5).forEach(j => alerts.unshift(`<div class="ws-alert"><span class="ws-pill bad">${wsEsc(wsT('deletesOn', { d: wsDate(j.purge_at) }))}</span><button type="button" class="ws-link" data-ws-open="${j.id}" data-ws-name="${wsEsc(j.job)}" data-ws-tool="${wsEsc(j.tool)}">${wsEsc(wsT('purgeSoon', { job: j.job, d: wsDate(j.purge_at) }))}</button></div>`));
-    if (Number(data.purge_soon_total) > Math.min(5, (data.purge_soon || []).length)) alerts.push(`<div class="ws-alert"><span class="ws-pill bad">+</span><span>${wsEsc(wsT('purgeSoonMore', { n: Number(data.purge_soon_total) - Math.min(5, (data.purge_soon || []).length) }))}</span></div>`);
-    if (Number(data.quiet_people) > 0) alerts.push(`<div class="ws-alert"><span class="ws-pill off">i</span><span>${wsEsc(wsT('quietPeople', { n: data.quiet_people }))}</span></div>`);
-    if (Number(data.stopped_jobs) > 0) alerts.push(`<div class="ws-alert"><span class="ws-pill off">i</span><span>${wsEsc(wsT('stoppedInfo', { n: data.stopped_jobs }))}</span></div>`);
-    box.innerHTML = `
-        <div class="ws-tiles">${tile(data.active_jobs, wsT('activeJobs'))}${tile(data.people_now, wsT('peopleNow'))}${tile(data.units_today, wsT('unitsToday'))}${tile(data.boxes_today, wsT('boxesToday'))}</div>
-        <div class="ws-split">
-            <div class="ws-card"><h4>${wsEsc(wsT('topJobs'))}</h4>${top.length ? top.map(t => `<div class="ws-hbar"><span title="${wsEsc(t.job)}">${wsEsc(t.job || '-')}</span><div class="ws-track"><i style="width:${Math.max(2, Math.round(100 * Number(t.units) / max))}%"></i></div><span class="v">${wsNum(t.units)}</span></div>`).join('') : `<p class="ws-muted">${wsEsc(wsT('none'))}</p>`}</div>
-            <div class="ws-card"><h4>${wsEsc(wsT('attention'))}</h4>${alerts.length ? alerts.join('') : `<p class="ws-muted">${wsEsc(wsT('allGood'))}</p>`}</div>
-        </div>
-        ${(data.purged_recent || []).length ? `<div class="ws-card"><h4>${wsEsc(wsT('purgedRecent'))}</h4>${data.purged_recent.map(p => `<div class="ws-alert"><span class="ws-pill off">${wsEsc(wsToolName(p.tool))}</span><span>${wsEsc(wsT('purgedLine', { job: p.job, u: wsNum(p.units), d: wsDate(p.purged_at) }))}</span></div>`).join('')}</div>` : ''}`;
-}
-
-// ============================================
 // JOBS
 // ============================================
 function wsRenderJobs() {
@@ -318,38 +267,86 @@ function wsRenderJobs() {
             <input type="search" id="wsJobSearch" class="form-input ws-grow" placeholder="${wsEsc(wsT('searchJobs'))}" value="${wsEsc(J.search)}" autocomplete="off">
             <span class="ws-seg">${seg('active', wsT('active'))}${seg('stopped', wsT('stopped'))}${seg('all', wsT('all'))}</span>
             ${wsToolSelectHtml('wsJobTool', J.tool, true)}
-            <select id="wsJobSort" class="form-input ws-sel"><option value="last_scan"${J.sort === 'last_scan' ? ' selected' : ''}>${wsEsc(wsT('sortLast'))}</option><option value="created"${J.sort === 'created' ? ' selected' : ''}>${wsEsc(wsT('sortNewest'))}</option><option value="name"${J.sort === 'name' ? ' selected' : ''}>${wsEsc(wsT('sortName'))}</option></select>
         </div>
         <div id="wsJobsBulk"></div>
         <div id="wsJobsList"><p class="ws-muted">${wsEsc(wsT('loading'))}</p></div>
-        <div id="wsJobsPager"></div>`;
+        <div id="wsJobsPager"></div>
+        <div id="wsPurgeLog"></div>`;
     wsLoadJobs();
+    wsLoadPurgeLog();
+}
+
+// The jobs, each with its people one tap away (the number in the People column opens them in place).
+function wsJobsTable() {
+    const J = WS.jobs;
+    const head = `<thead><tr><th class="ws-chk"></th><th>${wsEsc(wsT('job'))}</th><th>${wsEsc(wsT('status'))}</th><th class="n">${wsEsc(wsT('peopleCol'))}</th><th class="n">${wsEsc(wsT('boxes'))}</th><th class="n">${wsEsc(wsT('units'))}</th><th>${wsEsc(wsT('lastScan'))}</th><th></th></tr></thead>`;
+    const body = J.rows.map(r => {
+        const open = J.open.has(r.id);
+        let html = `
+            <tr class="${J.sel.has(r.id) ? 'sel' : ''}">
+                <td class="ws-chk"><input type="checkbox" data-ws-sel="${r.id}" ${J.sel.has(r.id) ? 'checked' : ''} aria-label="${wsEsc(r.job_name)}"></td>
+                <td><button type="button" class="ws-link" data-ws-open="${r.id}"><b>${wsEsc(r.job_name)}</b></button><small>${wsEsc(wsToolName(r.tool))}</small></td>
+                <td data-label="${wsEsc(wsT('status'))}">${wsPill(r)}</td>
+                <td class="n" data-label="${wsEsc(wsT('peopleCol'))}">${Number(r.people) > 0 ? `<button type="button" class="ws-link" data-ws-people="${r.id}" aria-expanded="${open}" title="${wsEsc(wsT(open ? 'hidePeople' : 'showPeople'))}">${wsNum(r.people)} ${open ? '&#9652;' : '&#9662;'}</button>` : '0'}</td>
+                <td class="n" data-label="${wsEsc(wsT('boxes'))}">${wsNum(r.boxes)}</td>
+                <td class="n" data-label="${wsEsc(wsT('units'))}">${wsNum(r.units)}</td>
+                <td data-label="${wsEsc(wsT('lastScan'))}">${wsEsc(wsAgo(r.last_scan_at))}</td>
+                <td class="ws-act">${r.state === 'active' ? `<button type="button" class="btn btn-secondary btn-sm" data-ws-qr="${r.id}">QR</button>` : ''}</td>
+            </tr>`;
+        if (open) html += `<tr class="ws-sub"><td colspan="8">${wsPeopleHtml(J.people.get(r.id))}</td></tr>`;
+        return html;
+    }).join('');
+    return `<div class="ws-scroll"><table class="ws-table">${head}<tbody>${body}</tbody></table></div>`;
+}
+
+// the people of one job (used inline in the list and in the job's People tab)
+function wsPeopleHtml(rows) {
+    if (!rows) return `<p class="ws-muted">${wsEsc(wsT('loading'))}</p>`;
+    if (!rows.length) return `<div class="ws-empty">${wsEsc(wsT('noPeople'))}</div>`;
+    return `<div class="ws-scroll"><table class="ws-table ws-mini"><thead><tr><th>${wsEsc(wsT('name'))}</th><th class="n">${wsEsc(wsT('boxes'))}</th><th class="n">${wsEsc(wsT('units'))}</th><th>${wsEsc(wsT('lastScan'))}</th><th></th></tr></thead><tbody>${rows.map(p => `
+        <tr class="${p.removed_at ? 'ws-removed' : ''}"><td data-label="${wsEsc(wsT('name'))}"><b>${wsEsc(p.name)}</b>${p.removed_at ? ` <span class="ws-pill off">${wsEsc(wsT('removed'))}</span>` : ''}</td>
+        <td class="n" data-label="${wsEsc(wsT('boxes'))}">${wsNum(p.boxes)}</td><td class="n" data-label="${wsEsc(wsT('units'))}">${wsNum(p.units)}</td><td data-label="${wsEsc(wsT('lastScan'))}">${wsEsc(wsAgo(p.last_at))}</td>
+        <td class="ws-act">${p.removed_at ? '' : `<button type="button" class="btn btn-secondary btn-sm" data-ws-rename="${p.operator_id}" data-name="${wsEsc(p.name)}">${wsEsc(wsT('rename'))}</button> <button type="button" class="btn btn-secondary btn-sm btn-danger-text" data-ws-remove="${p.operator_id}">${wsEsc(wsT('remove'))}</button>`}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+async function wsTogglePeople(id) {
+    const J = WS.jobs;
+    if (J.open.has(id)) J.open.delete(id); else J.open.add(id);
+    wsRerenderJobs();
+    if (J.open.has(id) && !J.people.has(id)) {
+        const { data, error } = await supabaseClient.rpc('ws_job_people', { p_link_id: id });
+        if (error) { J.open.delete(id); alert(error.message); } else J.people.set(id, data || []);
+        wsRerenderJobs();
+    }
+}
+function wsRerenderJobs() {
+    const list = wsEl('wsJobsList');
+    if (list && WS.section === 'jobs' && !WS.job && WS.jobs.rows.length) list.innerHTML = wsJobsTable();
+}
+
+// what was deleted automatically in the last 30 days (shown only when there is something)
+async function wsLoadPurgeLog() {
+    const { data } = await supabaseClient.rpc('ws_purge_log');
+    const el = wsEl('wsPurgeLog');
+    if (!el || WS.section !== 'jobs' || WS.job || !data || !data.length) return;
+    el.innerHTML = `<div class="ws-card"><h4>${wsEsc(wsT('purgedRecent'))}</h4>${data.map(p => `<div class="ws-alert"><span class="ws-pill off">${wsEsc(wsToolName(p.tool))}</span><span>${wsEsc(wsT('purgedLine', { job: p.job, u: wsNum(p.units), d: wsDate(p.purged_at) }))}</span></div>`).join('')}</div>`;
 }
 
 async function wsLoadJobs() {
     const J = WS.jobs, req = ++J.req;
-    const { data, error } = await supabaseClient.rpc('ws_jobs', { p_search: J.search, p_tool: J.tool, p_status: J.status, p_sort: J.sort, p_limit: WS_PAGE, p_offset: J.offset });
+    const { data, error } = await supabaseClient.rpc('ws_jobs', { p_search: J.search, p_tool: J.tool, p_status: J.status, p_sort: 'last_scan', p_limit: WS_PAGE, p_offset: J.offset });
     if (req !== J.req || WS.section !== 'jobs' || WS.job) return;
     const list = wsEl('wsJobsList');
     if (error) { wsFail(list, 'jobs-retry'); return; }
     J.rows = data || [];
     J.total = J.rows.length ? Number(J.rows[0].total_count) : 0;
     J.rows.forEach(r => J.cache.set(r.id, r));
-    if (J.status === 'active' && !J.search && !J.tool) { WS.counts.jobs = J.total; wsRenderNav(); }
+    J.people.clear();
+    J.open.forEach(id => { if (!J.rows.some(r => r.id === id)) J.open.delete(id); });
     if (!J.rows.length) {
         list.innerHTML = `<div class="ws-empty">${wsEsc(wsT('noJobs'))}</div>`;
     } else {
-        list.innerHTML = `<div class="ws-scroll"><table class="ws-table"><thead><tr><th class="ws-chk"></th><th>${wsEsc(wsT('job'))}</th><th>${wsEsc(wsT('status'))}</th><th class="n">${wsEsc(wsT('peopleCol'))}</th><th class="n">${wsEsc(wsT('boxes'))}</th><th class="n">${wsEsc(wsT('units'))}</th><th>${wsEsc(wsT('lastScan'))}</th><th></th></tr></thead><tbody>${J.rows.map(r => `
-            <tr class="${J.sel.has(r.id) ? 'sel' : ''}">
-                <td class="ws-chk"><input type="checkbox" data-ws-sel="${r.id}" ${J.sel.has(r.id) ? 'checked' : ''} aria-label="${wsEsc(r.job_name)}"></td>
-                <td><button type="button" class="ws-link" data-ws-open="${r.id}"><b>${wsEsc(r.job_name)}</b></button><small>${wsEsc(wsToolName(r.tool))}</small></td>
-                <td data-label="${wsEsc(wsT('status'))}">${wsPill(r)}</td>
-                <td class="n" data-label="${wsEsc(wsT('peopleCol'))}">${wsNum(r.people)}</td>
-                <td class="n" data-label="${wsEsc(wsT('boxes'))}">${wsNum(r.boxes)}</td>
-                <td class="n" data-label="${wsEsc(wsT('units'))}">${wsNum(r.units)}</td>
-                <td data-label="${wsEsc(wsT('lastScan'))}">${wsEsc(wsAgo(r.last_scan_at))}</td>
-                <td class="ws-act">${r.state === 'active' ? `<button type="button" class="btn btn-secondary btn-sm" data-ws-qr="${r.id}">QR</button>` : ''}</td>
-            </tr>`).join('')}</tbody></table></div>`;
+        list.innerHTML = wsJobsTable();
     }
     wsEl('wsJobsPager').innerHTML = wsPager('jobs', J.offset, J.total, WS_PAGE);
     wsRenderJobsBulk();
@@ -403,7 +400,7 @@ async function wsStopLinks(ids) {
 // ============================================
 async function wsOpenJob(id, name, tool) {
     let row = WS.jobs.cache.get(id);
-    if (!row) {                                  // opened from the Overview: fetch the row
+    if (!row) {                                  // not in the loaded page: fetch the row
         const { data } = await supabaseClient.rpc('ws_jobs', { p_search: name || '', p_tool: tool || '', p_status: 'all', p_sort: 'name', p_limit: 100, p_offset: 0 });
         row = (data || []).find(r => r.id === id);
         if (row) WS.jobs.cache.set(id, row);
@@ -432,7 +429,7 @@ function wsRenderJobDetail() {
         <div class="ws-head"><h3><button type="button" class="ws-back" data-ws="job-back" aria-label="${wsEsc(wsT('back'))}">&lsaquo;</button> ${wsEsc(j.job_name)} ${wsPill(j)}</h3>
             <span class="ws-head-btns"><small class="ws-muted">${wsEsc(wsToolName(j.tool))}</small>
             ${j.state === 'active' ? `<button type="button" class="btn btn-secondary btn-sm" data-ws-qr="${j.id}">${wsEsc(wsT('showQr'))}</button><button type="button" class="btn btn-secondary btn-sm btn-danger-text" data-ws="job-stop">${wsEsc(wsT('stopLink'))}</button>` : ''}</span></div>
-        ${wsPurgeSoon(j) ? `<div class="ws-banner">${wsEsc(wsT('purgeBanner', { d: wsDate(j.purge_at) }))}</div>` : ''}
+        ${wsPurgeSoon(j) ? `<div class="ws-banner">${wsEsc(wsPurgeBanner(j))}</div>` : ''}
         <div class="ws-tiles">${tile(wsNum(j.units), wsT('units'))}${tile(wsNum(j.boxes), wsT('boxes'))}${tile(wsNum(j.people), wsT('peopleCol'))}${tile(wsEsc(wsAgo(j.last_scan_at)), wsT('lastScan'))}</div>
         <div class="ws-tabs">${tab('boxes', wsT('tabBoxes'))}${tab('people', wsT('tabPeople'))}${tab('activity', wsT('tabActivity'))}</div>
         <div id="wsJobTab"></div>
@@ -523,11 +520,7 @@ async function wsLoadJobPeople() {
     const el = wsEl('wsJobPeople');
     if (req !== WS.jb.req || !el) return;
     if (error) { wsFail(el, 'jobpeople-retry'); return; }
-    const rows = data || [];
-    el.innerHTML = rows.length ? `<div class="ws-scroll"><table class="ws-table"><thead><tr><th>${wsEsc(wsT('name'))}</th><th class="n">${wsEsc(wsT('boxes'))}</th><th class="n">${wsEsc(wsT('units'))}</th><th>${wsEsc(wsT('lastScan'))}</th><th></th></tr></thead><tbody>${rows.map(p => `
-        <tr class="${p.removed_at ? 'ws-removed' : ''}"><td data-label="${wsEsc(wsT('name'))}"><b>${wsEsc(p.name)}</b>${p.removed_at ? ` <span class="ws-pill off">${wsEsc(wsT('removed'))}</span>` : ''}</td>
-        <td class="n" data-label="${wsEsc(wsT('boxes'))}">${wsNum(p.boxes)}</td><td class="n" data-label="${wsEsc(wsT('units'))}">${wsNum(p.units)}</td><td data-label="${wsEsc(wsT('lastScan'))}">${wsEsc(wsAgo(p.last_at))}</td>
-        <td class="ws-act">${p.removed_at ? '' : `<button type="button" class="btn btn-secondary btn-sm" data-ws-rename="${p.operator_id}" data-name="${wsEsc(p.name)}">${wsEsc(wsT('rename'))}</button> <button type="button" class="btn btn-secondary btn-sm btn-danger-text" data-ws-remove="${p.operator_id}">${wsEsc(wsT('remove'))}</button>`}</td></tr>`).join('')}</tbody></table></div>` : `<div class="ws-empty">${wsEsc(wsT('noPeople'))}</div>`;
+    el.innerHTML = wsPeopleHtml(data || []);
 }
 
 async function wsLoadJobActivity() {
@@ -542,40 +535,15 @@ async function wsLoadJobActivity() {
         <div class="ws-spark-x"><span>${rows.length ? wsEsc(new Date(rows[0].hour).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) : ''}</span><span>${rows.length ? wsEsc(new Date(rows[rows.length - 1].hour).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) : ''}</span></div></div>`;
 }
 
-// ============================================
-// PEOPLE
-// ============================================
-function wsRenderPeople() {
-    const P = WS.people;
-    const seg = (v, label) => `<button type="button" class="ws-seg-btn${P.type === v ? ' on' : ''}" data-ws-ptype="${v}">${wsEsc(label)}</button>`;
-    wsEl('wsMain').innerHTML = `
-        <div class="ws-head"><h3>${wsEsc(wsT('people'))}</h3></div>
-        <div class="ws-filters"><input type="search" id="wsPeopleSearch" class="form-input ws-grow" placeholder="${wsEsc(wsT('searchPeople'))}" value="${wsEsc(P.search)}" autocomplete="off">
-            <span class="ws-seg">${seg('all', wsT('all'))}${seg('labourer', wsT('labourers'))}${seg('google', wsT('google'))}</span></div>
-        <div id="wsPeopleList"><p class="ws-muted">${wsEsc(wsT('loading'))}</p></div><div id="wsPeoplePager"></div>`;
-    wsLoadPeople();
-}
-
-async function wsLoadPeople() {
-    const P = WS.people, req = ++P.req;
-    const { data, error } = await supabaseClient.rpc('ws_people', { p_search: P.search, p_type: P.type, p_limit: WS_PAGE, p_offset: P.offset });
-    const el = wsEl('wsPeopleList');
-    if (req !== P.req || WS.section !== 'people' || !el) return;
-    if (error) { wsFail(el, 'people-retry'); return; }
-    P.rows = data || [];
-    P.total = P.rows.length ? Number(P.rows[0].total_count) : 0;
-    if (!P.search && P.type === 'all') { WS.counts.people = P.total; wsRenderNav(); }
-    el.innerHTML = P.rows.length ? `<div class="ws-scroll"><table class="ws-table"><thead><tr><th>${wsEsc(wsT('name'))}</th><th>${wsEsc(wsT('type'))}</th><th>${wsEsc(wsT('jobsCol'))}</th><th class="n">${wsEsc(wsT('boxes'))}</th><th class="n">${wsEsc(wsT('units'))}</th><th>${wsEsc(wsT('lastScan'))}</th><th></th></tr></thead><tbody>${P.rows.map((p, i) => {
-        const isSelf = p.user_id && p.user_id === AppState.user?.id;
-        return `<tr><td data-label="${wsEsc(wsT('name'))}"><b>${wsEsc(p.name)}</b>${isSelf ? ` <small class="ws-muted">(${wsEsc(wsT('you'))})</small>` : ''}</td>
-            <td data-label="${wsEsc(wsT('type'))}"><span class="ws-tag">${wsEsc(p.kind === 'labourer' ? wsT('labourer') : wsT('member'))}</span></td>
-            <td data-label="${wsEsc(wsT('jobsCol'))}">${wsEsc(p.jobs || '')}</td>
-            <td class="n" data-label="${wsEsc(wsT('boxes'))}">${wsNum(p.boxes)}</td><td class="n" data-label="${wsEsc(wsT('units'))}">${wsNum(p.units)}</td>
-            <td data-label="${wsEsc(wsT('lastScan'))}">${wsEsc(wsAgo(p.last_at))}</td>
-            <td class="ws-act"><button type="button" class="btn btn-secondary btn-sm" data-ws-pdata="${i}">${wsEsc(wsT('viewData'))}</button>
-                ${p.kind === 'labourer' ? `<button type="button" class="btn btn-secondary btn-sm" data-ws-prename="${i}">${wsEsc(wsT('rename'))}</button> <button type="button" class="btn btn-secondary btn-sm btn-danger-text" data-ws-premove="${i}">${wsEsc(wsT('remove'))}</button>` : (isSelf ? '' : `<button type="button" class="btn btn-secondary btn-sm btn-danger-text" data-ws-pmember="${i}">${wsEsc(wsT('remove'))}</button>`)}</td></tr>`;
-    }).join('')}</tbody></table></div>` : `<div class="ws-empty">${wsEsc(wsT('none'))}</div>`;
-    wsEl('wsPeoplePager').innerHTML = wsPager('people', P.offset, P.total, WS_PAGE);
+// after a person was renamed / removed: reload whichever view shows people
+async function wsPeopleChanged(removed) {
+    if (WS.job) { wsLoadJobPeople(); if (removed) await wsRefreshJobRow(); return; }
+    WS.jobs.people.clear();
+    for (const id of WS.jobs.open) {
+        const { data } = await supabaseClient.rpc('ws_job_people', { p_link_id: id });
+        WS.jobs.people.set(id, data || []);
+    }
+    if (removed) await wsLoadJobs(); else wsRerenderJobs();
 }
 
 async function wsRenameOperators(ids, current) {
@@ -600,39 +568,18 @@ async function wsRemoveOperators(ids) {
 // ============================================
 // DATA
 // ============================================
-function wsDateRange() {
-    const D = WS.data;
-    const start = new Date(); start.setHours(0, 0, 0, 0);
-    if (D.range === 'today') return { from: start.toISOString(), to: null };
-    if (D.range === '7d') { start.setDate(start.getDate() - 6); return { from: start.toISOString(), to: null }; }
-    if (D.range === '30d') { start.setDate(start.getDate() - 29); return { from: start.toISOString(), to: null }; }
-    if (D.range === 'custom') {
-        const f = D.from ? new Date(D.from + 'T00:00:00') : null;
-        const t = D.to ? new Date(D.to + 'T00:00:00') : null;
-        if (t) t.setDate(t.getDate() + 1);        // the "to" day is included
-        return { from: f && !isNaN(f) ? f.toISOString() : null, to: t && !isNaN(t) ? t.toISOString() : null };
-    }
-    return { from: null, to: null };
-}
 function wsDataArgs() {
-    const D = WS.data, r = wsDateRange();
-    return { p_jobs: D.jobs.length ? D.jobs : null, p_person: D.person || null, p_from: r.from, p_to: r.to, p_status: D.status || null, p_search: D.search || null };
+    const D = WS.data;
+    return { p_jobs: D.jobs.length ? D.jobs : null, p_person: D.person || null, p_from: null, p_to: null, p_status: null, p_search: D.search || null };
 }
 
 function wsRenderData() {
     const D = WS.data;
-    const sel = (id, value, opts) => `<select id="${id}" class="form-input ws-sel">${opts.map(([v, l]) => `<option value="${v}"${v === value ? ' selected' : ''}>${wsEsc(l)}</option>`).join('')}</select>`;
     wsEl('wsMain').innerHTML = `
         <div class="ws-head"><h3>${wsEsc(wsT('data'))}</h3><span class="ws-muted" id="wsDataTotals"></span></div>
         <div class="ws-filters">
             <input type="search" id="wsDataSearch" class="form-input ws-grow" placeholder="${wsEsc(wsT('searchData'))}" value="${wsEsc(D.search)}" autocomplete="off">
             ${wsToolSelectHtml('wsDataTool', D.tool, false)}
-            ${sel('wsDataRange', D.range, [['today', wsT('today')], ['7d', wsT('last7')], ['30d', wsT('last30')], ['all', wsT('allTime')], ['custom', wsT('custom')]])}
-            ${sel('wsDataStatus', D.status, [['', wsT('anyStatus')], ['Closed', wsT('closed')], ['Open', wsT('open')]])}
-        </div>
-        <div class="ws-filters" id="wsDataDates" ${D.range === 'custom' ? '' : 'hidden'}>
-            <label class="ws-lbl">${wsEsc(wsT('from'))} <input type="date" id="wsDataFrom" class="form-input" value="${wsEsc(D.from)}"></label>
-            <label class="ws-lbl">${wsEsc(wsT('to'))} <input type="date" id="wsDataTo" class="form-input" value="${wsEsc(D.to)}"></label>
         </div>
         <div class="ws-filters">
             <span class="ws-pick"><input type="text" id="wsDataJobIn" class="form-input" list="wsJobOpts" placeholder="${wsEsc(wsT('anyJob'))}" autocomplete="off"><datalist id="wsJobOpts"></datalist></span>
@@ -819,31 +766,10 @@ function wsRenderDataOnly() {
 }
 
 // ============================================
-// ACCOUNT
-// ============================================
-function wsRenderAccount() {
-    wsEl('wsMain').innerHTML = `
-        <div class="ws-head"><h3>${wsEsc(wsT('account'))}</h3></div>
-        <div class="ws-card ws-kv">
-            <div><span class="ws-muted">${wsEsc(wsT('email'))}</span><b>${wsEsc(AppState.user?.email || '')}</b></div>
-            <div><span class="ws-muted">${wsEsc(wsT('role'))}</span><b>${wsEsc(wsT('adminRole'))}</b></div>
-            <div><span class="ws-muted">${wsEsc(wsT('enterprise'))}</span><b>${wsEsc(WS.enterprise)}</b> <button type="button" class="btn btn-secondary btn-sm" data-ws="rename-ent">${wsEsc(wsT('renameEnterprise'))}</button></div>
-        </div>`;
-}
-async function wsRenameEnterprise() {
-    const name = prompt(wsT('enterpriseName'), WS.enterprise);
-    if (name === null) return;
-    if (!name.trim()) { alert(wsT('nameEmpty')); return; }
-    const { error } = await supabaseClient.rpc('rename_enterprise', { new_name: name });
-    if (error) { alert(error.message); return; }
-    await wsLoadEnterpriseName();
-}
-
-// ============================================
 // EVENTS (one handler for the whole workspace)
 // ============================================
 function wsRefreshCurrent() {
-    ({ overview: wsRenderOverview, jobs: () => (WS.job ? wsRenderJobDetail() : wsLoadJobs()), people: wsLoadPeople, data: wsLoadData, account: wsRenderAccount })[WS.section]();
+    ({ jobs: () => (WS.job ? wsRenderJobDetail() : wsLoadJobs()), data: wsLoadData })[WS.section]();
 }
 
 async function wsOnClick(e) {
@@ -852,11 +778,10 @@ async function wsOnClick(e) {
     const d = t.dataset;
     if (d.wsGo) { wsGo(d.wsGo); return; }
     if (d.wsStatus) { WS.jobs.status = d.wsStatus; WS.jobs.offset = 0; WS.jobs.sel.clear(); wsRenderJobs(); return; }
-    if (d.wsPtype) { WS.people.type = d.wsPtype; WS.people.offset = 0; wsRenderPeople(); return; }
+    if (d.wsPeople) { wsTogglePeople(d.wsPeople); return; }
     if (d.wsPage) {
         const [id, dir] = d.wsPage.split(':'), step = dir === 'next' ? 1 : -1;
         if (id === 'jobs') { WS.jobs.offset = Math.max(0, WS.jobs.offset + step * WS_PAGE); wsLoadJobs(); }
-        if (id === 'people') { WS.people.offset = Math.max(0, WS.people.offset + step * WS_PAGE); wsLoadPeople(); }
         if (id === 'data') { WS.data.offset = Math.max(0, WS.data.offset + step * WS_DATA_PAGE); wsLoadData(); }
         if (id === 'jobboxes') { WS.jb.offset = Math.max(0, WS.jb.offset + step * WS_DATA_PAGE); wsLoadJobBoxes(); }
         return;
@@ -866,25 +791,14 @@ async function wsOnClick(e) {
     if (d.wsTab) { WS.jb.tab = d.wsTab; wsRenderJobDetail(); return; }
     if (d.wsExp) { wsToggleBox(d.wsExp.split(':')[0], d.wsExp); return; }
     if (d.wsBoxdl) { wsBoxDownload(d.wsBoxdl.split(':')[0], d.wsBoxdl); return; }
-    if (d.wsRename) { if (await wsRenameOperators([d.wsRename], d.name || '')) { wsLoadJobPeople(); } return; }
-    if (d.wsRemove) { if (await wsRemoveOperators([d.wsRemove])) { wsLoadJobPeople(); await wsRefreshJobRow(); } return; }
-    if (d.wsPdata !== undefined) { const p = WS.people.rows[Number(d.wsPdata)]; if (p) { WS.data.person = p.name; WS.data.jobs = []; WS.data.offset = 0; wsGo('data'); } return; }
-    if (d.wsPrename !== undefined) { const p = WS.people.rows[Number(d.wsPrename)]; if (p && await wsRenameOperators(p.operator_ids || [], p.name)) wsLoadPeople(); return; }
-    if (d.wsPremove !== undefined) { const p = WS.people.rows[Number(d.wsPremove)]; if (p && await wsRemoveOperators(p.operator_ids || [])) wsLoadPeople(); return; }
-    if (d.wsPmember !== undefined) {
-        const p = WS.people.rows[Number(d.wsPmember)];
-        if (p && confirm(wsT('removeMemberAsk'))) {
-            const { error } = await supabaseClient.rpc('remove_enterprise_member', { member_user_id: p.user_id });
-            if (error) alert(error.message); else wsLoadPeople();
-        }
-        return;
-    }
+    if (d.wsRename) { if (await wsRenameOperators([d.wsRename], d.name || '')) await wsPeopleChanged(false); return; }
+    if (d.wsRemove) { if (await wsRemoveOperators([d.wsRemove])) await wsPeopleChanged(true); return; }
     if (d.wsRmjob !== undefined) { WS.data.jobs.splice(Number(d.wsRmjob), 1); WS.data.offset = 0; wsRenderDataChips(); wsLoadData(); return; }
     if (d.wsRmperson) { WS.data.person = ''; WS.data.offset = 0; wsRenderDataChips(); wsLoadData(); return; }
     switch (d.ws) {
         case 'newjob': WS.jobs.formOpen = !WS.jobs.formOpen; wsEl('wsNewJob').hidden = !WS.jobs.formOpen; if (WS.jobs.formOpen) wsEl('wsNewName').focus(); return;
         case 'create': wsCreateJob(); return;
-        case 'jobs-retry': case 'jobboxes-retry': case 'jobpeople-retry': case 'jobactivity-retry': case 'people-retry': case 'data-retry': case 'ov-retry': wsRefreshCurrent(); return;
+        case 'jobs-retry': case 'jobboxes-retry': case 'jobpeople-retry': case 'jobactivity-retry': case 'data-retry': wsRefreshCurrent(); return;
         case 'job-back': WS.job = null; wsRenderJobs(); return;
         case 'job-stop': if (await wsStopLinks([WS.job.id])) { await wsRefreshJobRow(); wsRenderJobDetail(); } return;
         case 'job-download': wsDownloadFlow({ ...wsJobExportArgs(WS.job), total: WS.job.units }); return;
@@ -912,20 +826,17 @@ async function wsOnClick(e) {
                 after: async () => { D.sel.clear(); D.offset = 0; D.expanded.clear(); D.items.clear(); await wsLoadData(); } });
             return;
         }
-        case 'data-clear': Object.assign(WS.data, { jobs: [], person: '', search: '', status: '', offset: 0 }); wsRenderData(); return;
+        case 'data-clear': Object.assign(WS.data, { jobs: [], person: '', search: '', offset: 0 }); wsRenderData(); return;
         case 'data-download': wsDownloadFlow({ tool: WS.data.tool, args: wsDataArgs(), total: WS.data.totals.rows, prefix: 'team_data' }); return;
         case 'data-delete': {
-            const D = WS.data, a = wsDataArgs(), r = wsDateRange();
+            const D = WS.data, a = wsDataArgs();
             const parts = [`<b>${wsEsc(wsToolName(D.tool))}</b>`];
             if (D.jobs.length) parts.push(wsEsc(wsT('job')) + ': ' + D.jobs.map(wsEsc).join(', '));
             if (D.person) parts.push(wsEsc(wsT('person')) + ': ' + wsEsc(D.person));
-            if (r.from || r.to) parts.push(wsEsc(wsT('when')) + ': ' + wsEsc((r.from ? new Date(r.from).toLocaleDateString() : '...') + ' - ' + (r.to ? new Date(new Date(r.to).getTime() - 1).toLocaleDateString() : '...')));
-            if (D.status) parts.push(wsEsc(wsT('status')) + ': ' + wsEsc(D.status === 'Closed' ? wsT('closed') : wsT('open')));
             if (D.search) parts.push('&quot;' + wsEsc(D.search) + '&quot;');
             wsDeleteFlow({ tool: D.tool, args: a, totals: D.totals, exact: true, scopeHtml: parts.join('<br>'), prefix: 'team_data_deleted', after: async () => { D.offset = 0; D.expanded.clear(); D.items.clear(); await wsLoadData(); } });
             return;
         }
-        case 'rename-ent': wsRenameEnterprise(); return;
     }
 }
 
@@ -950,12 +861,7 @@ function wsOnChange(e) {
     }
     switch (t.id) {
         case 'wsJobTool': WS.jobs.tool = t.value; WS.jobs.offset = 0; wsLoadJobs(); break;
-        case 'wsJobSort': WS.jobs.sort = t.value; WS.jobs.offset = 0; wsLoadJobs(); break;
         case 'wsDataTool': WS.data.tool = t.value; WS.data.jobs = []; WS.data.person = ''; WS.data.offset = 0; WS.data.expanded.clear(); WS.data.items.clear(); wsRenderData(); break;
-        case 'wsDataRange': WS.data.range = t.value; WS.data.offset = 0; wsEl('wsDataDates').hidden = t.value !== 'custom'; wsLoadData(); break;
-        case 'wsDataStatus': WS.data.status = t.value; WS.data.offset = 0; wsLoadData(); break;
-        case 'wsDataFrom': WS.data.from = t.value; WS.data.offset = 0; wsLoadData(); break;
-        case 'wsDataTo': WS.data.to = t.value; WS.data.offset = 0; wsLoadData(); break;
         case 'wsDataJobIn': {
             const v = t.value.trim();
             if (v && !WS.data.jobs.some(j => j.toLowerCase() === v.toLowerCase())) { WS.data.jobs.push(v); WS.data.offset = 0; wsRenderDataChips(); wsLoadData(); }
@@ -970,7 +876,6 @@ function wsOnChange(e) {
 }
 
 const wsSearchJobs = wsDebounce(() => { WS.jobs.offset = 0; wsLoadJobs(); }, 300);
-const wsSearchPeople = wsDebounce(() => { WS.people.offset = 0; wsLoadPeople(); }, 300);
 const wsSearchData = wsDebounce(() => { WS.data.offset = 0; wsLoadData(); }, 300);
 const wsSearchBoxes = wsDebounce(() => { WS.jb.offset = 0; wsLoadJobBoxes(); }, 300);
 
@@ -978,7 +883,6 @@ function wsOnInput(e) {
     const t = e.target;
     switch (t.id) {
         case 'wsJobSearch': WS.jobs.search = t.value.trim(); wsSearchJobs(); break;
-        case 'wsPeopleSearch': WS.people.search = t.value.trim(); wsSearchPeople(); break;
         case 'wsDataSearch': WS.data.search = t.value.trim(); wsSearchData(); break;
         case 'wsJobBoxSearch': WS.jb.search = t.value.trim(); wsSearchBoxes(); break;
         case 'wsDataJobIn': wsLoadFacets('job', t.value.trim()); break;

@@ -143,36 +143,7 @@ drop function if exists public.accept_enterprise_invite(uuid);
 drop function if exists public.my_pending_invites();
 drop function if exists public.send_enterprise_invite(text);
 
-create or replace function public.remove_enterprise_member(member_user_id uuid)
-returns boolean
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-    target_enterprise_id uuid;
-begin
-    if not public.current_user_is_enterprise_admin() then
-        raise exception 'Only an enterprise admin can remove a member.';
-    end if;
-    if member_user_id = auth.uid() then
-        raise exception 'Cannot remove yourself.';
-    end if;
 
-    select enterprise_id into target_enterprise_id from public.profiles where id = member_user_id;
-    if target_enterprise_id is null or target_enterprise_id != public.current_user_enterprise_id() then
-        raise exception 'That user is not a member of your enterprise.';
-    end if;
-
-    update public.profiles
-    set tier = 'individual', enterprise_id = null
-    where id = member_user_id;
-
-    return true;
-end;
-$$;
-
-grant execute on function public.remove_enterprise_member(uuid) to authenticated;
 
 
 -- ============================================
@@ -821,20 +792,39 @@ create table if not exists public.job_purge_log (
     purged_at timestamptz not null default now()
 );
 create index if not exists job_purge_log_ent_idx on public.job_purge_log(enterprise_id, purged_at desc);
-alter table public.job_purge_log enable row level security;       -- no policies: only ws_overview (below) reads it
+alter table public.job_purge_log enable row level security;       -- no policies: only ws_purge_log (below) reads it reads it
 revoke all on public.job_purge_log from anon, authenticated;
 
--- The moment of the last activity of a job: its last scan (or its creation), or its stop - whichever is later.
--- When the job will be deleted: null for tools that are never cleaned up.
-create or replace function public.team_link_purge_at(p_tool text, p_last_scan_at timestamptz, p_created_at timestamptz, p_stopped_at timestamptz, p_warned_at timestamptz)
+-- When a job goes away by itself (null = never):
+--  * Box-Item Scan / Year/Season: 30 days after the last scan (or the stop), after a 7-day warning - the data goes too.
+--  * Price Check, Box Segregate, Item Barcode, Box Code (they keep no scans): the link is switched off 10 days after its
+--    last USE - a labourer joining it, or the usage count of one of its labourers for that tool.
+drop function if exists public.team_link_purge_at(text, timestamptz, timestamptz, timestamptz, timestamptz);
+create or replace function public.team_link_last_use(p_id uuid, p_tool text, p_created timestamptz)
+returns timestamptz
+language sql
+stable
+as $$
+    select greatest(p_created,
+        coalesce((select max(o.joined_at) from public.team_operators o where o.link_id = p_id), p_created),
+        coalesce((select (max(u.day) + 1)::timestamptz
+                  from public.usage_daily u join public.team_operators o on o.user_id = u.user_id
+                  where o.link_id = p_id
+                    and u.tool like case p_tool when 'itemBarcode' then 'item_barcode' when 'boxCode' then 'box_code'
+                                                when 'boxSegregate' then 'box_segregate%' when 'priceCheck' then 'price_check' else '-' end), p_created));
+$$;
+drop function if exists public.team_link_purge_at(uuid, text, timestamptz, timestamptz, timestamptz, timestamptz);
+create or replace function public.team_link_purge_at(p_id uuid, p_tool text, p_last_scan_at timestamptz, p_created_at timestamptz, p_stopped_at timestamptz, p_warned_at timestamptz)
 returns timestamptz
 language sql
 stable
 as $$
     select case
-        when p_tool not in ('boxScanner', 'yearSegregate') then null
-        when now() >= la + interval '23 days' then greatest(la + interval '30 days', coalesce(p_warned_at, now()) + interval '7 days')
-        else la + interval '30 days'
+        when p_tool in ('boxScanner', 'yearSegregate') then
+            case when now() >= la + interval '23 days' then greatest(la + interval '30 days', coalesce(p_warned_at, now()) + interval '7 days')
+                 else la + interval '30 days' end
+        when p_stopped_at is not null then null
+        else public.team_link_last_use(p_id, p_tool, p_created_at) + interval '10 days'
     end
     from (select greatest(coalesce(p_last_scan_at, p_created_at), coalesce(p_stopped_at, p_created_at)) as la) x;
 $$;
@@ -1200,7 +1190,8 @@ as $$
           and (coalesce(p_status, 'active') = 'all'
                or (coalesce(p_status, 'active') = 'active' and l.stopped_at is null)
                or (p_status = 'stopped' and l.stopped_at is not null))
-          and (btrim(coalesce(p_search, '')) = '' or l.job_name ilike '%' || btrim(p_search) || '%')
+          and (btrim(coalesce(p_search, '')) = '' or l.job_name ilike '%' || btrim(p_search) || '%'
+               or exists (select 1 from public.team_operators o where o.link_id = l.id and o.removed_at is null and o.name ilike '%' || btrim(p_search) || '%'))
         order by (case when p_sort = 'name' then lower(l.job_name) end) asc,
                  (case when p_sort = 'created' then l.created_at end) desc,
                  coalesce(l.last_scan_at, l.created_at) desc, l.id
@@ -1212,7 +1203,7 @@ as $$
              where o.link_id = pg.id and o.removed_at is null
                and o.joined_at = (select max(x.joined_at) from public.team_operators x where x.user_id = o.user_id and x.removed_at is null)),
            coalesce(a.boxes, 0), coalesce(a.units, 0), pg.total,
-           public.team_link_purge_at(pg.tool, pg.last_scan_at, pg.created_at, pg.stopped_at, pg.purge_warned_at)
+           public.team_link_purge_at(pg.id, pg.tool, pg.last_scan_at, pg.created_at, pg.stopped_at, pg.purge_warned_at)
     from page pg
     left join lateral (
         select count(distinct t.box) filter (where t.st = 'Closed') as boxes, sum(t.qty)::bigint as units
@@ -1471,112 +1462,7 @@ $$;
 -- Sorted by name, so only the people on the page need their scan totals worked out.
 create index if not exists scans_ent_op_idx on public.scans(enterprise_id, lower(btrim(operator_name))) where operator_name is not null;
 create index if not exists ys_scans_ent_op_idx on public.ys_scans(enterprise_id, lower(btrim(operator_name))) where operator_name is not null;
-drop function if exists public.ws_people(text, text, integer, integer);
-create or replace function public.ws_people(p_search text default '', p_type text default 'all', p_limit integer default 25, p_offset integer default 0)
-returns table (person_key text, name text, kind text, jobs text, boxes bigint, units bigint, last_at timestamptz,
-               operator_ids uuid[], user_id uuid, total_count bigint)
-language sql
-security definer
-set search_path = public
-stable
-as $$
-    with ent as (select public.current_user_enterprise_id() as id where public.current_user_is_enterprise_admin()),
-    lab as (
-        select 'o:' || lower(btrim(o.name)) as pk, (array_agg(o.name order by o.joined_at desc))[1] as nm, 'labourer'::text as kd,
-               string_agg(distinct l.job_name, ', ') as jobs, array_agg(o.id) as ops, null::uuid as uid, lower(btrim(o.name)) as k
-        from public.team_operators o join public.team_links l on l.id = o.link_id, ent
-        where o.enterprise_id = ent.id and o.removed_at is null
-        group by lower(btrim(o.name))
-    ),
-    acc as (
-        select 'u:' || p.id::text as pk, coalesce(nullif(p.display_name, ''), p.email) as nm, 'google'::text as kd,
-               null::text as jobs, null::uuid[] as ops, p.id as uid, null::text as k
-        from public.profiles p, ent where p.enterprise_id = ent.id and p.tier <> 'operator'
-    ),
-    allp as (select * from lab union all select * from acc),
-    pg as (
-        select a.*, count(*) over () as total from allp a
-        where (coalesce(p_type, 'all') = 'all' or a.kd = p_type)
-          and (btrim(coalesce(p_search, '')) = '' or a.nm ilike '%' || btrim(p_search) || '%' or coalesce(a.jobs, '') ilike '%' || btrim(p_search) || '%')
-        order by lower(a.nm), a.pk
-        limit least(greatest(coalesce(p_limit, 25), 1), 100) offset greatest(coalesce(p_offset, 0), 0)
-    )
-    select pg.pk, pg.nm, pg.kd, coalesce(pg.jobs, ag.jobs), coalesce(ag.boxes, 0), coalesce(ag.units, 0), ag.last_at, pg.ops, pg.uid, pg.total
-    from pg, ent
-    left join lateral (
-        select count(distinct (t.box, t.remark)) filter (where t.st = 'Closed') as boxes, sum(t.qty)::bigint as units, max(t.at) as last_at,
-               string_agg(distinct t.remark, ', ') as jobs
-        from (select s.box_number as box, s.remark, s.box_status as st, s.qty, s.scanned_at as at from public.scans s
-               where pg.kd = 'labourer' and s.enterprise_id = ent.id and lower(btrim(s.operator_name)) = pg.k
-              union all
-              select s.box_number, s.remark, s.box_status, s.qty, s.scanned_at from public.scans s
-               where pg.kd = 'google' and s.user_id = pg.uid and s.operator_name is null
-              union all
-              select y.box_barcode, y.remark, y.box_status, y.qty, y.scanned_at from public.ys_scans y
-               where pg.kd = 'labourer' and y.enterprise_id = ent.id and lower(btrim(y.operator_name)) = pg.k
-              union all
-              select y.box_barcode, y.remark, y.box_status, y.qty, y.scanned_at from public.ys_scans y
-               where pg.kd = 'google' and y.user_id = pg.uid and y.operator_name is null) t
-    ) ag on true
-    order by lower(pg.nm), pg.pk;
-$$;
 
--- ---- Overview ----
--- p_since = the start of "today" on the admin's device; p_idle_hours = after how long without a scan an active job counts as idle
-drop function if exists public.ws_overview(timestamptz, integer);
-create or replace function public.ws_overview(p_since timestamptz, p_idle_hours integer default 24)
-returns jsonb
-language plpgsql
-security definer
-set search_path = public
-stable
-as $$
-declare
-    v_eid uuid := public.current_user_enterprise_id();
-    r jsonb;
-begin
-    if not public.current_user_is_enterprise_admin() then
-        raise exception 'Only the enterprise admin can open the overview.';
-    end if;
-    with t as (
-        select s.operator_name as who, s.user_id, s.remark, s.box_number as box, s.box_status as st, s.qty, s.scanned_at as at
-        from public.scans s where s.enterprise_id = v_eid and s.scanned_at >= least(p_since, now() - interval '30 minutes')
-        union all
-        select y.operator_name, y.user_id, y.remark, y.box_barcode, y.box_status, y.qty, y.scanned_at
-        from public.ys_scans y where y.enterprise_id = v_eid and y.scanned_at >= least(p_since, now() - interval '30 minutes')
-    ),
-    today as (select * from t where at >= p_since),
-    top as (select remark as job, sum(qty)::bigint as units from today group by remark order by sum(qty) desc, remark limit 8),
-    idle as (
-        select l.id, l.job_name, l.tool, l.last_scan_at, l.created_at from public.team_links l
-        where l.enterprise_id = v_eid and l.stopped_at is null
-          and coalesce(l.last_scan_at, l.created_at) < now() - make_interval(hours => greatest(coalesce(p_idle_hours, 24), 1))
-        order by coalesce(l.last_scan_at, l.created_at) limit 10
-    )
-    select jsonb_build_object(
-        'active_jobs', (select count(*) from public.team_links where enterprise_id = v_eid and stopped_at is null),
-        'stopped_jobs', (select count(*) from public.team_links where enterprise_id = v_eid and stopped_at is not null),
-        'people_now', (select count(distinct coalesce(lower(btrim(who)), user_id::text)) from t where at >= now() - interval '30 minutes'),
-        'units_today', coalesce((select sum(qty) from today), 0),
-        'boxes_today', (select count(distinct (box, remark)) filter (where st = 'Closed') from today),
-        'top_jobs', coalesce((select jsonb_agg(jsonb_build_object('job', job, 'units', units) order by units desc, job) from top), '[]'::jsonb),
-        'idle_jobs', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'job', job_name, 'tool', tool, 'last_scan_at', last_scan_at, 'created_at', created_at)) from idle), '[]'::jsonb),
-        'idle_total', (select count(*) from public.team_links l where l.enterprise_id = v_eid and l.stopped_at is null
-                        and coalesce(l.last_scan_at, l.created_at) < now() - make_interval(hours => greatest(coalesce(p_idle_hours, 24), 1))),
-        'purge_soon', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'job', job_name, 'tool', tool, 'purge_at', pa) order by pa) from (
-                          select l.id, l.job_name, l.tool, public.team_link_purge_at(l.tool, l.last_scan_at, l.created_at, l.stopped_at, l.purge_warned_at) as pa
-                          from public.team_links l where l.enterprise_id = v_eid) z where pa is not null and pa <= now() + interval '7 days'), '[]'::jsonb),
-        'purge_soon_total', (select count(*) from public.team_links l where l.enterprise_id = v_eid
-                              and public.team_link_purge_at(l.tool, l.last_scan_at, l.created_at, l.stopped_at, l.purge_warned_at) <= now() + interval '7 days'),
-        'purged_recent', coalesce((select jsonb_agg(jsonb_build_object('job', job_name, 'tool', tool, 'units', units, 'purged_at', purged_at) order by purged_at desc) from (
-                          select * from public.job_purge_log where enterprise_id = v_eid and purged_at >= now() - interval '30 days' order by purged_at desc limit 5) pl), '[]'::jsonb),
-        'quiet_people', (select count(*) from public.team_operators o where o.enterprise_id = v_eid and o.removed_at is null
-                          and not exists (select 1 from public.scans s where s.enterprise_id = v_eid and s.operator_name = o.name and s.scanned_at >= now() - interval '7 days')
-                          and not exists (select 1 from public.ys_scans y where y.enterprise_id = v_eid and y.operator_name = o.name and y.scanned_at >= now() - interval '7 days'))
-    ) into r;
-    return r;
-end;
-$$;
 
 revoke execute on function public.ws_jobs(text, text, text, text, integer, integer) from public, anon;
 revoke execute on function public.ws_job_boxes(uuid, text, integer, integer) from public, anon;
@@ -1586,8 +1472,6 @@ revoke execute on function public.ws_data_boxes(text, text[], text, timestamptz,
 revoke execute on function public.ws_data_rows(text, text[], text, timestamptz, timestamptz, text, text, timestamptz, uuid, timestamptz, integer, text[]) from public, anon;
 revoke execute on function public.ws_data_delete(text, text[], text, timestamptz, timestamptz, text, text, timestamptz, text[]) from public, anon;
 revoke execute on function public.ws_facets(text, text, text, integer) from public, anon;
-revoke execute on function public.ws_people(text, text, integer, integer) from public, anon;
-revoke execute on function public.ws_overview(timestamptz, integer) from public, anon;
 grant execute on function public.ws_jobs(text, text, text, text, integer, integer) to authenticated;
 grant execute on function public.ws_job_boxes(uuid, text, integer, integer) to authenticated;
 grant execute on function public.ws_job_people(uuid) to authenticated;
@@ -1596,8 +1480,6 @@ grant execute on function public.ws_data_boxes(text, text[], text, timestamptz, 
 grant execute on function public.ws_data_rows(text, text[], text, timestamptz, timestamptz, text, text, timestamptz, uuid, timestamptz, integer, text[]) to authenticated;
 grant execute on function public.ws_data_delete(text, text[], text, timestamptz, timestamptz, text, text, timestamptz, text[]) to authenticated;
 grant execute on function public.ws_facets(text, text, text, integer) to authenticated;
-grant execute on function public.ws_people(text, text, integer, integer) to authenticated;
-grant execute on function public.ws_overview(timestamptz, integer) to authenticated;
 
 -- ============================================
 -- AUTOMATIC CLEAN-UP OF IDLE JOBS: the daily run
@@ -1623,6 +1505,18 @@ begin
           and (l.tool not in ('boxScanner', 'yearSegregate')
                or now() < greatest(coalesce(l.last_scan_at, l.created_at), coalesce(l.stopped_at, l.created_at)) + interval '23 days');
     end if;
+
+    -- 0. links of tools that keep no data (Price Check, Box Segregate, Item Barcode, Box Code): switched off after 10 days without use
+    for lk in
+        select l.* from public.team_links l
+        where l.tool not in ('boxScanner', 'yearSegregate') and l.stopped_at is null
+          and now() >= public.team_link_last_use(l.id, l.tool, l.created_at) + interval '10 days'
+    loop
+        if not p_dry_run then update public.team_links set stopped_at = now() where id = lk.id; end if;
+        job_name := lk.job_name; tool := lk.tool; enterprise_id := lk.enterprise_id; units := null;
+        last_activity := public.team_link_last_use(lk.id, lk.tool, lk.created_at); action := 'expire';
+        return next;
+    end loop;
 
     -- 1. idle 23 days: mark it (the admin sees the date in Team & Data)
     for lk in
@@ -1682,6 +1576,23 @@ begin
 end
 $cron$;
 
+-- what the daily run deleted in the last 30 days, for the admin's own team
+drop function if exists public.ws_purge_log();
+create or replace function public.ws_purge_log()
+returns table (job text, tool text, units bigint, purged_at timestamptz)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select l.job_name, l.tool, l.units, l.purged_at from public.job_purge_log l
+    where public.current_user_is_enterprise_admin() and l.enterprise_id = public.current_user_enterprise_id()
+      and l.purged_at >= now() - interval '30 days'
+    order by l.purged_at desc limit 10;
+$$;
+revoke execute on function public.ws_purge_log() from public, anon;
+grant execute on function public.ws_purge_log() to authenticated;
+
 -- ============================================
 -- REMOVED OBJECTS (cleaned out of an existing database each time this file is run; nothing here is used any more)
 -- ============================================
@@ -1693,6 +1604,10 @@ drop function if exists public.search_team_scans(text, int);
 drop function if exists public.list_team_links();
 drop function if exists public.list_team_operators();
 drop table if exists public.enterprise_invites;
+-- the Overview and People screens were folded into Jobs & People / Data
+drop function if exists public.ws_overview(timestamptz, integer);
+drop function if exists public.ws_people(text, text, integer, integer);
+drop function if exists public.remove_enterprise_member(uuid);
 
 -- Make the API (PostgREST) notice new or changed functions straight away (harmless if nothing changed).
 notify pgrst, 'reload schema';
