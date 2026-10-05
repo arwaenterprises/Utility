@@ -156,8 +156,11 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('box code: Add text is off by default and its box is hidden', !bt.checked && getComputedStyle(bbox).display === 'none');
     const boxLabels = () => [...document.querySelectorAll('#printContainer .print-label')];
     const inkIn = (c, y0, y1) => { const d = c.getContext('2d').getImageData(0, y0, c.width, y1 - y0).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 100) n++; return n; };
-    const inkRows = (c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; const rowInk = []; for (let y = 0; y < c.height; y++) { let n = 0; for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4] < 100) n++; rowInk.push(n); } return rowInk; };
-    const inkCols = (c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let lo = c.width, hi = 0; for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4] < 100) { if (x < lo) lo = x; if (x > hi) hi = x; } return [lo, hi]; };
+    const thinRunsRemoved = (rows) => { let y = 0; const out = rows.slice(); while (y < out.length) { if (out[y] > 0) { let e = y; while (e + 1 < out.length && out[e + 1] > 0) e++; if (e - y + 1 <= 3) for (let k = y; k <= e; k++) out[k] = 0; y = e + 1; } else y++; } return out; };
+    const inkRowsRaw = (c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; const rowInk = []; for (let y = 0; y < c.height; y++) { let n = 0; for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4] < 100) n++; rowInk.push(n); } return rowInk; };
+    const inkRows = (c) => thinRunsRemoved(inkRowsRaw(c));
+    const cutLines = (c) => { const r = inkRowsRaw(c), t = thinRunsRemoved(r), ys = []; r.forEach((v, y) => { if (v > 0 && t[y] === 0) ys.push(y); }); return ys; };
+    const inkCols = (c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; const cuts = new Set(cutLines(c)); let lo = c.width, hi = 0; for (let y = 0; y < c.height; y++) { if (cuts.has(y)) continue; for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4] < 100) { if (x < lo) lo = x; if (x > hi) hi = x; } } return [lo, hi]; };
 
     // 1. the label is exactly the 2:3 shape of a 4x6 inch label, whatever is on it
     prints = 0; await printBoxLabels(); await sleep(700);
@@ -173,7 +176,10 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     const gapMid = (() => { let best = [0, 0], cur = null; rowInk.forEach((n, y) => { if (n === 0) { if (!cur) cur = [y, y]; cur[1] = y; } else if (cur) { if (cur[1] - cur[0] > best[1] - best[0]) best = cur; cur = null; } }); return best; })();
     const top = inkY[0], bottom = cv.height - 1 - inkY[inkY.length - 1];
     ok('box code: two codes: equal blank space above the first and below the second', Math.abs(top - bottom) <= 3, top + ' / ' + bottom);
-    ok('box code: ...and the larger gap between them is in the middle of the label', Math.abs((gapMid[0] + gapMid[1]) / 2 - cv.height / 2) <= 3, JSON.stringify(gapMid));
+    const cuts = cutLines(cv);
+    ok('box code: a dotted cut line runs between the two labels, exactly in the middle', cuts.length >= 1 && Math.abs(cuts.reduce((a, b) => a + b, 0) / cuts.length - cv.height / 2) <= 2, JSON.stringify(cuts));
+    ok('box code: the dotted line is really dotted (gaps in it) and nearly full width', (() => { const d = cv.getContext('2d').getImageData(0, cuts[0], cv.width, 1).data; let on = 0, runs = 0, prev = false; for (let x = 0; x < cv.width; x++) { const k = d[x * 4] < 128; if (k) on++; if (k && !prev) runs++; prev = k; } return runs > 40 && on < cv.width * 0.6 && on > cv.width * 0.2; })());
+    ok('box code: no cut line on a label with one code, none after the last code', (await createBoxLabel(['A-1'], 'barcode', '', 2), cutLines(await createBoxLabel(['A-1'], 'barcode', '', 2)).length === 0));
 
     // 4. codes per label: 1 to 4 for barcodes, all fit on the label, equal spacing, no overlap
     for (const n of [1, 3, 4]) {
@@ -185,7 +191,9 @@ const { start, openApp, report, stop } = require('./helpers/harness');
       ok('box code: ' + n + ' barcode(s) with text fit inside the 4x6 canvas with margins', ys[0] >= 12 && c.height - 1 - ys[ys.length - 1] >= 12, ys[0] + ' / ' + (c.height - 1 - ys[ys.length - 1]));
       const tops = []; { let prevEnd = -999; r.forEach((v, y) => { if (v > 0 && y - prevEnd > 30) tops.push(y); if (v > 0) prevEnd = y; }); }
       const slotH = 1218 / n;
-      ok('box code: ' + n + ' barcode(s): one block per slot, same distance between blocks', tops.length === n && tops.every((t, i) => i === 0 || Math.abs((t - tops[i - 1]) - slotH) <= 3), JSON.stringify(tops));
+      const cl = cutLines(c); const groups = []; cl.forEach(y => { if (!groups.length || y - groups[groups.length - 1][1] > 3) groups.push([y, y]); else groups[groups.length - 1][1] = y; });
+      ok('box code: ' + n + ' barcode(s): the cut lines sit exactly between the slots', groups.length === n - 1 && groups.every((g, i) => Math.abs((g[0] + g[1]) / 2 - slotH * (i + 1)) <= 2), JSON.stringify(groups));
+      ok('box code: ' + n + ' barcode(s): one block per slot, same distance between blocks, ' + (n - 1) + ' cut line(s)', tops.length === n && tops.every((t, i) => i === 0 || Math.abs((t - tops[i - 1]) - slotH) <= 3), JSON.stringify(tops));
     }
     // 5. the setting and the limit for QR
     PrintState.settings.boxLabelTextOn = false; PrintState.settings.boxLabelText = '';
@@ -223,10 +231,15 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     prints = 0; await printBoxLabels(); await sleep(900);
     cv = document.querySelector('#printContainer canvas');
     const segs = (c) => { const r = inkRows(c); let n = 0, on = false; r.forEach(v => { if (v > 0 && !on) n++; on = v > 0; }); return n; };
-    ok('box code: 4 codes with text print on 2 labels; each code has text above, bars, rule and its own text (4 parts x 2)', prints === 1 && boxLabels().length === 2 && segs(cv) === 8, prints + ' / ' + boxLabels().length + ' / ' + segs(cv));
+    ok('box code: 4 codes with text print on 2 labels; each code has the black text bar, the bars and its own text (3 parts x 2)', prints === 1 && boxLabels().length === 2 && segs(cv) === 6, prints + ' / ' + boxLabels().length + ' / ' + segs(cv));
     const plain2 = await createBoxLabel(['A-1', 'A-2'], 'barcode', '', 2);
-    ok('box code: without text each code has 3 parts (bars, rule, own text)', segs(plain2) === 6, segs(plain2));
-    PrintState.settings.boxOutputFormat = 'qrcode'; document.getElementById('trnInput').value = 'TR-1'; document.getElementById('boxQtyInput').value = '3'; PrintState.settings.boxPerLabel = 3;
+    ok('box code: without text each code has 2 parts (bars, own text) and no rule line under the bars', segs(plain2) === 4, segs(plain2));
+    // the text is white on black: the bar is solid black with white letters inside
+    const tagCv = await createBoxLabel(['RTO-TR-0012365-01'], 'barcode', 'Apparel', 1); const tagRows = inkRows(tagCv); const tagTop = tagRows.findIndex(v => v > 0);
+    const tagPx = (x, y) => tagCv.getContext('2d').getImageData(x, y, 1, 1).data[0];
+    ok('box code: the text sits on a solid black bar with white letters', tagPx(tagCv.width / 2 - 200, tagTop + 3) < 30 && (() => { const d = tagCv.getContext('2d').getImageData(0, tagTop + 14, tagCv.width, 40).data; let white = 0, black = 0; for (let x = 0; x < tagCv.width; x++) for (let y = 0; y < 40; y++) { const v = d[(y * tagCv.width + x) * 4]; if (v > 200) white++; } return white > 150; })());
+    ok('box code: the bar is as wide as the barcode below it', (() => { const d = tagCv.getContext('2d').getImageData(0, tagTop + 2, tagCv.width, 1).data; let lo = -1, hi = -1; for (let x = 0; x < tagCv.width; x++) if (d[x * 4] < 60) { if (lo < 0) lo = x; hi = x; } const [bl, bh] = inkCols(tagCv); return lo >= bl - 1 && hi <= bh + 1 && hi - lo > 300; })());
+        PrintState.settings.boxOutputFormat = 'qrcode'; document.getElementById('trnInput').value = 'TR-1'; document.getElementById('boxQtyInput').value = '3'; PrintState.settings.boxPerLabel = 3;
     prints = 0; await printBoxLabels(); await sleep(900);
     cv = document.querySelector('#printContainer canvas');
     ok('box code: QR labels (3 per label, with text) are 4x6 too and the content stays inside the label', prints === 1 && boxLabels().length === 1 && cv.width === 812 && cv.height === 1218 && inkCols(cv)[0] >= 29 && inkCols(cv)[1] <= 782);

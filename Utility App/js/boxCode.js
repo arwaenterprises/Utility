@@ -36,6 +36,25 @@ function handleBoxTextInput(e) {
     updateBoxPreview();
 }
 
+// The label text as an inverted tag: white bold text on a black bar, centred at cx with its top at y0. The bar is at
+// least minWidth wide (the width of the code under it) and grows for long text, never wider than maxWidth. Returns
+// the bar height.
+function drawBoxTag(ctx, text, cx, y0, minWidth, maxWidth, size, capH, padY) {
+    const padX = 22;
+    let fs = size;
+    ctx.font = `bold ${fs}px Arial`;
+    while (fs > 12 && ctx.measureText(text).width + padX * 2 > maxWidth) { fs--; ctx.font = `bold ${fs}px Arial`; }
+    const w = Math.min(maxWidth, Math.max(minWidth, ctx.measureText(text).width + padX * 2));
+    const h = capH + padY * 2;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(Math.round(cx - w / 2), y0, Math.round(w), h);
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText(text, cx, y0 + padY + Math.round(fs * 0.72));
+    ctx.fillStyle = '#000000';
+    return h;
+}
+
 // Draws bold text centred at x, shrinking it so it never runs wider than maxWidth (never below 12px).
 function drawBoxHeaderText(ctx, text, cx, baselineY, maxWidth, size) {
     let fs = size;
@@ -196,8 +215,9 @@ async function printBoxLabels() {
 // ============================================
 // The canvas has exactly the 2:3 shape of a 4x6 inch label, at the 203 dpi of a label printer (812 x 1218 px). It
 // is printed at the paper width, so it always fills the label and can never run onto a second page. The codes on
-// it share the height in equal slots (1 to 4 barcodes, 1 to 3 QR codes); inside a slot, the optional text, the code,
-// a rule and the code's own text are centred as one block, so every slot looks the same.
+// it share the height in equal slots (1 to 4 barcodes, 1 to 3 QR codes); inside a slot, the optional text (white on a
+// black bar), the code and the code's own text are centred as one block, so every slot looks the same. A dotted line
+// between two neighbouring slots shows where to cut.
 const BOX_LABEL_W = 812;
 const BOX_LABEL_H = 1218;
 const BOX_SIDE_PAD = 30;              // blank paper left and right of the content
@@ -265,13 +285,15 @@ async function createBoxLabel(codes, format, topText, perLabel) {
     const W = BOX_LABEL_W, H = BOX_LABEL_H, pad = BOX_SIDE_PAD;
     const isBarcode = format === 'barcode';
     const slotH = H / perLabel;
-    const fs = perLabel <= 2 ? 36 : 30;                       // code text and top text size
+    const fs = ({ 1: 72, 2: 60, 3: 50, 4: 42 })[perLabel] || 50;   // size of the code's own text and of the label text
     const capH = Math.round(fs * 0.72);                       // height of a capital letter: text is placed by its visible top and bottom
-    const headerH = topText ? capH + 22 : 0;
-    const gapAboveRule = 16, ruleH = 2, textGap = 16;        // the rule under the code, then the code's own text
+    const tagPadY = 14;                                       // blank above and below the white text inside the black bar
+    const tagH = topText ? capH + tagPadY * 2 : 0;
+    const headerH = topText ? tagH + 18 : 0;                  // the bar plus the gap under it
+    const textGap = 20;                                       // gap between the code and its own text
     const textH = textGap + capH;
-    const slotMargin = 22;                                    // minimum blank above and below a block
-    const fixed = headerH + gapAboveRule + ruleH + textH + slotMargin * 2;
+    const slotMargin = 22;                                    // minimum blank above and below a block (and from the cut line)
+    const fixed = headerH + textH + slotMargin * 2;
     const maxCode = Math.max(60, slotH - fixed);
     let codeSize = isBarcode ? Math.min(Math.max(maxCode, 80), 220) : Math.min(maxCode, W - pad * 2, 380);
     const qrs = isBarcode ? null : codes.map(c => boxQrCanvas(c, Math.floor(codeSize)));
@@ -286,21 +308,36 @@ async function createBoxLabel(codes, format, topText, perLabel) {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, W, H);
 
-    const blockH = headerH + codeSize + gapAboveRule + ruleH + textH;
+    const blockH = headerH + codeSize + textH;
     for (let i = 0; i < codes.length; i++) {
         const y0 = Math.round(i * slotH + (slotH - blockH) / 2);          // top of this slot's block
-        if (topText) drawBoxHeaderText(ctx, topText, W / 2, y0 + capH, W - pad * 2, fs);
         const codeY = y0 + headerH;
+        let codeW;
         if (isBarcode) {
             const bc = await boxBarcodeImage(codes[i], Math.round(codeSize));
+            codeW = bc.width;
             ctx.drawImage(bc.img, Math.round((W - bc.width) / 2), codeY, bc.width, bc.height);
         } else {
+            codeW = qrs[i].width;
             ctx.drawImage(qrs[i], Math.round((W - qrs[i].width) / 2), codeY + Math.round((codeSize - qrs[i].height) / 2));
         }
-        const ruleY = codeY + Math.round(codeSize) + gapAboveRule;
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(pad, ruleY, W - pad * 2, ruleH);
-        drawBoxHeaderText(ctx, codes[i], W / 2, ruleY + ruleH + textGap + capH, W - pad * 2, fs);
+        if (topText) drawBoxTag(ctx, topText, W / 2, y0, codeW, W - pad * 2, fs, capH, tagPadY);
+        drawBoxHeaderText(ctx, codes[i], W / 2, codeY + Math.round(codeSize) + textGap + capH, W - pad * 2, fs);
+    }
+    // a dotted line between neighbouring labels, so the operator can see where to cut
+    if (codes.length > 1) {
+        ctx.save();
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 9]);
+        for (let i = 1; i < codes.length; i++) {
+            const y = Math.round(i * slotH);
+            ctx.beginPath();
+            ctx.moveTo(10, y);
+            ctx.lineTo(W - 10, y);
+            ctx.stroke();
+        }
+        ctx.restore();
     }
     return canvas;
 }
