@@ -331,6 +331,27 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   ok('Delete from Data names what will go, with the counts', await page.evaluate(() => /Box-Item Scan/.test(document.getElementById('wsDialogBody').textContent) && /2 boxes, 8 units/.test(document.getElementById('wsDialogBody').textContent)));
   await page.click('#wsDialogOk'); await wait(700);
   ok('...then it deletes and the list is empty', /Deleted 2/.test(await page.textContent('#wsStatus')) && /No data matches/.test(await page.textContent('#wsDataList')));
+  // a search shows ALL its boxes at once (up to 500), and select-all + untick one + download covers exactly those
+  await page.evaluate(() => {
+    window.__saveData = [window.__wsData, window.__wsRows];
+    window.__wsData = Array.from({ length: 300 }, (_, i) => ({ box: 'T' + String(i).padStart(3, '0'), job: 'Transfer 123', person: 'Ravi', status: 'Closed', items: 2, last_at: new Date(Date.now() - i * 60000).toISOString() }));
+    window.__wsRows = window.__wsData.flatMap((b, i) => [0, 1].map(k => ({ id: 'z' + String(i).padStart(4, '0') + k, scanned_at: new Date(Date.now() - (9000 - i * 2 - k) * 1000).toISOString(), person: 'Ravi', job: 'Transfer 123', box: b.box, barcode: 'z' + i + '_' + k, qty: 1, status: 'Closed', extra: null })));
+    window.__rpcLog = []; window.__files.length = 0;
+    WS.data.search = ''; WS.data.jobs = []; WS.data.person = ''; WS.data.sel.clear(); wsRenderData();
+  });
+  await wait(700);
+  ok('a search with 300 boxes shows all 300 on one page, no pager buttons needed', (await page.$$('#wsDataList [data-ws-bsel]')).length === 300 && !(await page.$('[data-ws-page="data:next"]:not([disabled])')), String((await page.$$('#wsDataList [data-ws-bsel]')).length));
+  ok('...and asks the server for up to 500 boxes in one go', await page.evaluate(() => window.__rpcLog.filter(x => x.name === 'ws_data_boxes').pop().args.p_limit === 500));
+  await page.click('#wsDataSelAll'); await wait(300);
+  ok('select all ticks every one of the 300 boxes', /300 boxes selected \(600 units\)/.test(await page.textContent('#wsDataSel')), await page.textContent('#wsDataSel'));
+  await page.click('#wsDataList [data-ws-bsel]'); await page.click('#wsDataList tbody tr:nth-child(3) [data-ws-bsel]'); await wait(300);
+  ok('unticking two boxes leaves 298 selected', /298 boxes selected \(596 units\)/.test(await page.textContent('#wsDataSel')), await page.textContent('#wsDataSel'));
+  await page.evaluate(() => { window.__rpcLog = []; });
+  await page.click('[data-ws="sel-download"]'); await wait(1500);
+  const bigSel = await page.evaluate(() => ({ files: window.__files.length, nBoxes: window.__rpcLog.find(x => x.name === 'ws_data_rows').args.p_boxes.length }));
+  ok('Download selected sends exactly the 298 ticked boxes and writes the file', bigSel.files === 1 && bigSel.nBoxes === 298, JSON.stringify(bigSel));
+  await page.evaluate(() => { [window.__wsData, window.__wsRows] = window.__saveData; WS.data.sel.clear(); });
+
   // Jobs & People: the people of a job open inside the Jobs list
   await page.evaluate(() => {
     window.__labourers = [{ id: 'op1', name: 'Ravi' }];

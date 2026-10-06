@@ -8,7 +8,7 @@
 // (the ws_* functions in supabase/schema.sql), so it stays fast with many jobs, people and scans.
 // Members and individuals keep the older Data Management window (js/app.js).
 const WS_PAGE = 25;               // jobs / people per page
-const WS_DATA_PAGE = 50;          // boxes per page in Data and in a job
+const WS_DATA_PAGE = 500;         // boxes per page in Data and in a job (a search shows all its boxes at once; the server caps a page at 500)
 const WS_IDLE_HOURS = 24;         // an active job with no scan for this long shows "Idle" (it is never stopped by itself)
 const WS_FETCH_ROWS = 1000;       // rows per request when downloading (the API returns at most about 1000)
 const WS_FILE_ROWS = 50000;       // rows per Excel file; bigger downloads are split into several files
@@ -605,6 +605,7 @@ function wsRenderDataChips() {
 
 async function wsLoadData() {
     const D = WS.data, req = ++D.req;
+    const tot = wsEl('wsDataTotals'); if (tot) tot.textContent = wsT('loading');   // a search over a lot of data can take a few seconds: say so
     const { data, error } = await supabaseClient.rpc('ws_data_boxes', { p_tool: D.tool, ...wsDataArgs(), p_limit: WS_DATA_PAGE, p_offset: D.offset });
     const el = wsEl('wsDataList');
     if (req !== D.req || WS.section !== 'data' || !el) return;
@@ -875,8 +876,8 @@ function wsOnChange(e) {
     }
 }
 
-const wsSearchJobs = wsDebounce(() => { WS.jobs.offset = 0; wsLoadJobs(); }, 300);
-const wsSearchData = wsDebounce(() => { WS.data.offset = 0; wsLoadData(); }, 300);
+const wsSearchJobs = wsDebounce(() => { WS.jobs.offset = 0; wsLoadJobs(); }, 400);
+const wsSearchData = wsDebounce(() => { WS.data.offset = 0; wsLoadData(); }, 400);
 const wsSearchBoxes = wsDebounce(() => { WS.jb.offset = 0; wsLoadJobBoxes(); }, 300);
 
 function wsOnInput(e) {

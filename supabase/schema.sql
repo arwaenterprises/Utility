@@ -1268,7 +1268,7 @@ as $$
     )
     select g.box, g.status, g.items, g.who, g.last_at, count(*) over ()
     from g order by g.last_at desc, g.box
-    limit least(greatest(coalesce(p_limit, 25), 1), 100) offset greatest(coalesce(p_offset, 0), 0);
+    limit least(greatest(coalesce(p_limit, 25), 1), 500) offset greatest(coalesce(p_offset, 0), 0);
 $$;
 
 -- the people of one job with their own totals
@@ -1388,7 +1388,7 @@ as $$
     )
     select g.box, g.job, g.person, g.status, g.items, g.last_at, count(*) over (), sum(g.items) over ()::bigint, sum(g.n) over ()::bigint
     from g order by g.last_at desc, g.box, g.job
-    limit least(greatest(coalesce(p_limit, 50), 1), 100) offset greatest(coalesce(p_offset, 0), 0);
+    limit least(greatest(coalesce(p_limit, 50), 1), 500) offset greatest(coalesce(p_offset, 0), 0);
 $$;
 
 -- the scan rows behind a filter, for downloads: keyset-paged, at most 1000 per call
