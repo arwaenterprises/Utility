@@ -32,6 +32,7 @@ const ScannerT = {
         errEnterRemark: "Please enter a remark",
         errBoxFirst: "Scan Box ID first", errSameBox: "Scan same Box ID!", errCloseBoxFirst: "Close the box first!",
         errBoxAlreadyClosed: "Box already closed",
+        errBoxTakenBy: "This box was already scanned by {name}",
         errNumericOnly: "Numeric mode (Nu) is active — alphanumeric barcode not allowed",
         errModeLockedDuringBox: "Close the current box before changing Nu/AlNu mode",
         errDuplicateBarcode: "This barcode was already scanned in this box",
@@ -60,6 +61,7 @@ const ScannerT = {
         errEnterRemark: "الرجاء إدخال ملاحظة",
         errBoxFirst: "امسح رقم الصندوق أولاً", errSameBox: "امسح نفس رقم الصندوق!", errCloseBoxFirst: "أغلق الصندوق أولاً!",
         errBoxAlreadyClosed: "الصندوق مغلق بالفعل",
+        errBoxTakenBy: "تم مسح هذا الصندوق بالفعل بواسطة {name}",
         errNumericOnly: "وضع الأرقام (Nu) مفعّل — لا يُسمح بباركود يحتوي على حروف",
         errModeLockedDuringBox: "أغلق الصندوق الحالي قبل تغيير وضع Nu/AlNu",
         errDuplicateBarcode: "تم مسح هذا الباركود مسبقًا في هذا الصندوق",
@@ -353,10 +355,11 @@ function updateScannerScanFieldsEnabled() {
 // ============================================
 // BOX SCANNER - SCANNING LOGIC
 // ============================================
-function handleBoxIdScan(e) {
+let boxCheckBusy = false;
+async function handleBoxIdScan(e) {
     if (e.key !== 'Enter') return;
     const boxId = document.getElementById('boxIdInput').value.trim();
-    if (!boxId) return;
+    if (!boxId || boxCheckBusy) return;
     if (typeof operatorBlocked === 'function' && operatorBlocked()) { alert(opT('blocked')); document.getElementById('boxIdInput').value = ''; return; }
 
     // The first scan begins the session - which needs the Remark.
@@ -368,6 +371,19 @@ function handleBoxIdScan(e) {
             alert(scannerT('errBoxAlreadyClosed') + ' (' + boxQty + ' items)');
             document.getElementById('boxIdInput').value = '';
             return;
+        }
+
+        // A labourer's job: refuse a box another person of the job has already scanned (needs a connection; offline it is skipped)
+        if (AppState.operator && AppState.isOnline) {
+            boxCheckBusy = true;
+            let by = null;
+            try { const { data } = await supabaseClient.rpc('box_taken_by', { p_box: boxId }); by = data || null; } catch (err) { by = null; }
+            boxCheckBusy = false;
+            if (by) {
+                alert(scannerT('errBoxTakenBy').replace('{name}', by));
+                document.getElementById('boxIdInput').value = '';
+                return;
+            }
         }
 
         ScannerState.currentBox = boxId;

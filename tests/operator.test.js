@@ -52,6 +52,11 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
 
   // --- 3. scanning works without typing a remark ---
   await page.evaluate(() => { window.alert = (m) => { window.__alerts = (window.__alerts || []).concat(m); }; });
+  await page.evaluate(() => { window.__takenBoxes = { BX0: 'Sana' }; });
+  await page.fill('#boxIdInput', 'BX0'); await page.press('#boxIdInput', 'Enter'); await page.waitForTimeout(300);
+  const taken = await page.evaluate(() => ({ boxScanning: ScannerState.boxScanning, alerts: window.__alerts || [], input: document.getElementById('boxIdInput').value }));
+  ok('a box already scanned by another person of the job is refused, naming that person', !taken.boxScanning && taken.alerts.length === 1 && /already scanned by Sana/.test(taken.alerts[0]) && taken.input === '', JSON.stringify(taken));
+  await page.evaluate(() => { window.__alerts = []; });
   await page.fill('#boxIdInput', 'BX1'); await page.press('#boxIdInput', 'Enter'); await page.waitForTimeout(200);
   const afterBox = await page.evaluate(() => ({ remark: ScannerState.remark, boxScanning: ScannerState.boxScanning, alerts: window.__alerts || [] }));
   ok('first scan starts the job with the link\'s job name', afterBox.remark === 'Inbound 7' && afterBox.boxScanning && afterBox.alerts.length === 0, JSON.stringify(afterBox));

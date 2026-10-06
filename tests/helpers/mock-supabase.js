@@ -112,6 +112,7 @@ window.__rpcCalls = [];
       r.event_count += p_count; r.qty += p_qty;
     },
     // ---- Team & Data workspace (admin). Tests can set window.__wsPurgeLog / __wsBoxes / __wsJobPeople / __wsData / __wsRows / __wsFacets ----
+    box_taken_by: ({ p_box }) => (window.__takenBoxes || {})[p_box] || null,
     ws_purge_log: () => window.__wsPurgeLog || [],
     ws_jobs: ({ p_search, p_tool, p_status, p_sort, p_limit, p_offset }) => {
       const now = new Date().toISOString();

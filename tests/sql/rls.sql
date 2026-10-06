@@ -237,6 +237,10 @@ select _ta_do('00000000-0000-0000-0000-0000000000f1', $$update scans set remark=
 select _t_eq('operator cannot change the job, name or team of a scan afterwards (a re-send keeps them)', (select count(*) from scans where box_number='OB1' and remark='Inbound 8' and operator_name='Ravi' and enterprise_id='11111111-1111-1111-1111-111111111111'), 1);
 select _ta_do('00000000-0000-0000-0000-0000000000f2', $$insert into scans(user_id,box_number,barcode) values ('00000000-0000-0000-0000-0000000000f2','OB2','222')$$);
 select _t_eq('operator sees only their own scans, not the other operator''s', _ta_val('00000000-0000-0000-0000-0000000000f1', $$select count(*) from scans$$), 1);
+select _t_eq('box_taken_by: Ravi asking about a box Sana scanned gets Sana''s name', _ta_val('00000000-0000-0000-0000-0000000000f1', $$select count(*) from (select box_taken_by('OB2') as n) q where n = 'Sana'$$), 1);
+select _t_eq('...his own box is not "taken"', _ta_val('00000000-0000-0000-0000-0000000000f1', $$select count(*) from (select box_taken_by('OB1') as n) q where n is null$$), 1);
+select _t_eq('...a box nobody scanned is free', _ta_val('00000000-0000-0000-0000-0000000000f1', $$select count(*) from (select box_taken_by('NOBOX') as n) q where n is null$$), 1);
+select _t_eq('...a person who is in no job gets nothing back', _t_val('00000000-0000-0000-0000-0000000000b1', $$select count(*) from (select box_taken_by('OB2') as n) q where n is null$$), 1);
 select _ta_err('operator cannot upload lists', '00000000-0000-0000-0000-0000000000f1', $$select begin_list_upload('box_list')$$, 'Only an enterprise admin');
 select _t_eq('create_enterprise() no longer exists (every Google sign-in gets its own team automatically)', (select count(*) from pg_proc where proname = 'create_enterprise'), 0);
 select _ta_err('operator cannot create an enterprise through the API', '00000000-0000-0000-0000-0000000000f1', $$insert into enterprises(name, admin_user_id) values ('My own', '00000000-0000-0000-0000-0000000000f1')$$, 'permission denied');

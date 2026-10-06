@@ -1013,6 +1013,26 @@ $$;
 
 -- ---- the labourer's functions ----
 
+-- Box-Item Scan: "has a DIFFERENT labourer of my job already scanned this box?" Returns that person's name, or null.
+-- (Only closed boxes reach the server, so this sees boxes the others have closed.) Looks at the caller's own active job only.
+create or replace function public.box_taken_by(p_box text)
+returns text
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select s.operator_name
+    from public.scans s
+    where s.link_id = (select o.link_id from public.team_operators o join public.team_links l on l.id = o.link_id
+                       where o.user_id = auth.uid() and o.removed_at is null and l.stopped_at is null and l.tool = 'boxScanner'
+                       order by o.joined_at desc limit 1)
+      and s.box_number = p_box and s.user_id <> auth.uid()
+    order by s.scanned_at desc limit 1;
+$$;
+revoke execute on function public.box_taken_by(text) from public, anon;
+grant execute on function public.box_taken_by(text) to authenticated;
+
 -- Who does this link belong to? Names only, so the join page can show them BEFORE anybody signs in.
 create or replace function public.get_team_link_info(p_token text)
 returns table (enterprise_name text, admin_name text, tool text, job_name text, state text)
