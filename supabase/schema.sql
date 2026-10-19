@@ -1359,7 +1359,7 @@ as $$
     union all
     select y.id, y.scanned_at, y.user_id, y.remark, coalesce(nullif(y.operator_name, ''), nullif(p.display_name, ''), p.email, ''),
            y.box_barcode, y.barcode, y.qty, y.box_status,
-           jsonb_build_object('ptl', y.ptl_number, 'season', y.season, 'year', y.year, 'brand', y.brand, 'staff', y.staff_name, 'ts', y.scan_timestamp)
+           jsonb_build_object('ptl', y.ptl_number, 'rule', y.ptl_rule, 'season', y.season, 'year', y.year, 'brand', y.brand, 'staff', y.staff_name, 'ts', y.scan_timestamp)
     from public.ys_scans y join public.profiles p on p.id = y.user_id
     where p_tool = 'yearSegregate' and y.enterprise_id = p_ent
       and (p_jobs is null or lower(btrim(coalesce(y.remark, ''))) = any (array(select lower(btrim(j)) from unnest(p_jobs) j)))

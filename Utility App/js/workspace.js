@@ -458,7 +458,7 @@ function wsRenderJobTab() {
 function wsItemsQuery(tool, box, jobName, linkId) {
     const ys = tool === 'yearSegregate';
     let q = supabaseClient.from(ys ? 'ys_scans' : 'scans').select(ys
-        ? 'id, barcode, qty, operator_name, remark, ptl_number, season, year, brand, staff_name, box_barcode, box_status, scan_timestamp, scanned_at, user_id, profiles(display_name, email)'
+        ? 'id, barcode, qty, operator_name, remark, ptl_number, ptl_rule, season, year, brand, staff_name, box_barcode, box_status, scan_timestamp, scanned_at, user_id, profiles(display_name, email)'
         : 'id, barcode, qty, operator_name, remark, box_number, box_status, scanned_at, user_id, profiles(display_name, email)')
         .eq('enterprise_id', AppState.profile.enterprise_id).eq(ys ? 'box_barcode' : 'box_number', box);
     if (linkId) q = q.eq('link_id', linkId);
@@ -470,7 +470,7 @@ function wsNormaliseRow(tool, s) {
     const person = s.operator_name || s.profiles?.display_name || s.profiles?.email || '';
     if (tool === 'yearSegregate') {
         return { scanned_at: s.scanned_at, person, job: s.remark, box: s.box_barcode, barcode: s.barcode, qty: s.qty, status: s.box_status,
-            extra: { ptl: s.ptl_number, season: s.season, year: s.year, brand: s.brand, staff: s.staff_name, ts: s.scan_timestamp } };
+            extra: { ptl: s.ptl_number, rule: s.ptl_rule, season: s.season, year: s.year, brand: s.brand, staff: s.staff_name, ts: s.scan_timestamp } };
     }
     return { scanned_at: s.scanned_at, person, job: s.remark, box: s.box_number, barcode: s.barcode, qty: s.qty, status: s.box_status, extra: null };
 }
@@ -495,7 +495,7 @@ function wsBoxesTable(rows, scope, expanded, items, tool, withJob, sel) {
             <td class="ws-act"><button type="button" class="icon-btn" data-ws-boxdl="${wsEsc(key)}" title="${wsEsc(wsT('thisBox'))}" aria-label="${wsEsc(wsT('thisBox'))}">&#11015;</button></td></tr>`;
         if (isOpen) {
             const it = items.get(key);
-            html += `<tr class="ws-sub"><td colspan="${(withJob ? 8 : 7) + extra}">${!it ? `<p class="ws-muted">${wsEsc(wsT('loading'))}</p>` : `<div class="ws-scroll"><table class="ws-table ws-mini"><thead><tr><th>Barcode</th><th>${wsEsc(wsT('by'))}</th><th>${wsEsc(wsT('when'))}</th></tr></thead><tbody>${it.map(s => `<tr><td>${wsEsc(s.barcode)}${Number(s.qty) > 1 ? ' &times;' + wsNum(s.qty) : ''}</td><td>${wsEsc(s.operator_name || s.profiles?.display_name || s.profiles?.email || '')}</td><td>${wsEsc(new Date(s.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</td></tr>`).join('')}</tbody></table></div>`}</td></tr>`;
+            html += `<tr class="ws-sub"><td colspan="${(withJob ? 8 : 7) + extra}">${!it ? `<p class="ws-muted">${wsEsc(wsT('loading'))}</p>` : `<div class="ws-scroll"><table class="ws-table ws-mini"><thead><tr><th>Barcode</th>${tool === 'yearSegregate' ? '<th>PTL</th>' : ''}<th>${wsEsc(wsT('by'))}</th><th>${wsEsc(wsT('when'))}</th></tr></thead><tbody>${it.map(s => `<tr><td>${wsEsc(s.barcode)}${Number(s.qty) > 1 ? ' &times;' + wsNum(s.qty) : ''}</td>${tool === 'yearSegregate' ? `<td>${wsEsc([s.ptl_number, s.ptl_rule].filter(Boolean).join(' · '))}</td>` : ''}<td>${wsEsc(s.operator_name || s.profiles?.display_name || s.profiles?.email || '')}</td><td>${wsEsc(new Date(s.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</td></tr>`).join('')}</tbody></table></div>`}</td></tr>`;
         }
         return html;
     }).join('');
@@ -656,8 +656,8 @@ function wsWriteXlsx(tool, rows, filename) {
     let sheet, name, cols;
     if (tool === 'yearSegregate') {
         name = 'Year-Season Scans';
-        sheet = rows.map(r => ({ 'Scanned By': r.person || '', 'Staff': (r.extra && r.extra.staff) || '', 'Remark': r.job || '', 'PTL Number': r.extra && r.extra.ptl, 'Season': r.extra && r.extra.season, 'Year': r.extra && r.extra.year, 'Brand': (r.extra && r.extra.brand) || '', 'Barcode': r.barcode, 'Qty': r.qty, 'Box Barcode': r.box, 'Box Status': r.status, 'Scan Timestamp': (r.extra && r.extra.ts) || new Date(r.scanned_at).toLocaleString() }));
-        cols = [{wch:20},{wch:16},{wch:20},{wch:10},{wch:8},{wch:6},{wch:14},{wch:18},{wch:5},{wch:16},{wch:10},{wch:20}];
+        sheet = rows.map(r => ({ 'Scanned By': r.person || '', 'Staff': (r.extra && r.extra.staff) || '', 'Remark': r.job || '', 'PTL Number': r.extra && r.extra.ptl, 'PTL Rule': (r.extra && r.extra.rule) || '', 'Season': r.extra && r.extra.season, 'Year': r.extra && r.extra.year, 'Brand': (r.extra && r.extra.brand) || '', 'Barcode': r.barcode, 'Qty': r.qty, 'Box Barcode': r.box, 'Box Status': r.status, 'Scan Timestamp': (r.extra && r.extra.ts) || new Date(r.scanned_at).toLocaleString() }));
+        cols = [{wch:20},{wch:16},{wch:20},{wch:10},{wch:24},{wch:8},{wch:6},{wch:14},{wch:18},{wch:5},{wch:16},{wch:10},{wch:20}];
     } else {
         name = 'Team Scans';
         sheet = rows.map(r => ({ 'Scanned By': r.person || '', 'Remark': r.job || '', 'Box Number': r.box, 'Barcode': r.barcode, 'Qty': r.qty, 'Status': r.status, 'Scanned At': new Date(r.scanned_at).toLocaleString() }));

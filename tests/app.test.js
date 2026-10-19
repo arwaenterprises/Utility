@@ -290,6 +290,12 @@ const { start, openApp, report, stop } = require('./helpers/harness');
       const ru = (await ysDbGetAll(YS_SCANS_STORE)); ru.forEach(x => { x.boxStatus = 'Closed'; }); for (const x of ru) await ysDbPut(YS_SCANS_STORE, x);
       __db.ys_scans = []; await ysAutoSync();
       ok('YS rules: the uploaded row carries ptl_rule', __db.ys_scans.length === 1 && __db.ys_scans[0].ptl_rule === 'Color=Red, Size=S+M', JSON.stringify(__db.ys_scans[0]));
+      const wsRow = wsNormaliseRow('yearSegregate', { ...__db.ys_scans[0], profiles: { display_name: 'M' } });
+      ok('Team & Data: a Year/Season row read from the server keeps the PTL rule', wsRow.extra.rule === 'Color=Red, Size=S+M' && wsRow.extra.ptl === '07');
+      wsWriteXlsx('yearSegregate', [wsRow], 'x.xlsx'); const td = written.pop();
+      ok('Team & Data: the Year/Season download has a PTL Rule column after PTL Number', Object.keys(td.rows[0]).join().includes('PTL Number,PTL Rule,Season') && td.rows[0]['PTL Rule'] === 'Color=Red, Size=S+M', Object.keys(td.rows[0]).join());
+      const bt = document.createElement('div'); bt.innerHTML = '<table>' + wsBoxesTable([{ box: 'BOXR7', job: 'Rules', status: 'Closed', items: 1, person: 'M', last_at: new Date().toISOString() }], 'd', new Set(['d:Rules\u0001BOXR7']), new Map([['d:Rules\u0001BOXR7', [__db.ys_scans[0]]]]), 'yearSegregate', true) + '</table>';
+      ok('Team & Data: a Year/Season box\'s item list shows its PTL and rule', /07 · Color=Red, Size=S\+M/.test(bt.textContent), bt.textContent.replace(/\s+/g, ' '));
       await ysDbClearStore(YS_SCANS_STORE); __db.ys_scans = []; ysFinishReset();
     }
 
