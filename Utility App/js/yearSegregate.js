@@ -145,13 +145,210 @@ async function ysBackfillScanUids() {
     }
 }
 
-// Upload buttons (item master / PTL config) are only for individuals and enterprise admins.
+// The Setup button (item master / PTL config: upload, paste, templates, presets) is only for individuals and enterprise admins.
 function ysSetupUploadButtons() {
     document.getElementById('ysUploadRow').style.display = refCanUpload() ? 'flex' : 'none';
     const itemsBtn = document.getElementById('ysUploadItemsBtn');
     const ptlBtn = document.getElementById('ysUploadPtlBtn');
-    itemsBtn.onclick = () => refStartUpload('ys_item_master', itemsBtn, async () => { await syncItemMaster(null, true); await ysUpdateImCount(); });
-    ptlBtn.onclick = () => refStartUpload('ys_ptl_config', ptlBtn, async () => { await syncHuConfig(true); });
+    itemsBtn.onclick = () => refStartUpload('ys_item_master', itemsBtn, ysAfterItemsUpload);
+    ptlBtn.onclick = () => refStartUpload('ys_ptl_config', ptlBtn, ysAfterPtlUpload);
+    document.getElementById('ysSetupBtn').onclick = ysOpenSetup;
+    document.getElementById('ysSetupCloseBtn').onclick = () => document.getElementById('ysSetupModal').classList.remove('active');
+    document.querySelectorAll('#ysSetupModal [data-ys-tab]').forEach(b => { b.onclick = () => ysSetupTab(b.dataset.ysTab); });
+    const pasteItemsBtn = document.getElementById('ysPasteItemsBtn');
+    pasteItemsBtn.onclick = async () => {
+        const box = document.getElementById('ysPasteItems');
+        if (!box.value.trim()) { alert('Paste the rows first (copy them in Excel, header row included).'); return; }
+        if (await refUploadPasted('ys_item_master', box.value, pasteItemsBtn, ysAfterItemsUpload)) box.value = '';
+    };
+    const pastePtlBtn = document.getElementById('ysPastePtlBtn');
+    pastePtlBtn.onclick = async () => {
+        const box = document.getElementById('ysPastePtl');
+        if (!box.value.trim()) { alert('Paste the rows first (copy them in Excel, header row included).'); return; }
+        if (await refUploadPasted('ys_ptl_config', box.value, pastePtlBtn, ysAfterPtlUpload)) box.value = '';
+    };
+    document.getElementById('ysPresetList').onclick = (e) => {
+        const btn = e.target.closest('[data-ys-preset]');
+        if (btn && !btn.disabled) ysPickPreset(btn.dataset.ysPreset);
+    };
+    const rowsEl = document.getElementById('ysPresetRows');
+    rowsEl.oninput = (e) => {
+        const tr = e.target.closest('tr[data-i]');
+        if (!tr) return;
+        const row = YSSetup.rows[Number(tr.dataset.i)];
+        if (e.target.dataset.f === 'ptl') row.ptl = e.target.value; else row.rule = e.target.value;
+        ysSetupRecount();
+    };
+    rowsEl.onclick = (e) => {
+        const del = e.target.closest('[data-ys-del]');
+        if (!del) return;
+        YSSetup.rows.splice(Number(del.dataset.ysDel), 1);
+        ysRenderPresetRows();
+    };
+    document.getElementById('ysPresetAddBtn').onclick = ysPresetAddRow;
+    const applyBtn = document.getElementById('ysPresetApplyBtn');
+    applyBtn.onclick = () => refUploadParsed('ys_ptl_config',
+        { rows: YSSetup.rows.map(r => ({ ptl_number: String(r.ptl).trim(), rule: String(r.rule).trim() })).filter(r => r.ptl_number) },
+        applyBtn, ysAfterPtlUpload);
+}
+
+async function ysAfterItemsUpload() {
+    await syncItemMaster(null, true);
+    await ysUpdateImCount();
+    if (document.getElementById('ysSetupModal').classList.contains('active')) await ysOpenSetup();
+}
+
+async function ysAfterPtlUpload() {
+    await syncHuConfig(true);
+    buildHuStates();
+    ysRenderHuPanel();
+    ysUpdateStats();
+    document.getElementById('ysPresetEditor').style.display = 'none';
+    YSSetup.preset = null;
+    if (document.getElementById('ysSetupModal').classList.contains('active')) ysRenderSetup();
+}
+
+// ============================================
+// SETUP WINDOW: item master info, current PTL rules, presets (up to 12 PTLs) and the rule editor
+// ============================================
+const YS_PRESET_PTLS = 12;
+const YSSetup = { vals: [], presets: [], preset: null, rows: [], tab: 'items' };
+
+async function ysOpenSetup() {
+    const items = await ysDbGetAll(YS_ITEMS_STORE);
+    YSSetup.vals = items.map(ysItemValues);
+    YSSetup.presets = ysBuildPresets(items);
+    ysRenderSetup();
+    ysSetupTab(YSSetup.tab);
+    document.getElementById('ysSetupModal').classList.add('active');
+}
+
+function ysSetupTab(tab) {
+    YSSetup.tab = tab;
+    document.querySelectorAll('#ysSetupModal [data-ys-tab]').forEach(b => b.classList.toggle('on', b.dataset.ysTab === tab));
+    document.getElementById('ysSetupItems').style.display = tab === 'items' ? '' : 'none';
+    document.getElementById('ysSetupPtl').style.display = tab === 'ptl' ? '' : 'none';
+}
+
+function ysRenderSetup() {
+    const cols = Storage.getJSON('ys_item_columns');
+    document.getElementById('ysSetupItemsInfo').textContent = YSSetup.vals.length
+        ? `${YSSetup.vals.length} items on this device.` + (cols ? ' Columns: ' + Object.values(cols).join(', ') + '.' : '')
+        : 'No item master on this device yet.';
+    const cur = YSState.huConfig;
+    document.getElementById('ysSetupPtlCurrent').innerHTML = cur.length
+        ? '<b>Current rules</b> (checked top to bottom):<br>' + cur.map(c => `${escapeHtml(c.ptlNumber)} &nbsp;${escapeHtml(c.rule)}`).join('<br>')
+        : 'No PTL config yet - pick a preset below, paste, or upload a file.';
+    document.getElementById('ysPresetList').innerHTML = YSSetup.presets.map(p =>
+        `<button type="button" class="ys-preset${YSSetup.preset === p.id ? ' on' : ''}" data-ys-preset="${p.id}"${p.rules ? '' : ' disabled'}>` +
+        `<b>${escapeHtml(p.name)}</b><span>${escapeHtml(p.rules ? p.rules.length + ' PTLs · ' + p.desc : p.why)}</span></button>`).join('');
+}
+
+// Presets are built from the Season / Year values in the item master on this device. Each fits in 12 PTLs:
+// when a preset has more values than that, the oldest go into the last PTL. A "*" PTL is added for items
+// the preset would otherwise not place (no Season / Year, or another season) when there is room.
+function ysBuildPresets(items) {
+    const seasonCount = new Map();
+    const yearSet = new Set();
+    const combos = new Map();
+    items.forEach(it => {
+        const s = normaliseSeason(it.season);
+        const y = Number(it.year) || 0;
+        if (s) seasonCount.set(s, (seasonCount.get(s) || 0) + 1);
+        if (y) yearSet.add(y);
+        if (s && y) combos.set(s + '|' + y, { s, y });
+    });
+    const seasons = Array.from(seasonCount.keys()).sort((a, b) =>
+        (a === 'FW' ? 0 : a === 'SS' ? 1 : 2) - (b === 'FW' ? 0 : b === 'SS' ? 1 : 2) || a.localeCompare(b));
+    const years = Array.from(yearSet).sort((a, b) => b - a);
+    const sy = (s, y) => `Season=${s}, Year=${y}`;
+    const comboList = years.flatMap(y => seasons.filter(s => combos.has(s + '|' + y)).map(s => ({ s, y })));
+    const cap = (rules) => rules.length <= YS_PRESET_PTLS ? rules : rules.slice(0, YS_PRESET_PTLS - 1).concat(['*']);
+    // newest N years one PTL per season, then one "older" PTL per season
+    const lastYears = (n) => {
+        if (years.length <= n) return null;
+        const cut = years[n];
+        const rules = comboList.filter(c => c.y > cut).map(c => sy(c.s, c.y));
+        seasons.forEach(s => { if (comboList.some(c => c.s === s && c.y <= cut)) rules.push(`Season=${s}, Year<=${cut}`); });
+        return cap(rules);
+    };
+    const noData = !seasons.length && !years.length ? 'Needs Season / Year in the item master' : null;
+    const list = [
+        { id: 'sy', name: 'Season + Year', desc: 'one PTL per season and year, newest first',
+          rules: comboList.length ? cap(comboList.map(c => sy(c.s, c.y))) : null, why: 'Needs Season and Year' },
+        { id: 'last1', name: 'Latest year + older', desc: 'latest year by season, older grouped by season', rules: lastYears(1), why: 'Needs 2 or more years' },
+        { id: 'last2', name: 'Last 2 years + older', desc: 'last 2 years by season, older grouped', rules: lastYears(2), why: 'Needs 3 or more years' },
+        { id: 'last3', name: 'Last 3 years + older', desc: 'last 3 years by season, older grouped', rules: lastYears(3), why: 'Needs 4 or more years' },
+        { id: 'last5', name: 'Last 5 years + older', desc: 'last 5 years by season, older grouped', rules: lastYears(5), why: 'Needs 6 or more years' },
+        { id: 'season', name: 'Season only', desc: 'one PTL per season', rules: seasons.length ? cap(seasons.map(s => `Season=${s}`)) : null, why: 'Needs Season' },
+        { id: 'year', name: 'Year only', desc: 'one PTL per year, newest first',
+          rules: years.length ? (years.length <= YS_PRESET_PTLS ? years.map(y => `Year=${y}`)
+              : years.slice(0, YS_PRESET_PTLS - 1).map(y => `Year=${y}`).concat([`Year<=${years[YS_PRESET_PTLS - 1]}`])) : null, why: 'Needs Year' },
+        { id: 'newold', name: 'New vs old', desc: `last 2 years in one PTL, older in another`,
+          rules: years.length > 2 ? [`Year>=${years[1]}`, `Year<${years[1]}`] : null, why: 'Needs 3 or more years' }
+    ];
+    const vals = items.map(ysItemValues);
+    list.forEach(p => {
+        if (noData) { p.rules = null; p.why = noData; return; }
+        if (!p.rules || p.rules.includes('*') || p.rules.length >= YS_PRESET_PTLS) return;
+        const compiled = p.rules.map(ysCompiledRule);
+        if (vals.some(v => !compiled.some(r => ysRuleMatches(r, v)))) p.rules = p.rules.concat(['*']);
+    });
+    return list;
+}
+
+function ysPickPreset(id) {
+    const p = YSSetup.presets.find(x => x.id === id);
+    if (!p || !p.rules) return;
+    YSSetup.preset = id;
+    YSSetup.rows = p.rules.map((rule, i) => ({ ptl: String(i + 1).padStart(2, '0'), rule }));
+    document.getElementById('ysPresetTitle').textContent = `${p.name} - edit any rule, add or remove PTLs, then Apply`;
+    document.getElementById('ysPresetEditor').style.display = '';
+    ysRenderSetup();
+    ysRenderPresetRows();
+    document.getElementById('ysPresetEditor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// "+ Add PTL": the next free number, placed before a final "*" row so the catch-all stays last.
+function ysPresetAddRow() {
+    const max = YSSetup.rows.reduce((m, r) => Math.max(m, parseInt(r.ptl, 10) || 0), 0);
+    const row = { ptl: String(max + 1).padStart(2, '0'), rule: '' };
+    const last = YSSetup.rows[YSSetup.rows.length - 1];
+    if (last && last.rule.trim() === '*') YSSetup.rows.splice(YSSetup.rows.length - 1, 0, row); else YSSetup.rows.push(row);
+    ysRenderPresetRows();
+    const inputs = document.querySelectorAll('#ysPresetRows input[data-f="rule"]');
+    const idx = YSSetup.rows.indexOf(row);
+    if (inputs[idx]) inputs[idx].focus();
+}
+
+function ysRenderPresetRows() {
+    document.getElementById('ysPresetRows').innerHTML = YSSetup.rows.map((r, i) =>
+        `<tr data-i="${i}"><td class="ys-preset-ptl"><input data-f="ptl" value="${escapeHtml(r.ptl)}" aria-label="PTL number"></td>` +
+        `<td><input data-f="rule" value="${escapeHtml(r.rule)}" placeholder="e.g. Season=FW, Year=2025" aria-label="Rule"></td>` +
+        `<td class="n" data-count="${i}"></td>` +
+        `<td><button type="button" class="ys-preset-del" data-ys-del="${i}" title="Remove this PTL" aria-label="Remove this PTL">✕</button></td></tr>`).join('');
+    ysSetupRecount();
+}
+
+// Items per row with the real matching (first match from the top wins), from the item master on this device.
+function ysSetupRecount() {
+    const compiled = YSSetup.rows.map(r => ysParseRule(r.rule));
+    const hits = compiled.map(() => 0);
+    let unmatched = 0;
+    for (const v of YSSetup.vals) {
+        const i = compiled.findIndex(r => ysRuleMatches(r, v));
+        if (i >= 0) hits[i]++; else unmatched++;
+    }
+    compiled.forEach((r, i) => {
+        const td = document.querySelector(`#ysPresetRows [data-count="${i}"]`);
+        if (!td) return;
+        td.textContent = r.error ? '⚠ ' + r.error : String(hits[i]);
+        td.className = 'n' + (r.error || hits[i] === 0 ? ' warn' : '');
+        td.title = r.error || (hits[i] === 0 ? 'No item goes here (a typo, or a rule above takes them)' : '');
+    });
+    document.getElementById('ysPresetUnmatched').textContent = YSSetup.vals.length
+        ? (unmatched ? `${unmatched} items match no rule (they would show "Not configured").` : 'Every item has a PTL.')
+        : 'No item master on this device, so the rules cannot be tried.';
 }
 
 // Update all scan records for a given box (by ptlNumber + boxBarcode) to Closed

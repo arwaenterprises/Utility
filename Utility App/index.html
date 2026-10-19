@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=80"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=80"></script>
-    <script src="vendor/qrcode.min.js?v=80"></script>
-    <script src="vendor/html5-qrcode.min.js?v=80"></script>
-    <script src="vendor/supabase.js?v=80"></script>
+    <script src="vendor/xlsx.full.min.js?v=81"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=81"></script>
+    <script src="vendor/qrcode.min.js?v=81"></script>
+    <script src="vendor/html5-qrcode.min.js?v=81"></script>
+    <script src="vendor/supabase.js?v=81"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -735,10 +735,7 @@
                         <label for="ysRemarkInput">Remark</label>
                         <input type="text" id="ysRemarkInput" class="form-input" placeholder="e.g., FW2025 returns sorting" autocomplete="off">
                         <div id="ysUploadRow" class="ys-upload-row" style="display:none;">
-                            <button class="bs-sync-btn bs-upload-btn bs-small-btn" id="ysUploadItemsBtn" type="button" title="Upload item master"><img class="btn-img" src="icons/ui-upload.png" alt=""> Items</button>
-                            <button class="bs-round-btn bs-upload-btn bs-tpl-btn has-img" type="button" onclick="refDownloadTemplate('ys_item_master')" title="Download item master template" aria-label="Download item master template"><img class="btn-img" src="icons/ui-download.png" alt=""></button>
-                            <button class="bs-sync-btn bs-upload-btn bs-small-btn" id="ysUploadPtlBtn" type="button" title="Upload PTL config"><img class="btn-img" src="icons/ui-upload.png" alt=""> PTL</button>
-                            <button class="bs-round-btn bs-upload-btn bs-tpl-btn has-img" type="button" onclick="refDownloadTemplate('ys_ptl_config')" title="Download PTL config template" aria-label="Download PTL config template"><img class="btn-img" src="icons/ui-download.png" alt=""></button>
+                            <button class="bs-sync-btn bs-upload-btn bs-small-btn" id="ysSetupBtn" type="button" title="Item master and PTL setup">⚙ Setup</button>
                         </div>
                         <div id="ysSyncStatus" class="ys-sync-status" style="display:none;">
                             <span class="spinner"></span> <span id="ysSyncMsg">Syncing item data...</span>
@@ -1033,6 +1030,54 @@
                     </div>
                 </div>
 
+                <!-- Modal: Setup (admins / individuals) - item master and PTL config: upload, paste, templates, presets -->
+                <div class="modal-overlay" id="ysSetupModal">
+                    <div class="modal ys-setup-modal">
+                        <h3 class="modal-title">⚙ Setup</h3>
+                        <div class="ws-tabs ys-setup-tabs">
+                            <button type="button" class="ws-tab on" data-ys-tab="items">Item Master</button>
+                            <button type="button" class="ws-tab" data-ys-tab="ptl">PTL Config</button>
+                        </div>
+                        <div id="ysSetupItems" class="ys-setup-pane">
+                            <p id="ysSetupItemsInfo" class="ys-setup-info"></p>
+                            <div class="ys-setup-actions">
+                                <button class="btn btn-primary btn-sm" id="ysUploadItemsBtn" type="button"><img class="btn-img" src="icons/ui-upload.png" alt=""> Upload file</button>
+                                <button class="btn btn-secondary btn-sm" type="button" onclick="refDownloadTemplate('ys_item_master')"><img class="btn-img" src="icons/ui-download.png" alt=""> Template</button>
+                            </div>
+                            <label class="ys-setup-label" for="ysPasteItems">Or paste from Excel (include the header row)</label>
+                            <textarea id="ysPasteItems" class="form-input ys-paste" rows="4" placeholder="Barcode&#9;Season&#9;Year&#9;Brand&#9;Color"></textarea>
+                            <button class="btn btn-secondary btn-sm" id="ysPasteItemsBtn" type="button"><img class="btn-img" src="icons/ui-upload.png" alt=""> Upload pasted rows</button>
+                        </div>
+                        <div id="ysSetupPtl" class="ys-setup-pane" style="display:none;">
+                            <div id="ysSetupPtlCurrent" class="ys-setup-info"></div>
+                            <div class="ys-setup-actions">
+                                <button class="btn btn-primary btn-sm" id="ysUploadPtlBtn" type="button"><img class="btn-img" src="icons/ui-upload.png" alt=""> Upload file</button>
+                                <button class="btn btn-secondary btn-sm" type="button" onclick="refDownloadTemplate('ys_ptl_config')"><img class="btn-img" src="icons/ui-download.png" alt=""> Template</button>
+                            </div>
+                            <label class="ys-setup-label" for="ysPastePtl">Or paste from Excel (PTL Number, Rule - include the header row)</label>
+                            <textarea id="ysPastePtl" class="form-input ys-paste" rows="3" placeholder="PTL Number&#9;Rule"></textarea>
+                            <button class="btn btn-secondary btn-sm" id="ysPastePtlBtn" type="button"><img class="btn-img" src="icons/ui-upload.png" alt=""> Upload pasted rows</button>
+                            <div class="ys-setup-label">Presets from your item master (up to 12 PTLs)</div>
+                            <div id="ysPresetList" class="ys-preset-grid"></div>
+                            <div id="ysPresetEditor" style="display:none;">
+                                <div class="ys-setup-label" id="ysPresetTitle"></div>
+                                <table class="scans-table ys-preset-table">
+                                    <thead><tr><th>PTL</th><th>Rule</th><th>Items</th><th></th></tr></thead>
+                                    <tbody id="ysPresetRows"></tbody>
+                                </table>
+                                <p id="ysPresetUnmatched" class="ys-setup-info"></p>
+                                <div class="ys-setup-actions">
+                                    <button class="btn btn-secondary btn-sm" id="ysPresetAddBtn" type="button">+ Add PTL</button>
+                                    <button class="btn btn-primary btn-sm" id="ysPresetApplyBtn" type="button">Apply these rules</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-buttons">
+                            <button class="btn btn-secondary btn-block" id="ysSetupCloseBtn" type="button">Close</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Modal: Reset Session -->
                 <div class="modal-overlay" id="ysResetModal">
                     <div class="modal">
@@ -1083,25 +1128,25 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=80"></script>
-    <script src="js/lang.js?v=80"></script>
-    <script src="js/supabaseClient.js?v=80"></script>
-    <script src="js/camera.js?v=80"></script>
-    <script src="js/lists.js?v=80"></script>
-    <script src="js/usage.js?v=80"></script>
-    <script src="js/syncstatus.js?v=80"></script>
-    <script src="js/help.js?v=80"></script>
-    <script src="js/tooltip.js?v=80"></script>
-    <script src="js/operator.js?v=80"></script>
-    <script src="js/teamlinks.js?v=80"></script>
-    <script src="js/workspace.js?v=80"></script>
-    <script src="js/app.js?v=80"></script>
-    <script src="js/boxScanner.js?v=80"></script>
-    <script src="js/itemBarcode.js?v=80"></script>
-    <script src="js/boxCode.js?v=80"></script>
-    <script src="js/boxSegregate.js?v=80"></script>
-    <script src="js/segregatePack.js?v=80"></script>
-    <script src="js/priceCheck.js?v=80"></script>
-    <script src="js/yearSegregate.js?v=80"></script>
+    <script src="js/config.js?v=81"></script>
+    <script src="js/lang.js?v=81"></script>
+    <script src="js/supabaseClient.js?v=81"></script>
+    <script src="js/camera.js?v=81"></script>
+    <script src="js/lists.js?v=81"></script>
+    <script src="js/usage.js?v=81"></script>
+    <script src="js/syncstatus.js?v=81"></script>
+    <script src="js/help.js?v=81"></script>
+    <script src="js/tooltip.js?v=81"></script>
+    <script src="js/operator.js?v=81"></script>
+    <script src="js/teamlinks.js?v=81"></script>
+    <script src="js/workspace.js?v=81"></script>
+    <script src="js/app.js?v=81"></script>
+    <script src="js/boxScanner.js?v=81"></script>
+    <script src="js/itemBarcode.js?v=81"></script>
+    <script src="js/boxCode.js?v=81"></script>
+    <script src="js/boxSegregate.js?v=81"></script>
+    <script src="js/segregatePack.js?v=81"></script>
+    <script src="js/priceCheck.js?v=81"></script>
+    <script src="js/yearSegregate.js?v=81"></script>
 </body>
 </html>

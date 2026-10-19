@@ -324,10 +324,7 @@ async function refUploadList(listType, rows, onProgress) {
 
 // Whole upload flow for a button: pick file -> parse -> confirm -> upload -> callback.
 function refStartUpload(listType, anchorBtn, onDone) {
-    const def = REF_LISTS[listType];
-    if (!refCanUpload()) { alert('Only your enterprise admin can upload the ' + def.label + '.'); return; }
-    if (!AppState.isOnline) { alert('You are offline. Connect to the internet to upload the ' + def.label + '.'); return; }
-
+    if (!refUploadAllowed(listType)) return;
     let input = document.getElementById('refFileInput');
     if (!input) {
         input = document.createElement('input');
@@ -341,36 +338,67 @@ function refStartUpload(listType, anchorBtn, onDone) {
     input.onchange = async () => {
         const file = input.files && input.files[0];
         if (!file) return;
-        const parsed = await refParseFile(file, listType);
-        if (parsed.error) { alert(parsed.error); return; }
-        if (parsed.duplicates && parsed.duplicates.length) {
-            const uniqueLabel = refHeaderLabel(def.columns.find(c => c.key === def.unique));
-            alert('Upload stopped: ' + parsed.duplicates.length + ' ' + uniqueLabel + '(s) appear more than once.\n' +
-                parsed.duplicates.slice(0, 10).map(d => d.value + ' (rows ' + d.rows.join(', ') + ')').join('\n') +
-                (parsed.duplicates.length > 10 ? '\n...' : '') +
-                '\n\nRemove the duplicates and upload again. Nothing was changed.');
-            return;
-        }
-        if (def.validate) {
-            const problem = await def.validate(parsed.rows);
-            if (problem) { alert('Upload stopped: ' + problem + '\n\nFix the file and upload again. Nothing was changed.'); return; }
-        }
-        const note = parsed.skipped ? '\n(' + parsed.skipped + ' row(s) with missing required values were skipped.)' : '';
-        const preview = def.preview ? await def.preview(parsed.rows) : '';
-        if (!confirm('Replace the whole ' + def.label + ' with this file (' + parsed.rows.length + ' rows)?\nThe old list will be deleted.' + note + (preview ? '\n\n' + preview : ''))) return;
-        const progress = refProgress(anchorBtn, 'Uploading');
-        try {
-            const total = await refUploadList(listType, parsed.rows, (p) => progress.update(p, 'Uploading'));
-            progress.done();
-            alert('✅ Uploaded - ' + total + ' rows. Other devices get it on their next Sync.');
-            if (onDone) await onDone();
-        } catch (e) {
-            progress.done();
-            console.error('List upload failed:', e);
-            alert('Upload failed: ' + (e.message || e) + '\nYour previous list was kept.');
-        }
+        await refUploadParsed(listType, await refParseFile(file, listType), anchorBtn, onDone);
     };
     input.click();
+}
+
+// Rows pasted from Excel / Google Sheets (header row first; tab-separated, or comma-separated when the
+// first line has no tab) go through exactly the same checks as a file. Returns true when uploaded.
+async function refUploadPasted(listType, text, anchorBtn, onDone) {
+    if (!refUploadAllowed(listType)) return false;
+    return refUploadParsed(listType, await refParseFile(refTextToFile(text), listType), anchorBtn, onDone);
+}
+
+function refTextToFile(text) {
+    const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n').filter(l => l.trim() !== '');
+    const sep = lines.length && lines[0].includes('\t') ? '\t' : ',';
+    const aoa = lines.map(l => l.split(sep).map(c => c.trim().replace(/^"(.*)"$/, '$1')));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Data');
+    return new File([XLSX.write(wb, { type: 'array', bookType: 'xlsx' })], 'pasted.xlsx');
+}
+
+function refUploadAllowed(listType) {
+    const def = REF_LISTS[listType];
+    if (!refCanUpload()) { alert('Only your enterprise admin can upload the ' + def.label + '.'); return false; }
+    if (!AppState.isOnline) { alert('You are offline. Connect to the internet to upload the ' + def.label + '.'); return false; }
+    return true;
+}
+
+// parsed = { rows, error?, skipped?, duplicates? } (refParseFile, or rows built in the app such as a preset).
+// Checks, asks for confirmation (with the list's preview), uploads, then calls onDone. Returns true when uploaded.
+async function refUploadParsed(listType, parsed, anchorBtn, onDone) {
+    const def = REF_LISTS[listType];
+    if (parsed.error) { alert(parsed.error); return false; }
+    if (parsed.duplicates && parsed.duplicates.length) {
+        const uniqueLabel = refHeaderLabel(def.columns.find(c => c.key === def.unique));
+        alert('Upload stopped: ' + parsed.duplicates.length + ' ' + uniqueLabel + '(s) appear more than once.\n' +
+            parsed.duplicates.slice(0, 10).map(d => d.value + ' (rows ' + d.rows.join(', ') + ')').join('\n') +
+            (parsed.duplicates.length > 10 ? '\n...' : '') +
+            '\n\nRemove the duplicates and upload again. Nothing was changed.');
+        return false;
+    }
+    if (def.validate) {
+        const problem = await def.validate(parsed.rows);
+        if (problem) { alert('Upload stopped: ' + problem + '\n\nFix the file and upload again. Nothing was changed.'); return false; }
+    }
+    const note = parsed.skipped ? '\n(' + parsed.skipped + ' row(s) with missing required values were skipped.)' : '';
+    const preview = def.preview ? await def.preview(parsed.rows) : '';
+    if (!confirm('Replace the whole ' + def.label + ' with these ' + parsed.rows.length + ' rows?\nThe old list will be deleted.' + note + (preview ? '\n\n' + preview : ''))) return false;
+    const progress = refProgress(anchorBtn, 'Uploading');
+    try {
+        const total = await refUploadList(listType, parsed.rows, (p) => progress.update(p, 'Uploading'));
+        progress.done();
+        alert('✅ Uploaded - ' + total + ' rows. Other devices get it on their next Sync.');
+        if (onDone) await onDone();
+        return true;
+    } catch (e) {
+        progress.done();
+        console.error('List upload failed:', e);
+        alert('Upload failed: ' + (e.message || e) + '\nYour previous list was kept.');
+        return false;
+    }
 }
 
 // ------------------------------------------------

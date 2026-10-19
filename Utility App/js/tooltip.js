@@ -24,6 +24,8 @@ const TIP_AR = {
     'Print a line of text above the barcode': 'اطبع سطرًا نصيًا فوق الباركود',
     'Print a line of text above each code': 'اطبع سطرًا نصيًا فوق كل رمز',
     'How to use this tool': 'طريقة استخدام هذه الأداة',
+    'Item master and PTL setup': 'إعداد قائمة القطع (Item Master) والـ PTL',
+    'Remove this PTL': 'حذف هذا الـ PTL',
     "Download this member's data": 'تحميل بيانات هذا العضو',
     "Download this member's Year/Season data": 'تحميل بيانات السنة/الموسم لهذا العضو',
     'Download this box': 'تحميل هذا الصندوق',

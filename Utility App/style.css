@@ -2037,6 +2037,26 @@ body.rtl .scans-table td { text-align: right; }
 .bs-top-bar { gap: 8px; }
 .bs-top-bar .bs-ts { font-size: 10px; }
 .ys-upload-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+/* Year/Season Setup window */
+.modal.ys-setup-modal { max-width: 560px; max-height: calc(100vh - 24px); overflow-y: auto; }
+.ys-setup-tabs { margin-bottom: 12px; }
+.ys-setup-pane { display: flex; flex-direction: column; gap: 8px; }
+.ys-setup-info { font-size: 13px; color: var(--ak-text-light); margin: 0; word-break: break-word; }
+.ys-setup-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ys-setup-label { font-size: 13px; font-weight: 600; margin-top: 8px; }
+.ys-paste { font-family: monospace; font-size: 12px; resize: vertical; min-height: 64px; }
+.ys-preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.ys-preset { text-align: left; border: 1px solid var(--ak-gray-300); border-radius: 10px; background: var(--ak-white); padding: 8px 10px; font: inherit; cursor: pointer; }
+.ys-preset b { display: block; font-size: 13px; color: var(--ak-maroon); }
+.ys-preset span { font-size: 11px; color: var(--ak-text-light); }
+.ys-preset.on { border-color: var(--ak-maroon); box-shadow: 0 0 0 2px var(--ak-maroon) inset; }
+.ys-preset:disabled { opacity: 0.45; cursor: default; }
+.ys-preset-table td { padding: 4px; vertical-align: middle; }
+.ys-preset-table input { width: 100%; padding: 6px; font: inherit; font-size: 13px; border: 1px solid var(--ak-gray-300); border-radius: 6px; }
+.ys-preset-table .ys-preset-ptl { width: 48px; }
+.ys-preset-table .n { text-align: right; white-space: nowrap; }
+.ys-preset-table .warn { color: var(--ak-danger); font-weight: 700; }
+.ys-preset-del { border: none; background: none; color: var(--ak-danger); font-size: 16px; cursor: pointer; }
 .ref-progress {
     height: 6px;
     background: var(--ak-gray-200, #e5e5e5);
@@ -2348,7 +2368,7 @@ body.rtl .app-back-btn { transform: scaleX(-1); }
 
 /* icon pictures inside the sync / upload / template buttons */
 .btn-img { width: 100%; height: 100%; max-width: 22px; max-height: 22px; display: block; object-fit: contain; pointer-events: none; }
-.btn-small .btn-img, .bs-small-btn .btn-img { display: inline-block; width: 16px; height: 16px; vertical-align: -3px; margin-right: 3px; }
+.btn-small .btn-img, .bs-small-btn .btn-img, .ys-setup-modal .btn-img { display: inline-block; width: 16px; height: 16px; vertical-align: -3px; margin-right: 3px; }
 .bs-round-btn.has-img, .bs-round-btn.bs-upload-btn.has-img { background: var(--ak-white); border: 1.5px solid var(--ak-gray-300); color: var(--ak-maroon); }
 .bs-round-btn.has-img:hover { border-color: var(--ak-maroon); }
 .bs-round-btn.has-img:disabled { color: var(--ak-maroon); font-size: 10px; font-weight: 700; }

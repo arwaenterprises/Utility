@@ -218,7 +218,7 @@ const HELP = {
     yearSegregate: {
         en: {
             intro: 'Sort items into PTL boxes by year, season or any rule you set (style, color, brand...).',
-            before: 'The <b>Item Master</b> and <b>PTL config</b> lists must be uploaded first (use the <img class="help-ico" src="icons/ui-upload.png" alt=""> Items and <img class="help-ico" src="icons/ui-upload.png" alt=""> PTL buttons; the <img class="help-ico" src="icons/ui-download.png" alt=""> icons give the templates). Team members: your admin uploads them. The PTL config has two columns, <b>PTL Number</b> and <b>Rule</b>; the template\'s Instructions sheet explains the rules.',
+            before: 'The <b>Item Master</b> and <b>PTL config</b> lists must be set up first: tap <b>⚙ Setup</b> to upload a file, paste rows copied from Excel, or download a template; on the PTL Config tab you can also pick a <b>preset</b> (Season / Year, up to 12 PTLs), edit it, add PTLs with <b>+ Add PTL</b>, and Apply. Team members: your admin sets them up. The PTL config has two columns, <b>PTL Number</b> and <b>Rule</b>; the template\'s Instructions sheet explains the rules.',
             steps: [
                 'Wait for the items to finish loading, then type a <b>Remark</b> (required). Your first scan starts the session and locks the Remark.',
                 'Choose <b>Nu</b> (numbers only) or <b>AlNu</b> (letters and numbers) at the top.',
@@ -238,7 +238,7 @@ const HELP = {
         },
         ar: {
             intro: 'افرز القطع داخل صناديق PTL حسب السنة أو الموسم أو أي قاعدة تحددها (الموديل، اللون، الماركة...).',
-            before: 'يجب رفع قائمتي <b>Item Master</b> و<b>PTL config</b> أولًا (أزرار <img class="help-ico" src="icons/ui-upload.png" alt=""> Items و<img class="help-ico" src="icons/ui-upload.png" alt=""> PTL؛ وأيقونات <img class="help-ico" src="icons/ui-download.png" alt=""> تعطيك النماذج). أعضاء الفريق: المسؤول يرفعهما. ملف PTL config فيه عمودان: <b>PTL Number</b> و<b>Rule</b>؛ وورقة Instructions في النموذج تشرح القواعد.',
+            before: 'يجب إعداد قائمتي <b>Item Master</b> و<b>PTL config</b> أولًا: اضغط <b>⚙ Setup</b> لرفع ملف، أو لصق صفوف منسوخة من Excel، أو تحميل نموذج؛ وفي تبويب PTL Config يمكنك أيضًا اختيار <b>إعداد جاهز</b> (الموسم / السنة، حتى 12 PTL)، وتعديله، وإضافة PTL بزر <b>+ Add PTL</b>، ثم Apply. أعضاء الفريق: المسؤول يعدّهما. ملف PTL config فيه عمودان: <b>PTL Number</b> و<b>Rule</b>؛ وورقة Instructions في النموذج تشرح القواعد.',
             steps: [
                 'انتظر حتى يكتمل تحميل القطع، ثم اكتب <b>Remark</b> (إلزامي). المسح الأول يبدأ الجلسة ويقفل الملاحظة.',
                 'اختر <b>Nu</b> (أرقام فقط) أو <b>AlNu</b> (أحرف وأرقام) في الأعلى.',

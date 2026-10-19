@@ -177,7 +177,7 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     await initYearSegregate();
     ok('YS: opening the tool loads the item master + PTL config by itself (no Start Session)', YSState.huConfig.length === 2 && (await ysDbCount(YS_ITEMS_STORE)) === 2 && YSState.huStates.length === 2 && !document.getElementById('ysStartSessionBtn') && !document.getElementById('ysSessionScreen'), 'ptls=' + YSState.huConfig.length);
     ok('YS: it opens on the scan screen with an empty, editable Remark and no "Your name" box', document.getElementById('ysScanScreen').classList.contains('active') && document.getElementById('ysRemarkInput').value === '' && !document.getElementById('ysRemarkInput').readOnly && !document.getElementById('ysStaffInput'));
-    ok('YS: the upload buttons sit on the scan screen', !!document.querySelector('#ysScanScreen #ysUploadItemsBtn') && !!document.querySelector('#ysScanScreen #ysUploadPtlBtn'));
+    ok('YS: one Setup button sits on the scan screen; uploads, templates and paste are inside its window', !!document.querySelector('#ysScanScreen #ysSetupBtn') && document.querySelectorAll('#ysUploadRow button').length === 1 && !!document.querySelector('#ysSetupModal #ysUploadItemsBtn') && !!document.querySelector('#ysSetupModal #ysUploadPtlBtn') && !!document.querySelector('#ysSetupModal #ysPasteItems') && !!document.querySelector('#ysSetupModal #ysPastePtl'));
     { // scanning without a Remark is refused
       let alerts2 = []; const oa = window.alert; window.alert = m => alerts2.push(String(m));
       document.getElementById('ysBarcodeInput').value = 'I1'; await handleYsScan({ key: 'Enter' });
@@ -296,6 +296,57 @@ const { start, openApp, report, stop } = require('./helpers/harness');
       ok('Team & Data: the Year/Season download has a PTL Rule column after PTL Number', Object.keys(td.rows[0]).join().includes('PTL Number,PTL Rule,Season') && td.rows[0]['PTL Rule'] === 'Color=Red, Size=S+M', Object.keys(td.rows[0]).join());
       const bt = document.createElement('div'); bt.innerHTML = '<table>' + wsBoxesTable([{ box: 'BOXR7', job: 'Rules', status: 'Closed', items: 1, person: 'M', last_at: new Date().toISOString() }], 'd', new Set(['d:Rules\u0001BOXR7']), new Map([['d:Rules\u0001BOXR7', [__db.ys_scans[0]]]]), 'yearSegregate', true) + '</table>';
       ok('Team & Data: a Year/Season box\'s item list shows its PTL and rule', /07 · Color=Red, Size=S\+M/.test(bt.textContent), bt.textContent.replace(/\s+/g, ' '));
+      // ---------- Setup window: presets (12 PTLs), editor, Apply, paste ----------
+      {
+        const oc = window.confirm, oa = window.alert, prof = AppState.profile; const msgs = [];
+        window.confirm = () => true; window.alert = (m) => msgs.push(String(m));
+        AppState.profile = { ...prof, tier: 'enterprise_admin' };
+        ysSetupUploadButtons();
+        ok('Setup: the Setup button shows for an admin', document.getElementById('ysUploadRow').style.display === 'flex');
+        document.getElementById('ysSetupBtn').click(); await sleep(150);
+        ok('Setup: the button opens the window on the Item Master tab with the item count and columns', document.getElementById('ysSetupModal').classList.contains('active') && document.getElementById('ysSetupItems').style.display === '' && /10 items/.test(document.getElementById('ysSetupItemsInfo').textContent) && /Style ID/.test(document.getElementById('ysSetupItemsInfo').textContent), document.getElementById('ysSetupItemsInfo').textContent);
+        document.querySelector('#ysSetupModal [data-ys-tab="ptl"]').click();
+        ok('Setup: the PTL Config tab shows the current rules', document.getElementById('ysSetupPtl').style.display === '' && /Brand=Nike, Color=Black/.test(document.getElementById('ysSetupPtlCurrent').textContent));
+        const pr = YSSetup.presets, byId = (id) => pr.find(x => x.id === id);
+        ok('Setup: 8 Year/Season presets, all usable with this item master', pr.length === 8 && pr.every(x => x.rules) && document.querySelectorAll('#ysPresetList .ys-preset:not([disabled])').length === 8, pr.map(x => x.id + ':' + (x.rules || []).length).join(' '));
+        ok('Setup: "Season + Year" gives one PTL per season and year, newest first', byId('sy').rules.join('|') === 'Season=SS, Year=2026|Season=FW, Year=2025|Season=SS, Year=2025|Season=FW, Year=2024|Season=SS, Year=2023|Season=FW, Year=2022|Season=SS, Year=2021', byId('sy').rules.join('|'));
+        ok('Setup: "Last 2 years + older" groups older years by season', byId('last2').rules.join('|') === 'Season=SS, Year=2026|Season=FW, Year=2025|Season=SS, Year=2025|Season=FW, Year<=2024|Season=SS, Year<=2024', byId('last2').rules.join('|'));
+        ok('Setup: "Year only" and "New vs old"', byId('year').rules.length === 6 && byId('newold').rules.join('|') === 'Year>=2025|Year<2025');
+        const many = []; for (let y = 2014; y <= 2026; y++) for (const se of ['FW', 'SS']) many.push({ barcode: se + y, season: se, year: y });
+        const big = ysBuildPresets(many);
+        ok('Setup: a preset never uses more than 12 PTLs (the rest go to the last one)', big.every(x => !x.rules || x.rules.length <= 12) && big.find(x => x.id === 'sy').rules[11] === '*' && big.find(x => x.id === 'year').rules[11] === 'Year<=2015', big.map(x => x.id + ':' + (x.rules || []).length).join(' '));
+        ok('Setup: presets need Season / Year', ysBuildPresets([{ barcode: 'x', season: '', year: 0 }]).every(x => !x.rules));
+        document.querySelector('#ysPresetList [data-ys-preset="last2"]').click();
+        const counts = () => [...document.querySelectorAll('#ysPresetRows [data-count]')].map(td => td.textContent).join(',');
+        ok('Setup: picking a preset opens the editor with item counts per PTL', document.getElementById('ysPresetEditor').style.display === '' && YSSetup.rows.length === 5 && counts() === '3,2,1,2,2' && /Every item has a PTL/.test(document.getElementById('ysPresetUnmatched').textContent), counts());
+        document.getElementById('ysPresetAddBtn').click();
+        ok('Setup: "+ Add PTL" adds PTL 06 with an empty rule (flagged)', YSSetup.rows.length === 6 && YSSetup.rows[5].ptl === '06' && /⚠/.test(counts()), counts());
+        const inp = document.querySelector('#ysPresetRows tr[data-i="5"] input[data-f="rule"]'); inp.value = 'Brand=Nike'; inp.dispatchEvent(new Event('input', { bubbles: true }));
+        ok('Setup: a rule typed in the editor is counted live (Nike items are all taken by rules above)', /,0$/.test(counts()) && YSSetup.rows[5].rule === 'Brand=Nike', counts());
+        document.querySelector('#ysPresetRows [data-ys-del="5"]').click();
+        ok('Setup: ✕ removes a PTL', YSSetup.rows.length === 5);
+        YSSetup.rows.push({ ptl: '06', rule: '*' }); document.getElementById('ysPresetAddBtn').click();
+        ok('Setup: "+ Add PTL" goes before a final "*" row', YSSetup.rows[5].ptl === '07' && YSSetup.rows[6].rule === '*');
+        YSSetup.rows.splice(5, 1); ysRenderPresetRows();
+        document.getElementById('ysPresetApplyBtn').click(); await sleep(400);
+        ok('Setup: Apply uploads the rules and the scan screen uses them at once', YSState.huConfig.map(c => c.ptlNumber + ' ' + c.rule).join('|') === '01 Season=SS, Year=2026|02 Season=FW, Year=2025|03 Season=SS, Year=2025|04 Season=FW, Year<=2024|05 Season=SS, Year<=2024|06 *' && YSState.huStates.length === 6 && document.getElementById('ysPresetEditor').style.display === 'none', YSState.huConfig.map(c => c.ptlNumber + ' ' + c.rule).join('|') + ' / ' + msgs.join(' ; '));
+        document.getElementById('ysPastePtl').value = 'PTL Number\tRule\n1\tSeason=FW\n2\t*\n';
+        document.getElementById('ysPastePtlBtn').click(); await sleep(400);
+        ok('Setup: PTL rules pasted from Excel are uploaded and the box is cleared', YSState.huConfig.map(c => c.ptlNumber + ' ' + c.rule).join('|') === '01 Season=FW|02 *' && document.getElementById('ysPastePtl').value === '', YSState.huConfig.map(c => c.rule).join('|'));
+        document.getElementById('ysPastePtl').value = 'PTL Number\tRule\n1\tColour=Red\n'; msgs.length = 0;
+        document.getElementById('ysPastePtlBtn').click(); await sleep(300);
+        ok('Setup: pasted rules get the same checks as a file (wrong column stops it, the text stays)', /Upload stopped/.test(msgs.join()) && /Colour/.test(msgs.join()) && document.getElementById('ysPastePtl').value !== '', msgs.join(' ; '));
+        document.getElementById('ysPasteItems').value = 'Barcode\tSeason\tYear\tDepartment\n3000001\tFW\t2026\tKids\n3000002\tSS\t2026\tMen\n';
+        document.getElementById('ysPasteItemsBtn').click(); await sleep(600);
+        const pasted = await ysDbGet(YS_ITEMS_STORE, '3000001');
+        ok('Setup: an item master pasted from Excel is uploaded with its extra columns', !!pasted && pasted.attrs.Department === 'Kids' && (await ysDbCount(YS_ITEMS_STORE)) === 2 && /2 items/.test(document.getElementById('ysSetupItemsInfo').textContent), JSON.stringify(pasted) + ' / ' + msgs.join(' ; '));
+        ok('Setup: comma-separated paste works too', (await refParseFile(refTextToFile('Barcode,Season\n9,FW\n'), 'ys_item_master')).rows[0].season === 'FW');
+        document.getElementById('ysSetupCloseBtn').click();
+        ok('Setup: Close shuts the window', !document.getElementById('ysSetupModal').classList.contains('active'));
+        AppState.profile = { ...prof, tier: 'enterprise_member', enterprise_id: 'E1' }; ysSetupUploadButtons();
+        ok('Setup: a team member does not see the Setup button', document.getElementById('ysUploadRow').style.display === 'none');
+        AppState.profile = prof; window.confirm = oc; window.alert = oa;
+      }
       await ysDbClearStore(YS_SCANS_STORE); __db.ys_scans = []; ysFinishReset();
     }
 
