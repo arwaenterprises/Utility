@@ -340,6 +340,24 @@ const { start, openApp, report, stop } = require('./helpers/harness');
         document.getElementById('ysPasteItemsBtn').click(); await sleep(600);
         const pasted = await ysDbGet(YS_ITEMS_STORE, '3000001');
         ok('Setup: an item master pasted from Excel is uploaded with its extra columns', !!pasted && pasted.attrs.Department === 'Kids' && (await ysDbCount(YS_ITEMS_STORE)) === 2 && /2 items/.test(document.getElementById('ysSetupItemsInfo').textContent), JSON.stringify(pasted) + ' / ' + msgs.join(' ; '));
+        { // item master checks before upload
+          const asked = []; window.confirm = (m) => { asked.push(String(m)); return false; };
+          const before = await ysDbCount(YS_ITEMS_STORE);
+          msgs.length = 0;
+          await refUploadPasted('ys_item_master', 'Barcode\tSeason\tYear\n111\tFW\t2025\n222\tSS\t2025\n111\tSS\t2024\n', null, null);
+          ok('Item master: a duplicate barcode stops the upload and names the rows', /Upload stopped: 1 Barcode\(s\) appear more than once/.test(msgs.join()) && /111 \(rows 2, 4\)/.test(msgs.join()) && asked.length === 0 && (await ysDbCount(YS_ITEMS_STORE)) === before, msgs.join(' ; '));
+          msgs.length = 0;
+          await refUploadPasted('ys_item_master', 'Barcode,Season,Year\n8.90123E+12,FW,2025\n4455.0,SS,2025\n777,SS,2025\n', null, null);
+          ok('Item master: barcodes damaged by Excel (8.9E+12, 123.0) stop the upload with their rows', /Upload stopped: 2 barcode\(s\) were changed by Excel/.test(msgs.join()) && /row 2 \(8\.90123E\+12\)/.test(msgs.join()) && /row 3 \(4455\.0\)/.test(msgs.join()) && /Format the Barcode column as Text/.test(msgs.join()) && asked.length === 0, msgs.join(' ; '));
+          msgs.length = 0;
+          await refUploadPasted('ys_item_master', 'Barcode\tSeason\tYear\n\tFW\t2025\nAB 12\tFW\t25\nAB13\tF/W 25\t2025\n555\tFall\t2024\n', null, null);
+          const q = asked.join();
+          ok('Item master: odd barcodes, years and seasons are warned about before confirming (nothing uploaded when cancelled)',
+            /1 row\(s\) with missing required values were skipped: row 2/.test(q) && /1 barcode\(s\) have spaces or unusual characters: row 3 \(AB 12\)/.test(q) &&
+            /1 row\(s\) have a Year that is not a 4-digit year .*row 3 \(25\)/.test(q) && /1 row\(s\) have a Season that is not SS \/ FW.*row 4 \(F\/W 25\)/.test(q) &&
+            /2 barcode\(s\) contain letters - scanners must use AlNu/.test(q) && !/row 5/.test(q) && (await ysDbCount(YS_ITEMS_STORE)) === before, q.replace(/\n/g, ' | '));
+          window.confirm = () => true;
+        }
         ok('Setup: comma-separated paste works too', (await refParseFile(refTextToFile('Barcode,Season\n9,FW\n'), 'ys_item_master')).rows[0].season === 'FW');
         document.getElementById('ysSetupCloseBtn').click();
         ok('Setup: Close shuts the window', !document.getElementById('ysSetupModal').classList.contains('active'));

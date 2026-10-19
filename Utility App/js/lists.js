@@ -42,6 +42,8 @@ const REF_LISTS = {
     },
     ys_item_master: {
         label: 'item master',
+        unique: 'barcode',           // a barcode may appear only once - duplicates stop the upload
+        // validate / warn (damaged barcodes, odd Year / Season...) are added by js/yearSegregate.js
         keepExtra: true,             // any other column (Style, Color, Size...) is kept, so PTL rules can use it
         columns: [{ key: 'barcode', required: true }, { key: 'year' }, { key: 'season' }, { key: 'brand' }]
     },
@@ -174,6 +176,7 @@ async function refParseFile(file, listType) {
     const rows = [];
     const rowNumbers = [];      // spreadsheet row number of each kept record (row 1 = headers)
     const incomplete = [];      // strict lists: rows with a missing mandatory value
+    const skippedRows = [];     // other lists: spreadsheet row numbers skipped for a missing required value
     let skipped = 0;
     for (let i = 1; i < sheetRows.length; i++) {
         const rec = {};
@@ -185,7 +188,7 @@ async function refParseFile(file, listType) {
         const missingCols = def.columns.filter(c => c.required && !rec[c.key]);
         if (missingCols.length) {
             if (def.strict) incomplete.push('row ' + (i + 1) + ' (missing ' + missingCols.map(refHeaderLabel).join(', ') + ')');
-            else skipped++;
+            else { skipped++; skippedRows.push(i + 1); }
             continue;
         }
         rows.push(rec);
@@ -208,7 +211,7 @@ async function refParseFile(file, listType) {
         });
         seen.forEach(v => { if (v.rows.length > 1) duplicates.push(v); });
     }
-    return { rows, skipped, duplicates };
+    return { rows, rowNumbers, skipped, skippedRows, duplicates };
 }
 
 // ------------------------------------------------
@@ -224,7 +227,9 @@ function refHeaderLabel(colOrKey) {
 const REF_TEMPLATE_NOTES = {
     box_list: ['Box Number is required (a column called Box Code also works). Everything else is optional.', 'A box number may appear only once - duplicates stop the upload.'],
     price_list: ['Barcode is required. Everything else is optional.'],
-    ys_item_master: ['Barcode is required. Season, Year and Brand are optional.',
+    ys_item_master: ['Barcode is required and may appear only once. Season, Year and Brand are optional.',
+        'Format the Barcode column as Text in Excel, so long barcodes do not turn into 8.9E+12 or lose leading zeros.',
+        'Year: 4 digits (2025). Season: SS or FW (Spring, Summer, Fall, Winter also work).',
         'Add ANY other columns you want to sort by (Style, Color, Size, Department...) - a PTL rule can use any column name.'],
     ys_ptl_config: ['PTL Number is required (1 becomes 01). Rule says which items go to that PTL.',
         'Column=value  exact match, any Item Master column (capitals and spaces ignored). Example: Season=FW',
@@ -366,8 +371,9 @@ function refUploadAllowed(listType) {
     return true;
 }
 
-// parsed = { rows, error?, skipped?, duplicates? } (refParseFile, or rows built in the app such as a preset).
-// Checks, asks for confirmation (with the list's preview), uploads, then calls onDone. Returns true when uploaded.
+// parsed = { rows, rowNumbers?, error?, skipped?, skippedRows?, duplicates? } (refParseFile, or rows built in
+// the app such as a preset). Checks (def.validate stops, def.warn only warns), asks for confirmation (with the
+// list's warnings and preview), uploads, then calls onDone. Returns true when uploaded.
 async function refUploadParsed(listType, parsed, anchorBtn, onDone) {
     const def = REF_LISTS[listType];
     if (parsed.error) { alert(parsed.error); return false; }
@@ -380,12 +386,15 @@ async function refUploadParsed(listType, parsed, anchorBtn, onDone) {
         return false;
     }
     if (def.validate) {
-        const problem = await def.validate(parsed.rows);
+        const problem = await def.validate(parsed.rows, parsed);
         if (problem) { alert('Upload stopped: ' + problem + '\n\nFix the file and upload again. Nothing was changed.'); return false; }
     }
-    const note = parsed.skipped ? '\n(' + parsed.skipped + ' row(s) with missing required values were skipped.)' : '';
+    const skippedAt = parsed.skippedRows && parsed.skippedRows.length
+        ? ': row' + (parsed.skippedRows.length > 1 ? 's ' : ' ') + parsed.skippedRows.slice(0, 10).join(', ') + (parsed.skippedRows.length > 10 ? ', ...' : '') : '';
+    const note = parsed.skipped ? '\n(' + parsed.skipped + ' row(s) with missing required values were skipped' + skippedAt + '.)' : '';
+    const warning = def.warn ? await def.warn(parsed.rows, parsed) : '';
     const preview = def.preview ? await def.preview(parsed.rows) : '';
-    if (!confirm('Replace the whole ' + def.label + ' with these ' + parsed.rows.length + ' rows?\nThe old list will be deleted.' + note + (preview ? '\n\n' + preview : ''))) return false;
+    if (!confirm('Replace the whole ' + def.label + ' with these ' + parsed.rows.length + ' rows?\nThe old list will be deleted.' + note + (warning ? '\n\n' + warning : '') + (preview ? '\n\n' + preview : ''))) return false;
     const progress = refProgress(anchorBtn, 'Uploading');
     try {
         const total = await refUploadList(listType, parsed.rows, (p) => progress.update(p, 'Uploading'));

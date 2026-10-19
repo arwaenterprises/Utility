@@ -650,6 +650,47 @@ async function ysPreviewPtlRows(rows) {
 }
 
 REF_LISTS.ys_ptl_config.validate = async (rows) => ysValidatePtlRows(rows);
+
+// Item master checks before upload (duplicate barcodes are stopped by the shared list code: unique 'barcode').
+// Stop: barcodes Excel has damaged (8.9E+12, 123.0) - they could never match a scan.
+// Warn: spaces / odd characters in a barcode, a Year that is not 2000-2100, a Season that is not SS / FW,
+// and barcodes with letters (scanners need AlNu mode for those).
+function ysItemRowLabel(parsed, i) { return 'row ' + (parsed && parsed.rowNumbers ? parsed.rowNumbers[i] : i + 2); }
+function ysListRows(found) {
+    return found.slice(0, 5).map(f => `${f.at} (${f.value})`).join(', ') + (found.length > 5 ? ', ...' : '');
+}
+function ysValidateItemRows(rows, parsed) {
+    const damaged = [];
+    rows.forEach((r, i) => {
+        const b = String(r.barcode).trim();
+        if (/^\d+(\.\d+)?e[+-]?\d+$/i.test(b) || /^\d+\.0+$/.test(b)) damaged.push({ at: ysItemRowLabel(parsed, i), value: b });
+    });
+    if (!damaged.length) return null;
+    return `${damaged.length} barcode(s) were changed by Excel and would never match a scan: ${ysListRows(damaged)}.\n` +
+        'Format the Barcode column as Text in Excel, type or paste the full barcodes again, save and upload.';
+}
+function ysWarnItemRows(rows, parsed) {
+    const odd = [], badYear = [], badSeason = [];
+    let letters = 0;
+    rows.forEach((r, i) => {
+        const at = ysItemRowLabel(parsed, i);
+        const b = String(r.barcode).trim();
+        if (/[^A-Za-z0-9-]/.test(b)) odd.push({ at, value: b });
+        if (/[A-Za-z]/.test(b)) letters++;
+        const y = String(r.year || '').trim();
+        if (y && !(/^\d{4}$/.test(y) && Number(y) >= 2000 && Number(y) <= 2100)) badYear.push({ at, value: y });
+        const s = String(r.season || '').trim();
+        if (s && !['SS', 'FW'].includes(normaliseSeason(s))) badSeason.push({ at, value: s });
+    });
+    const lines = [];
+    if (odd.length) lines.push(`⚠ ${odd.length} barcode(s) have spaces or unusual characters: ${ysListRows(odd)}`);
+    if (badYear.length) lines.push(`⚠ ${badYear.length} row(s) have a Year that is not a 4-digit year (2000-2100) - Year rules will skip them: ${ysListRows(badYear)}`);
+    if (badSeason.length) lines.push(`⚠ ${badSeason.length} row(s) have a Season that is not SS / FW (or Spring, Summer, Fall, Winter) - write it exactly the same in a rule: ${ysListRows(badSeason)}`);
+    if (letters) lines.push(`ℹ ${letters} barcode(s) contain letters - scanners must use AlNu mode for those items.`);
+    return lines.length ? 'Please check:\n' + lines.join('\n') : '';
+}
+REF_LISTS.ys_item_master.validate = async (rows, parsed) => ysValidateItemRows(rows, parsed);
+REF_LISTS.ys_item_master.warn = async (rows, parsed) => ysWarnItemRows(rows, parsed);
 REF_LISTS.ys_ptl_config.preview = ysPreviewPtlRows;
 
 function normaliseSeason(s) {
