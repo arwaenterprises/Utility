@@ -271,7 +271,7 @@ create policy "scans_delete_team" on public.scans for delete
 --   price_list       barcode, current_price, original_price, style, color, size, year, season
 --   ys_item_master   barcode, year, season, brand
 --   ys_ptl_config    ptl_number, season, year, year_logic
---   doc_boxes        document_number, box_number, store_name   (Box Segregate Document/Pallet mode)
+--   doc_boxes        document_number, box_number, store_name   (Segregate & Pack, formerly Box Segregate Pallet mode)
 --
 -- Owner: enterprise lists have enterprise_id set (user_id = the admin who uploaded);
 -- individual lists have enterprise_id null and user_id = the owner.
@@ -722,7 +722,7 @@ $$;
 create table if not exists public.team_links (
     id uuid primary key default gen_random_uuid(),
     enterprise_id uuid not null references public.enterprises(id) on delete cascade,
-    tool text not null check (tool in ('boxScanner', 'itemBarcode', 'boxCode', 'boxSegregate', 'priceCheck', 'yearSegregate')),
+    tool text not null,
     job_name text not null check (char_length(job_name) between 1 and 60),
     token text not null unique default replace(gen_random_uuid()::text, '-', ''),
     created_by uuid references auth.users(id) on delete set null,
@@ -731,6 +731,10 @@ create table if not exists public.team_links (
     last_scan_at timestamptz
 );
 create index if not exists team_links_enterprise_idx on public.team_links(enterprise_id);
+-- the tool list lives in a named constraint so a re-run can add tools (segregatePack added later)
+alter table public.team_links drop constraint if exists team_links_tool_check;
+alter table public.team_links add constraint team_links_tool_check
+    check (tool in ('boxScanner', 'itemBarcode', 'boxCode', 'boxSegregate', 'segregatePack', 'priceCheck', 'yearSegregate'));
 -- the job name is the Remark of every scan, so two active links of one tool must never share it
 create unique index if not exists team_links_one_active_job
     on public.team_links (enterprise_id, tool, lower(btrim(job_name))) where stopped_at is null;
@@ -797,7 +801,7 @@ revoke all on public.job_purge_log from anon, authenticated;
 
 -- When a job goes away by itself (null = never):
 --  * Box-Item Scan / Year/Season: 30 days after the last scan (or the stop), after a 7-day warning - the data goes too.
---  * Price Check, Box Segregate, Item Barcode, Box Code (they keep no scans): the link is switched off 10 days after its
+--  * Price Check, Box Segregate, Segregate & Pack, Item Barcode, Box Code (they keep no scans): the link is switched off 10 days after its
 --    last USE - a labourer joining it, or the usage count of one of its labourers for that tool.
 drop function if exists public.team_link_purge_at(text, timestamptz, timestamptz, timestamptz, timestamptz);
 create or replace function public.team_link_last_use(p_id uuid, p_tool text, p_created timestamptz)
@@ -811,7 +815,8 @@ as $$
                   from public.usage_daily u join public.team_operators o on o.user_id = u.user_id
                   where o.link_id = p_id
                     and u.tool like case p_tool when 'itemBarcode' then 'item_barcode' when 'boxCode' then 'box_code'
-                                                when 'boxSegregate' then 'box_segregate%' when 'priceCheck' then 'price_check' else '-' end), p_created));
+                                                when 'boxSegregate' then 'box_segregate%' when 'segregatePack' then 'box_segregate_pallet'
+                                                when 'priceCheck' then 'price_check' else '-' end), p_created));
 $$;
 drop function if exists public.team_link_purge_at(uuid, text, timestamptz, timestamptz, timestamptz, timestamptz);
 create or replace function public.team_link_purge_at(p_id uuid, p_tool text, p_last_scan_at timestamptz, p_created_at timestamptz, p_stopped_at timestamptz, p_warned_at timestamptz)
@@ -931,7 +936,7 @@ begin
     if not public.current_user_is_enterprise_admin() then
         raise exception 'Only the enterprise admin can create QR links.';
     end if;
-    if p_tool is null or p_tool not in ('boxScanner', 'itemBarcode', 'boxCode', 'boxSegregate', 'priceCheck', 'yearSegregate') then
+    if p_tool is null or p_tool not in ('boxScanner', 'itemBarcode', 'boxCode', 'boxSegregate', 'segregatePack', 'priceCheck', 'yearSegregate') then
         raise exception 'Please choose a tool.';
     end if;
     if char_length(v_job) < 1 or char_length(v_job) > 60 then

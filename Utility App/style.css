@@ -508,6 +508,7 @@ body.rtl { direction: rtl; }
 #itemBarcodeApp,
 #boxCodeApp,
 #boxSegregateApp,
+#segregatePackApp,
 #priceCheckApp,
 #yearSegregateApp {
     display: none;
@@ -517,6 +518,7 @@ body.rtl { direction: rtl; }
 #itemBarcodeApp.active,
 #boxCodeApp.active,
 #boxSegregateApp.active,
+#segregatePackApp.active,
 #priceCheckApp.active,
 #yearSegregateApp.active {
     display: block;
@@ -2006,7 +2008,7 @@ body.rtl .scans-table td { text-align: right; }
     padding: 0;
 }
 
-/* ---- Reference lists: upload button, % progress bar, Pallet mode ---- */
+/* ---- Reference lists: upload button, % progress bar, Segregate & Pack ---- */
 .bs-upload-btn { background: var(--ak-gray-700, #555); }
 /* Compact round icon buttons (Sync / Upload) - keeps the top bar to one slim row. */
 .bs-round-btn {
@@ -2030,7 +2032,6 @@ body.rtl .scans-table td { text-align: right; }
 .bs-round-btn.bs-upload-btn { background: var(--ak-gray-700, #555); }
 .bs-small-btn { padding: 6px 12px; font-size: 12px; }
 .bs-top-bar { gap: 8px; }
-.bs-top-bar .bs-pallet-toggle { margin: 0 0 0 2px; }
 .bs-top-bar .bs-ts { font-size: 10px; }
 .ys-upload-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .ref-progress {

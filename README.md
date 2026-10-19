@@ -1,6 +1,6 @@
 # Utility
 
-Warehouse utility app for scanning and sorting boxes (Box-Item Scan, Box Segregate, Price Check,
+Warehouse utility app for scanning and sorting boxes (Box-Item Scan, Box Segregate, Segregate & Pack, Price Check,
 Year/Season Sort, Item Barcode Print, Box Code Print, Data Management). Hosted on Netlify (publishes the `Utility App/`
 folder), backed by Supabase (`supabase/schema.sql`). See `ROADMAP.md` for decisions, status and
 what is pending.
@@ -26,7 +26,7 @@ npm test                          # everything
 
 `npm test` runs: static checks (syntax, script / cache wiring, leftovers, secrets, security headers),
 browser tests of the real app against an in-memory fake Supabase (list upload / replace / template, sync,
-both Box Segregate modes, Price Check, Year/Season Sort, Box Scanner offline sync and Reset, Data Management,
+Box Segregate, Segregate & Pack, Price Check, Year/Season Sort, Box Scanner offline sync and Reset, Data Management,
 Team QR links for admins and labourers, Content-Security-Policy enforced), and database tests on a throw-away
 Postgres (schema runs twice cleanly, and about 150 checks on who may read / write / delete what). The database tests are skipped when no Postgres is
 reachable; run them with `PGHOST=... PGUSER=... npm run test:sql`.

@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="style.css">
 
     <!-- External Libraries -->
-    <script src="vendor/xlsx.full.min.js?v=77"></script>
-    <script src="vendor/JsBarcode.all.min.js?v=77"></script>
-    <script src="vendor/qrcode.min.js?v=77"></script>
-    <script src="vendor/html5-qrcode.min.js?v=77"></script>
-    <script src="vendor/supabase.js?v=77"></script>
+    <script src="vendor/xlsx.full.min.js?v=78"></script>
+    <script src="vendor/JsBarcode.all.min.js?v=78"></script>
+    <script src="vendor/qrcode.min.js?v=78"></script>
+    <script src="vendor/html5-qrcode.min.js?v=78"></script>
+    <script src="vendor/supabase.js?v=78"></script>
     <style>
         .ys-scan-input-row { display:flex !important; flex-wrap:nowrap; align-items:center; gap:8px; }
         .ys-scan-input-row .form-input { flex:1 1 0 !important; width:0 !important; min-width:0; margin-bottom:0; }
@@ -668,10 +668,7 @@
                     <div class="bs-top-bar">
                         <button class="bs-round-btn has-img" id="bsRefreshBtn" onclick="refreshBsData()" title="Sync data" aria-label="Sync data"><img class="btn-img" src="icons/ui-sync.png" alt=""></button>
                         <button class="bs-round-btn bs-upload-btn has-img" id="bsUploadBtn" onclick="uploadBsList()" title="Upload list" aria-label="Upload list" style="display:none;"><img class="btn-img" src="icons/ui-upload.png" alt=""></button>
-                        <button class="bs-round-btn bs-upload-btn has-img" id="bsTemplateBtn" onclick="refDownloadTemplate(bsActiveList())" title="Download template" aria-label="Download template" style="display:none;"><img class="btn-img" src="icons/ui-download.png" alt=""></button>
-                        <div class="unique-toggle bs-pallet-toggle" title="Pallet mode: sort boxes by document / store">
-                            <label><input type="checkbox" id="bsPalletToggle"> <span>Pallet</span></label>
-                        </div>
+                        <button class="bs-round-btn bs-upload-btn has-img" id="bsTemplateBtn" onclick="refDownloadTemplate('box_list')" title="Download template" aria-label="Download template" style="display:none;"><img class="btn-img" src="icons/ui-download.png" alt=""></button>
                         <span id="bsTimestamp" class="bs-ts">No data</span>
                     </div>
                     <div class="bs-search-row">
@@ -688,16 +685,40 @@
                         </div>
                     </div>
                     <div id="bsNotFound" class="bs-notfound" style="display:none;"></div>
-                    <div id="bsNormalWrap">
-                        <div id="bsResultCard" class="bs-result" style="display:none;"></div>
+                    <div id="bsResultCard" class="bs-result" style="display:none;"></div>
+                </div>
+                </div>
+            </div>
+
+<!-- Segregate & Pack App (formerly the Pallet mode of Box Segregate) -->
+            <div id="segregatePackApp" class="app-module">
+                <div class="card">
+                <div class="bs-wrap">
+                    <div class="bs-top-bar">
+                        <button class="bs-round-btn has-img" id="spRefreshBtn" onclick="refreshSpData()" title="Sync data" aria-label="Sync data"><img class="btn-img" src="icons/ui-sync.png" alt=""></button>
+                        <button class="bs-round-btn bs-upload-btn has-img" id="spUploadBtn" onclick="uploadSpList()" title="Upload list" aria-label="Upload list" style="display:none;"><img class="btn-img" src="icons/ui-upload.png" alt=""></button>
+                        <button class="bs-round-btn bs-upload-btn has-img" id="spTemplateBtn" onclick="refDownloadTemplate('doc_boxes')" title="Download template" aria-label="Download template" style="display:none;"><img class="btn-img" src="icons/ui-download.png" alt=""></button>
+                        <span id="spTimestamp" class="bs-ts">No data</span>
                     </div>
-                    <div id="bsPalletWrap" style="display:none;">
-                        <div id="bsDocResult" class="bs-doc-result" style="display:none;"></div>
-                        <div id="bsDocSummary"></div>
-                        <div class="bs-doc-actions">
-                            <button class="btn btn-secondary" onclick="downloadPalletExcel()">⬇ Download</button>
-                            <button class="btn btn-secondary" onclick="resetPalletScans()" style="background: var(--ak-danger); color: white; border: none;">Reset</button>
+                    <div class="bs-search-row">
+                        <input type="text" id="spBarcodeInput" inputmode="none" placeholder="Point camera or HHT scan…" autocomplete="off" autocorrect="off" spellcheck="false">
+                        <button class="bs-icon-btn bs-cam-btn" id="spCamBtn" onclick="toggleSpCamera()" title="Scan with camera">📷</button>
+                        <button class="bs-icon-btn bs-kbd-btn" id="spKbdBtn" onclick="toggleSpKeyboard()" title="Type manually">⌨️</button>
+                    </div>
+                    <!-- Camera overlay -->
+                    <div id="spCamOverlay" class="bs-cam-overlay" style="display:none;">
+                        <div id="spQrReader"></div>
+                        <div class="bs-cam-bar">
+                            <button class="bs-cam-torch" id="spTorchBtn" type="button" style="display:none;" title="Torch" aria-label="Torch">🔦</button>
+                            <button class="bs-cam-close" onclick="stopSpCamera()" data-i18n="cam_close">✕ Close Camera</button>
                         </div>
+                    </div>
+                    <div id="spNotFound" class="bs-notfound" style="display:none;"></div>
+                    <div id="spDocResult" class="bs-doc-result" style="display:none;"></div>
+                    <div id="spDocSummary"></div>
+                    <div class="bs-doc-actions">
+                        <button class="btn btn-secondary" onclick="downloadPackExcel()">⬇ Download</button>
+                        <button class="btn btn-secondary" onclick="resetPackScans()" style="background: var(--ak-danger); color: white; border: none;">Reset</button>
                     </div>
                 </div>
                 </div>
@@ -1062,24 +1083,25 @@
     <!-- App Scripts -->
     <!-- ?v= forces tablets to fetch fresh copies instead of serving cached ones.
          BUMP THIS NUMBER every time you change any file in js/. -->
-    <script src="js/config.js?v=77"></script>
-    <script src="js/lang.js?v=77"></script>
-    <script src="js/supabaseClient.js?v=77"></script>
-    <script src="js/camera.js?v=77"></script>
-    <script src="js/lists.js?v=77"></script>
-    <script src="js/usage.js?v=77"></script>
-    <script src="js/syncstatus.js?v=77"></script>
-    <script src="js/help.js?v=77"></script>
-    <script src="js/tooltip.js?v=77"></script>
-    <script src="js/operator.js?v=77"></script>
-    <script src="js/teamlinks.js?v=77"></script>
-    <script src="js/workspace.js?v=77"></script>
-    <script src="js/app.js?v=77"></script>
-    <script src="js/boxScanner.js?v=77"></script>
-    <script src="js/itemBarcode.js?v=77"></script>
-    <script src="js/boxCode.js?v=77"></script>
-    <script src="js/boxSegregate.js?v=77"></script>
-    <script src="js/priceCheck.js?v=77"></script>
-    <script src="js/yearSegregate.js?v=77"></script>
+    <script src="js/config.js?v=78"></script>
+    <script src="js/lang.js?v=78"></script>
+    <script src="js/supabaseClient.js?v=78"></script>
+    <script src="js/camera.js?v=78"></script>
+    <script src="js/lists.js?v=78"></script>
+    <script src="js/usage.js?v=78"></script>
+    <script src="js/syncstatus.js?v=78"></script>
+    <script src="js/help.js?v=78"></script>
+    <script src="js/tooltip.js?v=78"></script>
+    <script src="js/operator.js?v=78"></script>
+    <script src="js/teamlinks.js?v=78"></script>
+    <script src="js/workspace.js?v=78"></script>
+    <script src="js/app.js?v=78"></script>
+    <script src="js/boxScanner.js?v=78"></script>
+    <script src="js/itemBarcode.js?v=78"></script>
+    <script src="js/boxCode.js?v=78"></script>
+    <script src="js/boxSegregate.js?v=78"></script>
+    <script src="js/segregatePack.js?v=78"></script>
+    <script src="js/priceCheck.js?v=78"></script>
+    <script src="js/yearSegregate.js?v=78"></script>
 </body>
 </html>

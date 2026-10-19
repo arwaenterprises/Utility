@@ -15,6 +15,7 @@ const APPS = [
     { id: 'itemBarcode', name: 'Item Barcode Print', nameAr: 'طباعة باركود القطع', icon: '🏷️', description: 'Print item labels', descAr: 'طباعة ملصقات القطع', sessionRequired: false, containerId: 'itemBarcodeApp' },
     { id: 'boxCode', name: 'Box Code Print', nameAr: 'طباعة رمز الصندوق', icon: '🖨️', description: 'Generate box labels', descAr: 'إنشاء ملصقات الصناديق', sessionRequired: false, containerId: 'boxCodeApp' },
     { id: 'boxSegregate', name: 'Box Segregate', nameAr: 'فرز الصناديق', icon: '🔍', description: 'Look up box details by barcode', descAr: 'البحث عن تفاصيل الصندوق بالباركود', sessionRequired: false, containerId: 'boxSegregateApp' },
+    { id: 'segregatePack', name: 'Segregate & Pack', nameAr: 'فرز وتعبئة', icon: '🚚', description: 'Sort boxes onto store pallets by TRN#', descAr: 'فرز الصناديق على طبليات المتاجر حسب TRN#', sessionRequired: false, containerId: 'segregatePackApp' },
     { id: 'priceCheck', name: 'Price Check', nameAr: 'التحقق من السعر', icon: '💰', description: 'Check item price by barcode', descAr: 'معرفة سعر القطعة بالباركود', sessionRequired: false, containerId: 'priceCheckApp' },
     { id: 'yearSegregate', name: 'Year/Season Sort', nameAr: 'الفرز حسب السنة والموسم', icon: '🗂️', description: 'Sort items by year & season into PTL boxes', descAr: 'فرز القطع حسب السنة والموسم في صناديق PTL', sessionRequired: true, containerId: 'yearSegregateApp' },
     // modal: true = opens a window (Data Management) instead of a tool screen

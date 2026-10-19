@@ -291,6 +291,7 @@ function initializeApp(appId) {
         case 'itemBarcode': initItemBarcode(); break;
         case 'boxCode': initBoxCode(); break;
         case 'boxSegregate': initBoxSegregate(); break;
+        case 'segregatePack': initSegregatePack(); break;
         case 'priceCheck': initPriceCheck(); break;
         case 'yearSegregate': initYearSegregate(); break;
     }

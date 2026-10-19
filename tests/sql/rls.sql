@@ -201,6 +201,8 @@ select _t_eq('same tool + same job name (any capitals, end spaces) replaces only
 select _t_eq('...it has a fresh active link, and Inbound 8 was not touched', (select count(*) from team_links where tool='boxScanner' and stopped_at is null and lower(btrim(job_name)) in ('inbound 7','inbound 8')), 2);
 select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('priceCheck','Counter 1')$$);
 select _t_eq('a link for another tool does not touch the Box Scanner links', (select count(*) from team_links where tool='boxScanner' and stopped_at is null), 2);
+select _t_do('00000000-0000-0000-0000-0000000000e1', $$select create_team_link('segregatePack','Pallet bay 1')$$);
+select _t_eq('Segregate & Pack can have a QR link', (select count(*) from team_links where tool='segregatePack' and stopped_at is null), 1);
 select _t_err('an enterprise member cannot create links', '00000000-0000-0000-0000-0000000000b1', $$select create_team_link('boxScanner','x')$$, 'Only the enterprise admin');
 select _t_err('an individual cannot create links', '00000000-0000-0000-0000-00000000000a', $$select create_team_link('boxScanner','x')$$, 'Only the enterprise admin');
 select _t_err('a made-up tool is refused', '00000000-0000-0000-0000-0000000000e1', $$select create_team_link('hackTool','x')$$, 'choose a tool');

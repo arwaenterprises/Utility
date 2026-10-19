@@ -101,28 +101,50 @@ const HELP = {
     },
     boxSegregate: {
         en: {
-            intro: 'Scan a box barcode to see its details, or check boxes against a pallet.',
+            intro: 'Scan a box barcode to see its details.',
             before: 'Your box list must be uploaded first. If you work alone or are your team\'s admin, tap the upload icon (<img class="help-ico" src="icons/ui-upload.png" alt="">); the download icon (<img class="help-ico" src="icons/ui-download.png" alt="">) gives you the template. Team members: your admin uploads the list; tap <img class="help-ico" src="icons/ui-sync.png" alt=""> to get it.',
             steps: [
                 'Tap <img class="help-ico" src="icons/ui-sync.png" alt=""> to load the latest list. The time next to it shows when it was last updated.',
                 'Scan the box barcode with a handheld scanner, or tap the camera (&#128247;): it stays open and keeps scanning. Put the red <b>+</b> on the barcode you want: the one nearest the + is read and gets a red rectangle, and the result shows under the picture. The phone vibrates on every read. Tap &#128294; for light. Use &#9000;&#65039; to type it instead.',
-                'The result card shows the box details. If it says <b>not found</b>, check the barcode and that the list has been uploaded.',
-                '<b>Pallet mode:</b> switch on <b>Pallet</b>, then scan each box on the pallet. The app counts them and flags duplicates and boxes that are not in the list.',
-                'In Pallet mode, tap <b>Download</b> for the Excel file, and <b>Reset</b> when the pallet is done.'
+                'The result card shows the box details. If it says <b>not found</b>, check the barcode and that the list has been uploaded.'
             ],
-            tips: ['Works offline once the list has been loaded on this device.']
+            tips: ['Works offline once the list has been loaded on this device.', 'To sort boxes onto store pallets by TRN#, use the <b>Segregate &amp; Pack</b> tile.']
         },
         ar: {
-            intro: 'امسح باركود الصندوق لعرض تفاصيله، أو راجع الصناديق مقابل طبلية (Pallet).',
+            intro: 'امسح باركود الصندوق لعرض تفاصيله.',
             before: 'يجب رفع قائمة الصناديق أولًا. إذا كنت تعمل بمفردك أو كنت مسؤول الفريق فاضغط أيقونة الرفع (<img class="help-ico" src="icons/ui-upload.png" alt="">)؛ وأيقونة التحميل (<img class="help-ico" src="icons/ui-download.png" alt="">) تعطيك النموذج. أعضاء الفريق: المسؤول يرفع القائمة؛ اضغط <img class="help-ico" src="icons/ui-sync.png" alt=""> لتحميلها.',
             steps: [
                 'اضغط <img class="help-ico" src="icons/ui-sync.png" alt=""> لتحميل أحدث قائمة. الوقت بجانبه يوضح آخر تحديث.',
                 'امسح باركود الصندوق بالماسح اليدوي، أو اضغط الكاميرا (&#128247;): تبقى مفتوحة وتواصل المسح. ضع علامة <b>+</b> الحمراء على الباركود المطلوب: يُقرأ الأقرب إلى العلامة ويُحاط بمستطيل أحمر، وتظهر النتيجة أسفل الصورة. ويهتز الهاتف عند كل قراءة. اضغط &#128294; للإضاءة. استخدم &#9000;&#65039; للكتابة بدلًا من المسح.',
-                'تعرض البطاقة تفاصيل الصندوق. إذا ظهر <b>not found</b> فتحقق من الباركود ومن أن القائمة قد رُفعت.',
-                '<b>وضع الطبلية:</b> فعّل <b>Pallet</b> ثم امسح كل صندوق على الطبلية. يحسبها التطبيق وينبّه إلى المكرر وإلى الصناديق غير الموجودة في القائمة.',
-                'في وضع الطبلية اضغط <b>Download</b> لملف Excel، و<b>Reset</b> عند انتهاء الطبلية.'
+                'تعرض البطاقة تفاصيل الصندوق. إذا ظهر <b>not found</b> فتحقق من الباركود ومن أن القائمة قد رُفعت.'
             ],
-            tips: ['يعمل بدون إنترنت بعد تحميل القائمة على هذا الجهاز.']
+            tips: ['يعمل بدون إنترنت بعد تحميل القائمة على هذا الجهاز.', 'لفرز الصناديق على طبليات المتاجر حسب TRN# استخدم بطاقة <b>فرز وتعبئة</b>.']
+        }
+    },
+    segregatePack: {
+        en: {
+            intro: 'Scan each box to see which store pallet it goes on.',
+            before: 'Your TRN# / box list (TRN#, Box Number, Store Name) must be uploaded first. If you work alone or are your team\'s admin, tap the upload icon (<img class="help-ico" src="icons/ui-upload.png" alt="">); the download icon (<img class="help-ico" src="icons/ui-download.png" alt="">) gives you the template. Team members: your admin uploads the list; tap <img class="help-ico" src="icons/ui-sync.png" alt=""> to get it.',
+            steps: [
+                'Tap <img class="help-ico" src="icons/ui-sync.png" alt=""> to load the latest list. The time next to it shows when it was last updated.',
+                'Scan the box barcode with a handheld scanner, or tap the camera (&#128247;): it stays open and keeps scanning. Use &#9000;&#65039; to type it instead.',
+                'The card shows the <b>store</b> and <b>TRN#</b>: put the box on that store\'s pallet. A box scanned twice shows <b>ALREADY SCANNED</b>; a box not in the list shows <b>not found</b>.',
+                'Tap the <b>boxes scanned</b> line to see every TRN# and its boxes (scanned ones are ticked).',
+                'Tap <b>Download</b> for the Excel file (scanned boxes, plus a sheet of boxes not scanned yet), and <b>Reset</b> when the job is done.'
+            ],
+            tips: ['Works offline once the list has been loaded on this device.', 'Scans stay on this device until you tap Reset.']
+        },
+        ar: {
+            intro: 'امسح كل صندوق لمعرفة طبلية المتجر التي يوضع عليها.',
+            before: 'يجب رفع قائمة TRN# / الصناديق (TRN# ورقم الصندوق واسم المتجر) أولًا. إذا كنت تعمل بمفردك أو كنت مسؤول الفريق فاضغط أيقونة الرفع (<img class="help-ico" src="icons/ui-upload.png" alt="">)؛ وأيقونة التحميل (<img class="help-ico" src="icons/ui-download.png" alt="">) تعطيك النموذج. أعضاء الفريق: المسؤول يرفع القائمة؛ اضغط <img class="help-ico" src="icons/ui-sync.png" alt=""> لتحميلها.',
+            steps: [
+                'اضغط <img class="help-ico" src="icons/ui-sync.png" alt=""> لتحميل أحدث قائمة. الوقت بجانبه يوضح آخر تحديث.',
+                'امسح باركود الصندوق بالماسح اليدوي، أو اضغط الكاميرا (&#128247;): تبقى مفتوحة وتواصل المسح. استخدم &#9000;&#65039; للكتابة بدلًا من المسح.',
+                'تعرض البطاقة <b>المتجر</b> و<b>TRN#</b>: ضع الصندوق على طبلية ذلك المتجر. الصندوق الممسوح مرتين يظهر <b>ALREADY SCANNED</b>، والصندوق غير الموجود في القائمة يظهر <b>not found</b>.',
+                'اضغط سطر <b>boxes scanned</b> لعرض كل TRN# وصناديقه (الممسوحة عليها علامة صح).',
+                'اضغط <b>Download</b> لملف Excel (الصناديق الممسوحة، وورقة بالصناديق التي لم تُمسح بعد)، و<b>Reset</b> عند انتهاء العمل.'
+            ],
+            tips: ['يعمل بدون إنترنت بعد تحميل القائمة على هذا الجهاز.', 'تبقى عمليات المسح على هذا الجهاز حتى تضغط Reset.']
         }
     },
     priceCheck: {

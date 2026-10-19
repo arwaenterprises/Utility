@@ -64,7 +64,8 @@ const usageWiring = {
   'yearSegregate.js': ["Usage.log('year_season', 'box_closed'"],
   'itemBarcode.js': ["Usage.log('item_barcode', 'print_job', 1, qty)", "Usage.log('item_barcode', 'print_job', 1, totalLabels)"],
   'boxCode.js': ["Usage.log('box_code', 'print_job'"],
-  'boxSegregate.js': ["Usage.log('box_segregate', row ?", "Usage.log('box_segregate_pallet', 'box_scanned'", "Usage.log('box_segregate_pallet', 'box_duplicate'", "Usage.log('box_segregate_pallet', 'box_not_found'"],
+  'boxSegregate.js': ["Usage.log('box_segregate', row ?"],
+  'segregatePack.js': ["Usage.log('box_segregate_pallet', 'box_scanned'", "Usage.log('box_segregate_pallet', 'box_duplicate'", "Usage.log('box_segregate_pallet', 'box_not_found'"],
   'priceCheck.js': ["Usage.log('price_check', row ?"],
 };
 for (const [file, needles] of Object.entries(usageWiring)) {

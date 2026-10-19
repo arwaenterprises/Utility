@@ -136,7 +136,7 @@ const LINK = { id: 'L1', token: 'abcdef0123456789abcdef0123456789', tool: 'boxSc
   await wait(300);
   ok('the workspace opens on Jobs with an empty list', /No jobs match/.test(await page.textContent('#wsJobsList')));
   await page.click('[data-ws="newjob"]');
-  ok('the tool menu lists the six tools (not Team & Data itself)', (await page.$$eval('#wsNewTool option', o => o.map(x => x.value).filter(Boolean))).join() === 'boxScanner,itemBarcode,boxCode,boxSegregate,priceCheck,yearSegregate');
+  ok('the tool menu lists the seven tools (not Team & Data itself)', (await page.$$eval('#wsNewTool option', o => o.map(x => x.value).filter(Boolean))).join() === 'boxScanner,itemBarcode,boxCode,boxSegregate,segregatePack,priceCheck,yearSegregate');
   await page.click('[data-ws="create"]');
   ok('a tool is required', (await page.evaluate(() => (window.__alerts || []).length)) === 1);
   await page.selectOption('#wsNewTool', 'boxScanner');

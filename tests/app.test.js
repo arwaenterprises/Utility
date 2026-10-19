@@ -1,4 +1,4 @@
-// App behaviour tests: list uploads / templates / sync, Box Segregate (normal + Pallet mode),
+// App behaviour tests: list uploads / templates / sync, Box Segregate, Segregate & Pack,
 // Price Check, Year/Season Sort, Team console, and the Content-Security-Policy (enforced).
 const { start, openApp, report, stop } = require('./helpers/harness');
 
@@ -39,7 +39,7 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('normal lookup not found', document.getElementById('bsNotFound').style.display === 'block');
     // replace list
     await refUploadList('box_list', [{ box_number: 'ONLY' }]);
-    await bsSyncList('box_list', false);
+    await bsSyncList(false);
     ok('replace removes old boxes', bsMap.size === 1 && bsMap.has('only') && !bsMap.has('b1'));
     ok('server holds only the new list', __db.reference_chunks.filter(c => c.list_type === 'box_list').reduce((n, c) => n + c.row_count, 0) === 1);
     // unchanged -> up to date, no re-download
@@ -68,35 +68,36 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     window.__failSeq = null;
     ok('a failing chunk fails the upload and keeps the old list', failed && __db.reference_chunks.filter(c => c.list_type === 'box_list' && c.is_active).reduce((n, c) => n + c.row_count, 0) === activeBefore);
 
-    // ---------- Pallet mode ----------
+    // ---------- Segregate & Pack (formerly Pallet mode) ----------
     const docs = await refParseFile(mkFile('Document Number,Box Number,Store Name\nD1,P1,Riyadh Park\nD1,P2,Riyadh Park\nD2,P3,Jeddah Mall of Arabia\n'), 'doc_boxes');
     await refUploadList('doc_boxes', docs.rows);
-    bsSetPalletMode(true); await bsSyncList('doc_boxes', false);
-    ok('pallet doc list loaded', bsDocMap.size === 3);
-    const scan = (v) => { document.getElementById('bsBarcodeInput').value = v; bsIsLooking = false; lookupSegregateBox(); };
+    await initSegregatePack(); await spSyncList(false);
+    ok('pallet doc list loaded', spDocMap.size === 3);
+    const scan = (v) => { document.getElementById('spBarcodeInput').value = v; spIsLooking = false; lookupPackBox(); };
     scan('p1');
-    let card = document.getElementById('bsDocResult');
+    let card = document.getElementById('spDocResult');
     ok('pallet scan shows store/doc + progress', /Riyadh Park/.test(card.textContent) && /D1/.test(card.textContent) && /1 of 2/.test(card.textContent) && /PUT ON PALLET/.test(card.textContent), card.textContent.replace(/\s+/g,' '));
-    scan('P1'); ok('duplicate blocked, not counted twice', /ALREADY SCANNED/.test(card.textContent) && bsDocScans.length === 1);
-    scan('p3'); scan('ZZ'); ok('unknown box flagged', document.getElementById('bsNotFound').style.display === 'block' && bsDocScans.length === 2);
+    scan('P1'); ok('duplicate blocked, not counted twice', /ALREADY SCANNED/.test(card.textContent) && spDocScans.length === 1);
+    scan('p3'); scan('ZZ'); ok('unknown box flagged', document.getElementById('spNotFound').style.display === 'block' && spDocScans.length === 2);
     ok('doc scans persisted per user', Storage.getJSON('bs_doc_scans_u1').length === 2);
-    downloadPalletExcel(); const dl = written.pop();
+    downloadPackExcel(); const dl = written.pop();
     ok('AWB download grouped by doc/store', dl.rows.length === 2 && dl.rows[0]['TRN#'] === 'D1' && dl.rows[0]['Store Name'] === 'Riyadh Park' && dl.rows[1]['TRN#'] === 'D2' && Object.keys(dl.rows[0]).join() === 'TRN#,Store Name,Box Number,Scanned At', JSON.stringify(dl.rows));
     ok('Pallet download: second sheet "Not scanned" lists the boxes never scanned', dl.sheets.join() === 'Segregation,Not scanned' && dl.second.length === 1 && dl.second[0]['TRN#'] === 'D1' && dl.second[0]['Store Name'] === 'Riyadh Park' && dl.second[0]['Box Number'] === 'P2', JSON.stringify(dl.sheets) + JSON.stringify(dl.second));
     ok('Pallet download: the first sheet (for AWBs) is unchanged and has no unscanned boxes', dl.rows.length === 2 && !dl.rows.some(r => r['Box Number'] === 'P2'));
-    resetPalletScans(); ok('pallet reset downloads then clears', written.length === 1 && bsDocScans.length === 0);
+    resetPackScans(); ok('pallet reset downloads then clears', written.length === 1 && spDocScans.length === 0);
     { // nothing scanned: Reset neither asks nor downloads
       let asked2 = 0, alerted = 0; const oc = window.confirm, oa = window.alert, w0 = written.length;
       window.confirm = () => { asked2++; return true; }; window.alert = () => { alerted++; };
-      bsDocScans = []; resetPalletScans();
+      spDocScans = []; resetPackScans();
       ok('pallet with zero scans: Reset asks nothing, shows no message, downloads nothing', asked2 === 0 && alerted === 0 && written.length === w0);
       window.confirm = oc; window.alert = oa;
     }
-    bsDocScans = []; for (const v of ['p1', 'p2', 'p3']) { document.getElementById('bsBarcodeInput').value = v; bsIsLooking = false; lookupSegregateBox(); }
-    downloadPalletExcel(); const full = written.pop();
+    spDocScans = []; for (const v of ['p1', 'p2', 'p3']) { document.getElementById('spBarcodeInput').value = v; spIsLooking = false; lookupPackBox(); }
+    downloadPackExcel(); const full = written.pop();
     ok('Pallet download when everything was scanned: "Not scanned" sheet is present but empty', full.sheets.join() === 'Segregation,Not scanned' && full.second.length === 0 && full.rows.length === 3, JSON.stringify(full.second));
-    bsDocScans = []; Storage.setJSON('bs_doc_scans_u1', []);
-    bsSetPalletMode(false); ok('toggle back to normal hides pallet panel', document.getElementById('bsPalletWrap').style.display === 'none');
+    spDocScans = []; Storage.setJSON('bs_doc_scans_u1', []);
+    ok('Box Segregate has no Pallet toggle any more', !document.getElementById('bsPalletToggle') && !document.getElementById('bsPalletWrap') && !document.getElementById('bsDocSummary'));
+    ok('Segregate & Pack is its own tool after Box Segregate', APPS.map(x => x.id).indexOf('segregatePack') === APPS.map(x => x.id).indexOf('boxSegregate') + 1 && APPS.find(x => x.id === 'segregatePack').nameAr === 'فرز وتعبئة');
 
     // ---------- templates ----------
     const tplHeaders = (lt) => { const n = written.length; refDownloadTemplate(lt); const w = written[written.length - 1]; return w; };
@@ -113,21 +114,20 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     ok('no ad placeholder left in the app (ads are for the main domain only)', !document.getElementById('adSlotBottom') && ![...document.styleSheets].some(ss => [...ss.cssRules].some(r => /ad-slot/.test(r.cssText))));
 
 
-    // ---------- Pallet list: hidden until expanded ----------
-    bsSetPalletMode(true); await bsSyncList('doc_boxes', true);
+    // ---------- Segregate & Pack list: hidden until expanded ----------
+    await spSyncList(true);
     // (the pallet scans above were reset, so start from a known state)
-    bsDocScans = []; Storage.setJSON('bs_doc_scans_u1', []); bsSummaryOpen = false; bsOpenGroups.clear(); bsRenderDocSummary();
-    const sum = document.getElementById('bsDocSummary');
+    spDocScans = []; Storage.setJSON('bs_doc_scans_u1', []); spSummaryOpen = false; spOpenGroups.clear(); spRenderDocSummary();
+    const sum = document.getElementById('spDocSummary');
     ok('box list is hidden by default (only the total shows)', !sum.querySelector('table') && /0 of 3 boxes scanned/.test(sum.textContent), sum.textContent.trim());
-    sum.querySelector('[data-bs-toggle-summary]').click();
+    sum.querySelector('[data-sp-toggle-summary]').click();
     ok('tapping the total expands the list with TRN# / Store Name / Boxes', !!sum.querySelector('table') && [...sum.querySelectorAll('th')].map(t => t.textContent).join() === 'TRN#,Store Name,Boxes', [...sum.querySelectorAll('th')].map(t => t.textContent).join());
     scan('p1');
-    sum.querySelector('[data-bs-group]').click();
+    sum.querySelector('[data-sp-group]').click();
     ok('tapping a TRN# row shows its box numbers, scanned ones ticked', /P1 ✓/.test(sum.textContent) && /P2/.test(sum.textContent) && !/P2 ✓/.test(sum.textContent), sum.textContent.replace(/\s+/g, ' '));
-    sum.querySelector('[data-bs-toggle-summary]').click();
+    sum.querySelector('[data-sp-toggle-summary]').click();
     ok('tapping the total again hides the list', !sum.querySelector('table'));
-    scan('NOPE-32'); ok('box not found message sits right under the scan field', document.getElementById('bsNotFound').style.display === 'block' && document.getElementById('bsNotFound').previousElementSibling.id === 'bsCamOverlay');
-    bsSetPalletMode(false);
+    scan('NOPE-32'); ok('box not found message sits right under the scan field', document.getElementById('spNotFound').style.display === 'block' && document.getElementById('spNotFound').previousElementSibling.id === 'spCamOverlay');
 
     // ---------- upload checks: duplicates, mandatory fields, header aliases ----------
     let d = await refParseFile(mkFile('TRN#,Box Number,Store Name\nT1,B1,Riyadh\nT2,b1,Jeddah\nT3,B2,Dammam\nT4,B2,Dammam\n'), 'doc_boxes');
@@ -272,32 +272,30 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     AppState.profile = { ...AppState.profile, tier: 'enterprise_admin' }; renderAppGrid();
     ok('an admin does', !!document.querySelector('.app-tile[data-app-id="dataManagement"]'));
     ok('photo capture is gone', !document.getElementById('photoCaptureApp') && !APPS.some(a => a.id === 'photoCapture') && typeof initPhotoCapture === 'undefined');
-    ok('6 tools + the Team & Data tile', APPS.length === 7 && APPS.filter(a => a.modal).map(a => a.id).join() === 'dataManagement', APPS.map(a => a.id).join());
+    ok('7 tools + the Team & Data tile', APPS.length === 8 && APPS.filter(a => a.modal).map(a => a.id).join() === 'dataManagement', APPS.map(a => a.id).join());
     ok('NO content-security-policy violations during the whole run', window.__csp.length === 0, JSON.stringify(window.__csp));
 
     // ---------- usage statistics ----------
     AppState.profile = { display_name: 'Ann', enterprise_id: null, tier: 'individual' }; __me.enterprise_id = null; __me.id = 'u1'; AppState.user = { id: 'u1', email: 'a@b.c' };
     __db.usage_daily.length = 0; Storage.setJSON('usage_pending_u1', {}); window.__fail = false; AppState.isOnline = true;
-    await bsSyncList('box_list', true);
-    bsSetPalletMode(false);
+    await bsSyncList(true);
     for (const v of ['x1', 'x2', 'nope']) { document.getElementById('bsBarcodeInput').value = v; bsIsLooking = false; lookupSegregateBox(); }
     await initPriceCheck(); for (let i = 0; i < 40 && !(await refMetaGet('price_list')); i++) await sleep(100);
     for (const v of ['PB1', 'PB2', 'PB3', 'zzz']) { document.getElementById('pcBarcodeInput').value = v; await lookupPriceCheck(); }
-    bsDocScans = []; bsSetPalletMode(true);
-    for (const v of ['p2', 'P2', 'q9']) { document.getElementById('bsBarcodeInput').value = v; bsIsLooking = false; lookupSegregateBox(); }
+    spDocScans = [];
+    for (const v of ['p2', 'P2', 'q9']) { document.getElementById('spBarcodeInput').value = v; spIsLooking = false; lookupPackBox(); }
     window.__fail = true; await Usage.flush();
     ok('usage: nothing is lost when the server is unreachable', __db.usage_daily.length === 0 && Object.keys(Storage.getJSON('usage_pending_u1')).length === 7, Object.keys(Storage.getJSON('usage_pending_u1')).join());
     window.__fail = false; await Usage.flush();
     const u = (t, a) => __db.usage_daily.find(x => x.tool === t && x.action === a);
     ok('usage: Box Segregate lookups counted (2 found, 1 not found)', u('box_segregate', 'lookup_found')?.event_count === 2 && u('box_segregate', 'lookup_not_found')?.event_count === 1);
     ok('usage: Price Check lookups counted (3 found, 1 not found)', u('price_check', 'lookup_found')?.event_count === 3 && u('price_check', 'lookup_not_found')?.event_count === 1);
-    ok('usage: Pallet scans counted (1 scanned, 1 duplicate, 1 unknown)', u('box_segregate_pallet', 'box_scanned')?.event_count === 1 && u('box_segregate_pallet', 'box_duplicate')?.event_count === 1 && u('box_segregate_pallet', 'box_not_found')?.event_count === 1);
+    ok('usage: Segregate & Pack scans counted (1 scanned, 1 duplicate, 1 unknown)', u('box_segregate_pallet', 'box_scanned')?.event_count === 1 && u('box_segregate_pallet', 'box_duplicate')?.event_count === 1 && u('box_segregate_pallet', 'box_not_found')?.event_count === 1);
     ok('usage: rows carry the user and a YYYY-MM-DD day', __db.usage_daily.every(x => x.user_id === 'u1' && /^\d{4}-\d{2}-\d{2}$/.test(x.day)));
     const sentRows = __db.usage_daily.length; await Usage.flush();
     ok('usage: flushing again sends nothing twice', __db.usage_daily.length === sentRows && __db.usage_daily.reduce((n, x) => n + x.event_count, 0) === 10);
     Usage.log('hacking', 'x', 1, 0); await Usage.flush();
     ok('usage: an event the server rejects is dropped, not retried forever', Object.keys(Storage.getJSON('usage_pending_u1') || {}).length === 0);
-    bsSetPalletMode(false);
 
     // ---------- account deletion was rolled back ----------
     ok('no Delete-account button, modal or code in the app', !document.getElementById('openDeleteAccountBtn') && !document.getElementById('deleteAccountModal') && typeof openDeleteAccount === 'undefined' && typeof confirmDeleteAccount === 'undefined');
