@@ -42,12 +42,16 @@ const REF_LISTS = {
     },
     ys_item_master: {
         label: 'item master',
+        keepExtra: true,             // any other column (Style, Color, Size...) is kept, so PTL rules can use it
         columns: [{ key: 'barcode', required: true }, { key: 'year' }, { key: 'season' }, { key: 'brand' }]
     },
     ys_ptl_config: {
         label: 'PTL config',
+        // validate / preview are added by js/yearSegregate.js (they need the item master)
         columns: [
-            { key: 'ptl_number', required: true }, { key: 'season' }, { key: 'year' }, { key: 'year_logic' }
+            { key: 'ptl_number', required: true }, { key: 'rule' },
+            // older 4-column files (Season / Year / Year Logic) are still read and turned into a rule
+            { key: 'season', legacy: true }, { key: 'year', legacy: true }, { key: 'year_logic', legacy: true }
         ]
     },
     doc_boxes: {
@@ -123,8 +127,8 @@ function refNormalizeHeader(h) {
 }
 
 // Returns { rows, error }. Headers are matched loosely ("Box Number", "box_number",
-// "BoxNumber" are the same), extra columns are ignored, and rows missing a required
-// value are skipped (counted in `skipped`).
+// "BoxNumber" are the same), extra columns are ignored (kept under their own header when
+// the list has keepExtra), and rows missing a required value are skipped (counted in `skipped`).
 async function refParseFile(file, listType) {
     const def = REF_LISTS[listType];
     let sheetRows;
@@ -153,6 +157,19 @@ async function refParseFile(file, listType) {
     if (missing.length) {
         return { rows: [], error: 'Missing required column(s): ' + missing.join(', ') + '.\nColumns found: ' + sheetRows[0].join(', ') };
     }
+    // keepExtra: every other named column is kept under its header text as written ("Style ID").
+    const extraCols = [];
+    if (def.keepExtra) {
+        const used = new Set(Object.values(colIndex));
+        const seenExtra = new Set();
+        sheetRows[0].forEach((h, i) => {
+            const name = String(h == null ? '' : h).trim();
+            const norm = refNormalizeHeader(name);
+            if (!norm || used.has(i) || seenExtra.has(norm)) return;
+            seenExtra.add(norm);
+            extraCols.push({ name, idx: i });
+        });
+    }
 
     const rows = [];
     const rowNumbers = [];      // spreadsheet row number of each kept record (row 1 = headers)
@@ -164,6 +181,7 @@ async function refParseFile(file, listType) {
             const idx = colIndex[c.key];
             rec[c.key] = idx === undefined ? '' : String(sheetRows[i][idx] == null ? '' : sheetRows[i][idx]).trim();
         });
+        extraCols.forEach(x => { rec[x.name] = String(sheetRows[i][x.idx] == null ? '' : sheetRows[i][x.idx]).trim(); });
         const missingCols = def.columns.filter(c => c.required && !rec[c.key]);
         if (missingCols.length) {
             if (def.strict) incomplete.push('row ' + (i + 1) + ' (missing ' + missingCols.map(refHeaderLabel).join(', ') + ')');
@@ -206,8 +224,17 @@ function refHeaderLabel(colOrKey) {
 const REF_TEMPLATE_NOTES = {
     box_list: ['Box Number is required (a column called Box Code also works). Everything else is optional.', 'A box number may appear only once - duplicates stop the upload.'],
     price_list: ['Barcode is required. Everything else is optional.'],
-    ys_item_master: ['Barcode is required.', 'Season: SS or FW.'],
-    ys_ptl_config: ['PTL Number is required (1 becomes 01).', 'Season: SS or FW.', 'Year Logic: lte (that year and earlier) or exact (that year only).'],
+    ys_item_master: ['Barcode is required. Season, Year and Brand are optional.',
+        'Add ANY other columns you want to sort by (Style, Color, Size, Department...) - a PTL rule can use any column name.'],
+    ys_ptl_config: ['PTL Number is required (1 becomes 01). Rule says which items go to that PTL.',
+        'Column=value  exact match, any Item Master column (capitals and spaces ignored). Example: Season=FW',
+        'Comma = AND (all must be true). Example: Brand=Nike, Color=Black',
+        'Plus = OR inside one column. Example: Color=Red+Blue',
+        'Same PTL Number on two rows = OR across columns. Example: 08 Brand=Mango, and 08 Color=Pink',
+        '<=  >=  <  >  for numbers. Example: Season=FW, Year<=2024 (FW 2024 and older)',
+        '!=  means NOT. Example: Color!=Black',
+        '*  on its own = everything not matched by a row above. Put it last.',
+        'Rows are checked top to bottom and the FIRST match wins - put specific rules above general ones.'],
     doc_boxes: ['TRN#, Box Number and Store Name are all required on every row.', 'One row per box. A box number may appear only once - duplicates stop the upload.']
 };
 
@@ -216,12 +243,13 @@ const REF_TEMPLATE_NOTES = {
 function refDownloadTemplate(listType) {
     const def = REF_LISTS[listType];
     const wb = XLSX.utils.book_new();
-    const headers = def.columns.map(c => refHeaderLabel(c));
+    const cols = def.columns.filter(c => !c.legacy);
+    const headers = cols.map(c => refHeaderLabel(c));
     const ws = XLSX.utils.aoa_to_sheet([headers]);
     ws['!cols'] = headers.map(h => ({ wch: Math.max(14, h.length + 4) }));
     XLSX.utils.book_append_sheet(wb, ws, 'Data');
     const info = [['Column', 'Required?']]
-        .concat(def.columns.map(c => [refHeaderLabel(c), c.required ? 'Required' : 'Optional']))
+        .concat(cols.map(c => [refHeaderLabel(c), c.required ? 'Required' : 'Optional']))
         .concat([[''], ['Notes']])
         .concat((REF_TEMPLATE_NOTES[listType] || []).map(n => [n]))
         .concat([['Fill the Data sheet from row 2 down, save, then upload. An upload replaces the whole list.']]);
@@ -323,8 +351,13 @@ function refStartUpload(listType, anchorBtn, onDone) {
                 '\n\nRemove the duplicates and upload again. Nothing was changed.');
             return;
         }
+        if (def.validate) {
+            const problem = await def.validate(parsed.rows);
+            if (problem) { alert('Upload stopped: ' + problem + '\n\nFix the file and upload again. Nothing was changed.'); return; }
+        }
         const note = parsed.skipped ? '\n(' + parsed.skipped + ' row(s) with missing required values were skipped.)' : '';
-        if (!confirm('Replace the whole ' + def.label + ' with this file (' + parsed.rows.length + ' rows)?\nThe old list will be deleted.' + note)) return;
+        const preview = def.preview ? await def.preview(parsed.rows) : '';
+        if (!confirm('Replace the whole ' + def.label + ' with this file (' + parsed.rows.length + ' rows)?\nThe old list will be deleted.' + note + (preview ? '\n\n' + preview : ''))) return;
         const progress = refProgress(anchorBtn, 'Uploading');
         try {
             const total = await refUploadList(listType, parsed.rows, (p) => progress.update(p, 'Uploading'));

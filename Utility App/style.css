@@ -1918,6 +1918,9 @@ body.rtl .scans-table td { text-align: right; }
     font-weight: 700;
     color: var(--ak-text);
     white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;   /* long PTL rules are cut here; the PTL detail window shows them whole */
 }
 
 .ys-hu-cell-box {

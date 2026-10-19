@@ -217,8 +217,8 @@ const HELP = {
     },
     yearSegregate: {
         en: {
-            intro: 'Sort items by year and season into PTL boxes.',
-            before: 'The <b>Item Master</b> and <b>PTL config</b> lists must be uploaded first (use the <img class="help-ico" src="icons/ui-upload.png" alt=""> Items and <img class="help-ico" src="icons/ui-upload.png" alt=""> PTL buttons; the <img class="help-ico" src="icons/ui-download.png" alt=""> icons give the templates). Team members: your admin uploads them.',
+            intro: 'Sort items into PTL boxes by year, season or any rule you set (style, color, brand...).',
+            before: 'The <b>Item Master</b> and <b>PTL config</b> lists must be uploaded first (use the <img class="help-ico" src="icons/ui-upload.png" alt=""> Items and <img class="help-ico" src="icons/ui-upload.png" alt=""> PTL buttons; the <img class="help-ico" src="icons/ui-download.png" alt=""> icons give the templates). Team members: your admin uploads them. The PTL config has two columns, <b>PTL Number</b> and <b>Rule</b>; the template\'s Instructions sheet explains the rules.',
             steps: [
                 'Wait for the items to finish loading, then type a <b>Remark</b> (required). Your first scan starts the session and locks the Remark.',
                 'Choose <b>Nu</b> (numbers only) or <b>AlNu</b> (letters and numbers) at the top.',
@@ -232,12 +232,13 @@ const HELP = {
                 'You cannot change Nu/AlNu or Reset while a PTL box is still open.',
                 'The &#127760; button turns spoken prompts on or off and picks their language.',
                 'Tap a PTL in the list to see its details.',
+                'Rules (admins): <b>Column=value</b> using any Item Master column; comma = AND (<b>Brand=Nike, Color=Black</b>); plus = OR (<b>Color=Red+Blue</b>); <b>Year&lt;=2024</b> for that year and older; <b>!=</b> = NOT; <b>*</b> = everything else. The same PTL on two rows = OR. The first matching row from the top wins. On upload the app shows how many items each PTL would get.',
                 'If you joined with a team QR code, the Remark is the <b>job name</b> from the QR &mdash; you do not type it, and your name is saved on every scan.'
             ]
         },
         ar: {
-            intro: 'افرز القطع حسب السنة والموسم داخل صناديق PTL.',
-            before: 'يجب رفع قائمتي <b>Item Master</b> و<b>PTL config</b> أولًا (أزرار <img class="help-ico" src="icons/ui-upload.png" alt=""> Items و<img class="help-ico" src="icons/ui-upload.png" alt=""> PTL؛ وأيقونات <img class="help-ico" src="icons/ui-download.png" alt=""> تعطيك النماذج). أعضاء الفريق: المسؤول يرفعهما.',
+            intro: 'افرز القطع داخل صناديق PTL حسب السنة أو الموسم أو أي قاعدة تحددها (الموديل، اللون، الماركة...).',
+            before: 'يجب رفع قائمتي <b>Item Master</b> و<b>PTL config</b> أولًا (أزرار <img class="help-ico" src="icons/ui-upload.png" alt=""> Items و<img class="help-ico" src="icons/ui-upload.png" alt=""> PTL؛ وأيقونات <img class="help-ico" src="icons/ui-download.png" alt=""> تعطيك النماذج). أعضاء الفريق: المسؤول يرفعهما. ملف PTL config فيه عمودان: <b>PTL Number</b> و<b>Rule</b>؛ وورقة Instructions في النموذج تشرح القواعد.',
             steps: [
                 'انتظر حتى يكتمل تحميل القطع، ثم اكتب <b>Remark</b> (إلزامي). المسح الأول يبدأ الجلسة ويقفل الملاحظة.',
                 'اختر <b>Nu</b> (أرقام فقط) أو <b>AlNu</b> (أحرف وأرقام) في الأعلى.',
@@ -251,6 +252,7 @@ const HELP = {
                 'لا يمكنك تغيير Nu/AlNu أو عمل Reset وهناك صندوق PTL مفتوح.',
                 'زر &#127760; يشغّل التنبيهات الصوتية أو يوقفها ويختار لغتها.',
                 'اضغط على أي PTL في القائمة لعرض تفاصيله.',
+                'القواعد (للمسؤول): <b>Column=value</b> بأي عمود من Item Master؛ الفاصلة = و (<b>Brand=Nike, Color=Black</b>)؛ علامة + = أو (<b>Color=Red+Blue</b>)؛ <b>Year&lt;=2024</b> لتلك السنة وما قبلها؛ <b>!=</b> = ليس؛ <b>*</b> = كل ما تبقى. نفس الـ PTL في سطرين = أو. أول سطر مطابق من الأعلى هو الذي يُطبَّق. عند الرفع يعرض التطبيق عدد القطع لكل PTL.',
                 'إذا انضممت عبر رمز QR للفريق فالملاحظة هي <b>اسم المهمة</b> من الرمز — لا تكتبها، ويُحفظ اسمك مع كل عملية مسح.'
             ]
         }

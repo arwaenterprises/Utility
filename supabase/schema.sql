@@ -472,6 +472,8 @@ create table if not exists public.ys_scans (
     scanned_at timestamptz not null default now()
 );
 alter table public.ys_scans add column if not exists operator_name text;
+-- the PTL rule the item matched (PTL config is PTL Number + Rule, e.g. "Brand=Nike, Color=Black")
+alter table public.ys_scans add column if not exists ptl_rule text;
 
 create index if not exists ys_scans_user_id_idx on public.ys_scans(user_id);
 create index if not exists ys_scans_enterprise_id_idx on public.ys_scans(enterprise_id);

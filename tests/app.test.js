@@ -104,7 +104,8 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     const grab = (lt) => { let cap; const old = XLSX.writeFile; XLSX.writeFile = (wb, name) => { cap = { name, headers: XLSX.utils.sheet_to_json(wb.Sheets['Data'], { header: 1 })[0], sheets: wb.SheetNames }; }; refDownloadTemplate(lt); XLSX.writeFile = old; return cap; };
     let t = grab('box_list'); ok('box list template headers', t.headers.join() === 'Box Number,TRN,Increff Order ID,Store Name,Region,Store Code,Brand' && t.sheets.join() === 'Data,Instructions', t.headers.join());
     t = grab('doc_boxes'); ok('doc template headers', t.headers.join() === 'TRN#,Box Number,Store Name', t.name);
-    t = grab('ys_ptl_config'); ok('ptl template headers', t.headers.join() === 'PTL Number,Season,Year,Year Logic');
+    t = grab('ys_ptl_config'); ok('ptl template headers', t.headers.join() === 'PTL Number,Rule', t.headers.join());
+    ok('ptl template explains the rules (+ = OR, comma = AND, *)', (() => { let cap; const old = XLSX.writeFile; XLSX.writeFile = (wb) => { cap = XLSX.utils.sheet_to_json(wb.Sheets['Instructions'], { header: 1 }).flat().join(' '); }; refDownloadTemplate('ys_ptl_config'); XLSX.writeFile = old; return /Color=Red\+Blue/.test(cap) && /Comma = AND/.test(cap) && /\*/.test(cap); })());
     t = grab('price_list'); ok('price template headers', t.headers.join() === 'Barcode,Current Price,Original Price,Style,Color,Size,Year,Season');
     t = grab('ys_item_master'); ok('item master template headers', t.headers.join() === 'Barcode,Year,Season,Brand');
     // a template filled in by the user round-trips through the parser
@@ -238,6 +239,59 @@ const { start, openApp, report, stop } = require('./helpers/harness');
     await ysExecuteReset(); ok('YS member reset blocked with unsynced boxes', (await ysDbGetAll(YS_SCANS_STORE)).length === 1);
     AppState.isOnline = true; await ysExecuteReset();
     ok('YS member reset clears device only, server keeps data', (await ysDbGetAll(YS_SCANS_STORE)).length === 0 && __db.ys_scans.length === 1);
+
+    // ---------- Year/Season: PTL rules (PTL Number + Rule, any Item Master column) ----------
+    {
+      const im = await refParseFile(mkFile('Barcode,Style ID,Color,Size,Brand,Season,Year\n' +
+        '1000001,NK100,Black,M,Nike,FW,2025\n1000002,AB1234,White,L,Adidas,SS,2023\n1000003,PU550,Grey,S,Puma,FW,2025\n' +
+        '1000004,ZR900,Red,M,Zara,SS,2026\n1000005,ZR901,Blue,L,Zara,SS,2026\n1000006,PU551,Green,XL,Puma,Fall/Winter,2022\n' +
+        '1000007,NK101,Red,S,Nike,SS,2025\n1000008,MG300,Pink,M,Mango,SS,2026\n1000009,AB1235,Black,M,Adidas,FW,2024\n1000010,LV200,Navy,L,Levis,SS,2021\n'), 'ys_item_master');
+      ok('YS rules: the item master keeps every extra column under its own header', im.rows[0]['Style ID'] === 'NK100' && im.rows[0].Color === 'Black' && im.rows[0].Size === 'M' && im.rows[0].barcode === '1000001' && im.rows[0].brand === 'Nike', JSON.stringify(im.rows[0]));
+      await ysSaveItemMaster(im.rows);
+      ok('YS rules: extra columns are stored with the item', (await ysDbGet(YS_ITEMS_STORE, '1000001')).attrs['Style ID'] === 'NK100');
+      const pr = await refParseFile(mkFile('PTL Number,Rule\n01,"Brand=Nike, Color=Black"\n02,Style ID=AB1234+AB1235\n03,"Season=FW, Year=2025"\n' +
+        '04,"Season=SS, Year=2025"\n05,"Season=FW, Year<=2024"\n06,"season = ss , year <= 2024"\n07,"Color=Red, Size=S+M"\n08,Brand=Mango\n8,Color=Pink\n09,*\n'), 'ys_ptl_config');
+      ok('YS rules: a good rules file passes the upload check', ysValidatePtlRows(pr.rows) === null, ysValidatePtlRows(pr.rows));
+      ysSavePtlConfig(pr.rows); buildHuStates();
+      ok('YS rules: one PTL per number; a PTL on two rows shows both rules', YSState.huStates.length === 9 && YSState.huStates.find(h => h.ptlNumber === '08').rule === 'Brand=Mango / Color=Pink', YSState.huStates.map(h => h.ptlNumber + ':' + h.rule).join('|'));
+      const expect = { 1000001: '01', 1000002: '02', 1000003: '03', 1000004: '07', 1000005: '09', 1000006: '05', 1000007: '04', 1000008: '08', 1000009: '02', 1000010: '06' };
+      const got = {};
+      for (const bc of Object.keys(expect)) { const i = matchItemToHu(await ysDbGet(YS_ITEMS_STORE, bc)); got[bc] = i < 0 ? '-' : YSState.huStates[i].ptlNumber; }
+      ok('YS rules: the 10 example items go where the example sheet says (first match from the top wins)', Object.keys(expect).every(k => got[k] === expect[k]), JSON.stringify(got));
+      ysSavePtlConfig([{ ptl_number: '01', rule: 'Color!=Black, Brand=Nike' }]); buildHuStates();
+      ok('YS rules: != means NOT', matchItemToHu(await ysDbGet(YS_ITEMS_STORE, '1000007')) === 0 && matchItemToHu(await ysDbGet(YS_ITEMS_STORE, '1000001')) === -1);
+      // upload check
+      const bad = ysValidatePtlRows([{ ptl_number: '1', rule: 'Colour=Red' }, { ptl_number: '2', rule: 'Brand Nike' }, { ptl_number: '3', rule: 'Year<=abc' }, { ptl_number: '4', rule: '' }]);
+      ok('YS rules: the upload check names a wrong column, a missing =, a non-number with <= and an empty rule', /PTL 01.*no column "Colour"/.test(bad) && /PTL 02.*no = sign/.test(bad) && /PTL 03.*needs one number/.test(bad) && /PTL 04.*empty/.test(bad) && /Item master columns: .*Style ID/.test(bad), bad);
+      // preview
+      const prev = await ysPreviewPtlRows(pr.rows.concat([{ ptl_number: '10', rule: 'Color=Purple' }]));
+      ok('YS rules: the upload preview counts items per PTL and flags a PTL that gets none', /with the 10 items/.test(prev) && /PTL 01: 1 items/.test(prev) && /PTL 02: 2 items/.test(prev) && /PTL 10: 0 items  ⚠/.test(prev), prev);
+      const prev2 = await ysPreviewPtlRows([{ ptl_number: '1', rule: 'Season=FW' }, { ptl_number: '2', rule: 'Brand=Nike, Color=Black' }, { ptl_number: '2', rule: 'Brand=Zara' }]);
+      ok('YS rules: the preview names a rule hidden under a rule above it, and counts unmatched items', /Not matched by any rule: 4 items/.test(prev2) && /PTL 02 "Brand=Nike, Color=Black"/.test(prev2), prev2);
+      // older 4-column files and devices still holding the old config
+      const legacy = await refParseFile(mkFile('PTL Number,Season,Year,Year Logic\n1,SS,2024,lte\n2,FW,2025,exact\n'), 'ys_ptl_config');
+      ok('YS rules: an old 4-column PTL file is still accepted and turned into rules', ysValidatePtlRows(legacy.rows) === null && (ysSavePtlConfig(legacy.rows), YSState.huConfig.map(c => c.rule).join('|') === 'Season=SS, Year<=2024|Season=FW, Year=2025'), YSState.huConfig.map(c => c.rule).join('|'));
+      Storage.setJSON('ys_hu_config', [{ ptlNumber: '01', season: 'FW', year: 2024, yearLogic: 'lte' }]); loadCachedHuConfig(); buildHuStates();
+      ok('YS rules: a device with the old saved config converts it', YSState.huConfig[0].rule === 'Season=FW, Year<=2024' && matchItemToHu(await ysDbGet(YS_ITEMS_STORE, '1000006')) === 0);
+      // a real scan records the rule and the item's own columns; the download carries them
+      ysSavePtlConfig(pr.rows); buildHuStates(); ysRenderHuPanel();
+      YSState.huStates.find(h => h.ptlNumber === '05').status = 'Open'; ysRenderHuPanel();
+      ok('YS rules: the PTL list shows the rule text safely (< and > are not HTML)', document.querySelector('#ysHuPanel [data-ptl="05"] .ys-hu-cell-cfg').textContent === 'Season=FW, Year<=2024' && /Year&lt;=2024/.test(document.getElementById('ysHuPanel').innerHTML));
+      YSState.huStates.find(h => h.ptlNumber === '05').status = 'Empty'; ysRenderHuPanel();
+      document.getElementById('ysRemarkInput').value = 'Rules'; document.getElementById('ysRemarkInput').readOnly = false;
+      const scanYs = async (v) => { document.getElementById('ysBarcodeInput').value = v; await handleYsScan({ key: 'Enter' }); };
+      await scanYs('1000004'); await scanYs('ST07'); await scanYs('BOXR7'); await scanYs('1000004'); await scanYs('BOXR7');
+      const rec = (await ysDbGetAll(YS_SCANS_STORE)).find(x => x.barcode === '1000004');
+      ok('YS rules: the scan is put in PTL 07 and records the rule and the item\'s own columns', !!rec && rec.ptlNumber === '07' && rec.rule === 'Color=Red, Size=S+M' && rec.attrs.Color === 'Red' && rec.season === 'SS' && rec.year === 2026, JSON.stringify(rec));
+      ok('YS rules: the close-box window shows the rule', (await handleCloseInitiate('07'), document.getElementById('ysCloseModalSeason').textContent === 'Color=Red, Size=S+M'));
+      ysCancelClose();
+      await ysDownloadExcel(); const yd = written.pop();
+      ok('YS rules: the download has PTL Rule and the item\'s Style ID / Color / Size columns', yd.rows[0]['PTL Rule'] === 'Color=Red, Size=S+M' && yd.rows[0]['Style ID'] === 'ZR900' && yd.rows[0].Color === 'Red' && yd.rows[0].Size === 'M', JSON.stringify(yd.rows[0]));
+      const ru = (await ysDbGetAll(YS_SCANS_STORE)); ru.forEach(x => { x.boxStatus = 'Closed'; }); for (const x of ru) await ysDbPut(YS_SCANS_STORE, x);
+      __db.ys_scans = []; await ysAutoSync();
+      ok('YS rules: the uploaded row carries ptl_rule', __db.ys_scans.length === 1 && __db.ys_scans[0].ptl_rule === 'Color=Red, Size=S+M', JSON.stringify(__db.ys_scans[0]));
+      await ysDbClearStore(YS_SCANS_STORE); __db.ys_scans = []; ysFinishReset();
+    }
 
     // ---------- Team & Data workspace (home tile) for an admin; no user icon, no older windows ----------
     AppState.profile = { ...AppState.profile, tier: 'enterprise_admin', enterprise_id: 'E1' };

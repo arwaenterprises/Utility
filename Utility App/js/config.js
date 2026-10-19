@@ -17,7 +17,7 @@ const APPS = [
     { id: 'boxSegregate', name: 'Box Segregate', nameAr: 'فرز الصناديق', icon: '🔍', description: 'Look up box details by barcode', descAr: 'البحث عن تفاصيل الصندوق بالباركود', sessionRequired: false, containerId: 'boxSegregateApp' },
     { id: 'segregatePack', name: 'Segregate & Pack', nameAr: 'فرز وتعبئة', icon: '🚚', description: 'Sort boxes onto store pallets by TRN#', descAr: 'فرز الصناديق على طبليات المتاجر حسب TRN#', sessionRequired: false, containerId: 'segregatePackApp' },
     { id: 'priceCheck', name: 'Price Check', nameAr: 'التحقق من السعر', icon: '💰', description: 'Check item price by barcode', descAr: 'معرفة سعر القطعة بالباركود', sessionRequired: false, containerId: 'priceCheckApp' },
-    { id: 'yearSegregate', name: 'Year/Season Sort', nameAr: 'الفرز حسب السنة والموسم', icon: '🗂️', description: 'Sort items by year & season into PTL boxes', descAr: 'فرز القطع حسب السنة والموسم في صناديق PTL', sessionRequired: true, containerId: 'yearSegregateApp' },
+    { id: 'yearSegregate', name: 'Year/Season Sort', nameAr: 'الفرز حسب السنة والموسم', icon: '🗂️', description: 'Sort items into PTL boxes by year, season or any rule', descAr: 'فرز القطع في صناديق PTL حسب السنة والموسم أو أي قاعدة', sessionRequired: true, containerId: 'yearSegregateApp' },
     // modal: true = opens a window (Data Management) instead of a tool screen
     { id: 'dataManagement', name: 'Team & Data', nameAr: 'الفريق والبيانات', icon: '🗄️', iconImg: 'icons/ui-data.png', description: 'Jobs, QR links, people and data', descAr: 'المهام وروابط QR والأشخاص والبيانات', sessionRequired: false, modal: true }
 ];

@@ -218,15 +218,30 @@ function clearYsSession() {
 // Each device keeps its own copy for instant, offline lookups.
 
 // Saves the item master into this tool's lookup table (chunked, so progress can be shown).
+// Columns other than Barcode / Season / Year / Brand go into `attrs` under their own header, so a PTL rule
+// can use them; the column names are remembered for checking rules at upload.
+const YS_ITEM_FIXED = ['barcode', 'season', 'year', 'brand'];
 async function ysSaveItemMaster(rows, onProgress) {
+    const columns = {};
     const mapped = rows
         .filter(row => row.barcode)
-        .map(row => ({
-            barcode: String(row.barcode).trim(),
-            year: Number(row.year) || 0,
-            season: String(row.season || '').trim().toUpperCase(),
-            brand: String(row.brand || '').trim()
-        }));
+        .map(row => {
+            const item = {
+                barcode: String(row.barcode).trim(),
+                year: Number(row.year) || 0,
+                season: String(row.season || '').trim().toUpperCase(),
+                brand: String(row.brand || '').trim()
+            };
+            for (const k in row) {
+                if (YS_ITEM_FIXED.includes(k)) continue;
+                if (!item.attrs) item.attrs = {};
+                item.attrs[k] = row[k];
+                columns[refNormalizeHeader(k)] = k;
+            }
+            return item;
+        });
+    YS_ITEM_FIXED.forEach(k => { columns[k] = refHeaderLabel(k); });
+    Storage.setJSON('ys_item_columns', columns);
 
     await ysDbClearStore(YS_ITEMS_STORE);
 
@@ -239,15 +254,11 @@ async function ysSaveItemMaster(rows, onProgress) {
     Storage.set('ys_item_master_ts', ysNow());
 }
 
+// One entry per row of the file, in file order (the order decides which rule wins): { ptlNumber, rule }.
 function ysSavePtlConfig(rows) {
     const config = rows
         .filter(row => row.ptl_number && String(row.ptl_number).trim() !== '')
-        .map(row => ({
-            ptlNumber: String(row.ptl_number).trim().padStart(2, '0'),
-            season: String(row.season || '').trim().toUpperCase(),
-            year: Number(row.year) || 0,
-            yearLogic: String(row.year_logic || 'lte').trim().toLowerCase()
-        }));
+        .map(row => ({ ptlNumber: String(row.ptl_number).trim().padStart(2, '0'), rule: ysRowRule(row) }));
     YSState.huConfig = config;
     Storage.setJSON('ys_hu_config', config);
 }
@@ -282,26 +293,33 @@ async function syncHuConfig(force) {
 function loadCachedHuConfig() {
     const cached = Storage.getJSON('ys_hu_config');
     if (cached && Array.isArray(cached) && cached.length > 0) {
-        YSState.huConfig = cached;
+        // a device that last synced before rules existed has {ptlNumber, season, year, yearLogic}
+        YSState.huConfig = cached.map(c => c.rule !== undefined ? c
+            : { ptlNumber: c.ptlNumber, rule: ysLegacyRule(c.season, c.year, c.yearLogic) });
         return true;
     }
     return false;
 }
 
-// Build fresh HU states from config (merge with existing session states)
-// Any PTL not in the current config is dropped, even if it has existing state.
+// Build fresh HU states from config (merge with existing session states): one per PTL, whose label is
+// its rules joined with " / " (a PTL on several rows). Any PTL not in the current config is dropped,
+// even if it has existing state.
 function buildHuStates() {
     const existing = YSState.huStates;
+    const rulesByPtl = new Map();
+    YSState.huConfig.forEach(cfg => {
+        if (!rulesByPtl.has(cfg.ptlNumber)) rulesByPtl.set(cfg.ptlNumber, []);
+        rulesByPtl.get(cfg.ptlNumber).push(cfg.rule);
+    });
 
-    YSState.huStates = YSState.huConfig.map(cfg => {
-        const prev = existing.find(s => s.ptlNumber === cfg.ptlNumber);
+    YSState.huStates = Array.from(rulesByPtl, ([ptlNumber, rules]) => {
+        const rule = rules.join(' / ');
+        const prev = existing.find(s => s.ptlNumber === ptlNumber);
         return prev
-            ? { ...prev, season: cfg.season, year: cfg.year, yearLogic: cfg.yearLogic }
+            ? { ...prev, rule }
             : {
-                ptlNumber: cfg.ptlNumber,
-                season: cfg.season,
-                year: cfg.year,
-                yearLogic: cfg.yearLogic,
+                ptlNumber,
+                rule,
                 status: 'Empty',
                 boxBarcode: null,
                 boxOpenTime: null,
@@ -317,17 +335,125 @@ function buildHuStates() {
 // ============================================
 // HU MATCHING
 // ============================================
-function matchItemToHu(year, season) {
-    // season normalised: 'SS' or 'FW'
-    const normSeason = normaliseSeason(season);
-    for (let i = 0; i < YSState.huStates.length; i++) {
-        const hu = YSState.huStates[i];
-        if (normaliseSeason(hu.season) !== normSeason) continue;
-        if (hu.yearLogic === 'lte' && year <= hu.year) return i;
-        if (hu.yearLogic === 'exact' && year === hu.year) return i;
+// The PTL config has two columns, PTL Number and Rule. A rule can name ANY Item Master column:
+//   Season=FW, Year<=2024     comma = AND (all must be true)
+//   Color=Red+Blue            plus = OR inside one column
+//   Color!=Black              != = NOT
+//   *                         everything not matched by a row above
+// The same PTL Number on several rows = OR across columns. Rows are checked top to bottom and the
+// first match wins. Values ignore capitals and end spaces; Season also accepts Fall/Winter etc.
+const ysRuleCache = new Map();
+
+function ysParseRule(text) {
+    const src = String(text || '').trim();
+    if (!src) return { error: 'the Rule is empty' };
+    if (src === '*') return { any: true, conds: [] };
+    const conds = [];
+    for (const part of src.split(',').map(x => x.trim()).filter(Boolean)) {
+        const m = part.match(/^([^<>=!]*?)\s*(<=|>=|!=|=|<|>)\s*(.*)$/);
+        if (!m) return { error: `"${part}" has no = sign (write Column=value)` };
+        const col = refNormalizeHeader(m[1]);
+        const op = m[2];
+        const values = m[3].split('+').map(v => v.trim()).filter(Boolean);
+        if (!col) return { error: `"${part}" has no column name before ${op}` };
+        if (!values.length) return { error: `"${part}" has no value after ${op}` };
+        const numeric = op === '<=' || op === '>=' || op === '<' || op === '>';
+        if (numeric && (values.length > 1 || !isFinite(Number(values[0])))) return { error: `"${part}": ${op} needs one number` };
+        const norm = (v) => (col === 'season' ? normaliseSeason(v) : v).toLowerCase();
+        conds.push({ col, name: m[1].trim(), op, numeric, values: values.map(norm), num: Number(values[0]) });
+    }
+    if (!conds.length) return { error: 'the Rule is empty' };
+    return { any: false, conds };
+}
+
+function ysCompiledRule(text) {
+    if (!ysRuleCache.has(text)) ysRuleCache.set(text, ysParseRule(text));
+    return ysRuleCache.get(text);
+}
+
+// An item's values by normalised column name ("Style ID" -> "styleid"); a missing Year (stored as 0) is empty.
+function ysItemValues(item) {
+    const vals = {};
+    const add = (k, v) => { const n = refNormalizeHeader(k); if (n && !(n in vals)) vals[n] = String(v == null ? '' : v).trim(); };
+    add('barcode', item.barcode); add('season', item.season); add('year', item.year ? item.year : ''); add('brand', item.brand);
+    if (item.attrs) for (const k in item.attrs) add(k, item.attrs[k]);
+    return vals;
+}
+
+function ysRuleMatches(rule, vals) {
+    if (!rule || rule.error) return false;
+    for (const c of rule.conds) {
+        const v = vals[c.col] === undefined ? '' : vals[c.col];
+        if (c.numeric) {
+            if (v === '' || !isFinite(Number(v))) return false;
+            const n = Number(v);
+            if (!(c.op === '<=' ? n <= c.num : c.op === '>=' ? n >= c.num : c.op === '<' ? n < c.num : n > c.num)) return false;
+        } else {
+            const hit = c.values.includes((c.col === 'season' ? normaliseSeason(v) : v).toLowerCase());
+            if (c.op === '=' ? !hit : hit) return false;
+        }
+    }
+    return true;
+}
+
+// Index in YSState.huStates of the PTL whose rule matches first, or -1.
+function matchItemToHu(item) {
+    const vals = ysItemValues(item);
+    for (const cfg of YSState.huConfig) {
+        if (ysRuleMatches(ysCompiledRule(cfg.rule), vals)) return YSState.huStates.findIndex(h => h.ptlNumber === cfg.ptlNumber);
     }
     return -1;
 }
+
+// Older 4-column configs: Season + Year + Year Logic (lte = that year and earlier, exact = that year only).
+function ysLegacyRule(season, year, logic) {
+    if (!String(season || '').trim()) return '';
+    const y = Number(year) || 0;
+    return `Season=${String(season).trim().toUpperCase()}, Year${String(logic || 'lte').trim().toLowerCase() === 'exact' ? '=' : '<='}${y}`;
+}
+function ysRowRule(row) {
+    return String(row.rule || '').trim() || ysLegacyRule(row.season, row.year, row.year_logic);
+}
+
+// Upload check (js/lists.js calls it before anything is sent): every row needs a rule that makes sense,
+// and its columns must exist in the item master on this device (when one is loaded).
+function ysValidatePtlRows(rows) {
+    const columns = Storage.getJSON('ys_item_columns');
+    const problems = [];
+    rows.forEach((row, i) => {
+        const ptl = String(row.ptl_number).trim().padStart(2, '0');
+        const where = `PTL ${ptl} (rule ${i + 1})`;
+        const rule = ysParseRule(ysRowRule(row));
+        if (rule.error) { problems.push(`${where}: ${rule.error}`); return; }
+        if (columns) rule.conds.filter(c => !(c.col in columns)).forEach(c => problems.push(`${where}: no column "${c.name}" in the item master`));
+    });
+    if (!problems.length) return null;
+    return problems.length + ' problem(s) in the rules:\n' + problems.slice(0, 10).join('\n') + (problems.length > 10 ? '\n...' : '') +
+        (columns && problems.some(p => /no column/.test(p)) ? '\n\nItem master columns: ' + Object.values(columns).join(', ') : '');
+}
+
+// Upload preview: how many items of the item master on this device each PTL would get.
+async function ysPreviewPtlRows(rows) {
+    const items = ysDB ? await ysDbGetAll(YS_ITEMS_STORE) : [];
+    if (!items.length) return 'Preview: no item master on this device yet, so the rules could not be tried.';
+    const config = rows.map(r => ({ ptlNumber: String(r.ptl_number).trim().padStart(2, '0'), rule: ysRowRule(r), hits: 0 }));
+    const perPtl = new Map();
+    config.forEach(c => perPtl.set(c.ptlNumber, 0));
+    let unmatched = 0;
+    for (const item of items) {
+        const vals = ysItemValues(item);
+        const c = config.find(x => ysRuleMatches(ysCompiledRule(x.rule), vals));
+        if (c) { c.hits++; perPtl.set(c.ptlNumber, perPtl.get(c.ptlNumber) + 1); } else unmatched++;
+    }
+    const lines = Array.from(perPtl, ([ptl, n]) => `PTL ${ptl}: ${n} items${n === 0 ? '  ⚠' : ''}`);
+    const idle = config.filter(c => c.hits === 0 && perPtl.get(c.ptlNumber) > 0);
+    return `Preview with the ${items.length} items on this device:\n` + lines.join('\n') +
+        (unmatched ? `\nNot matched by any rule: ${unmatched} items` : '') +
+        (idle.length ? '\n⚠ These rules get no items (a typo, or a rule above takes them): ' + idle.map(c => `PTL ${c.ptlNumber} "${c.rule}"`).join('; ') : '');
+}
+
+REF_LISTS.ys_ptl_config.validate = async (rows) => ysValidatePtlRows(rows);
+REF_LISTS.ys_ptl_config.preview = ysPreviewPtlRows;
 
 function normaliseSeason(s) {
     const upper = String(s || '').toUpperCase().trim();
@@ -336,9 +462,9 @@ function normaliseSeason(s) {
     return upper;
 }
 
+// Plain text (escape it before putting it in HTML - rules contain < and >).
 function huLabel(hu) {
-    const logic = hu.yearLogic === 'lte' ? `≤${hu.year}` : `${hu.year}`;
-    return `${normaliseSeason(hu.season)} ${logic}`;
+    return hu.rule !== undefined ? hu.rule : ysLegacyRule(hu.season, hu.year, hu.yearLogic);
 }
 
 // ============================================
@@ -408,10 +534,9 @@ async function handleItemScan(barcode) {
         return;
     }
 
-    const huIdx = matchItemToHu(item.year, item.season);
+    const huIdx = matchItemToHu(item);
     if (huIdx === -1) {
-        const label = `${normaliseSeason(item.season)} ${item.year}`;
-        ysSetResult('error', label, 'Not configured for any PTL', 'Ask your supervisor to add this season/year to HU config');
+        ysSetResult('error', barcode, 'Not configured for any PTL', 'Ask your supervisor to add a PTL rule for this item');
         ysVoice('notConfigured');
         return;
     }
@@ -517,7 +642,7 @@ async function handleItemRescan(barcode) {
         ysShowError(`Barcode ${barcode} not found in Item Master.`);
         return;
     }
-    const huIdx = matchItemToHu(item.year, item.season);
+    const huIdx = matchItemToHu(item);
     if (huIdx !== YSState.pendingHuIdx) {
         // Different item — reset pending state and route as a fresh scan
         // (the box on the original PTL stays open, ready for future scans)
@@ -571,9 +696,11 @@ async function handleBoxBarcodeScan(barcode) {
         staffName: YSState.staffName,
         remark: YSState.remark,
         ptlNumber: hu.ptlNumber,
-        season: normaliseSeason(hu.season),
-        year: hu.year,
+        rule: huLabel(hu),
+        season: normaliseSeason(item.season),
+        year: item.year,
         brand: item.brand || '',
+        attrs: item.attrs || null,
         barcode: item.barcode,
         qty: 1,
         boxBarcode: hu.boxBarcode,
@@ -620,7 +747,7 @@ async function handleCloseInitiate(ptlPadded) {
 
     // Show close modal
     document.getElementById('ysCloseModalPtl').textContent = ptlPadded;
-    document.getElementById('ysCloseModalSeason').textContent = `${normaliseSeason(hu.season)} ${hu.year}`;
+    document.getElementById('ysCloseModalSeason').textContent = huLabel(hu);
     document.getElementById('ysCloseModalBox').textContent = hu.boxBarcode;
     document.getElementById('ysCloseModalQty').textContent = hu.itemCount;
     document.getElementById('ysCloseStep1').style.display = 'block';
@@ -628,7 +755,7 @@ async function handleCloseInitiate(ptlPadded) {
     document.getElementById('ysCloseButtons1').style.display = 'flex';
     document.getElementById('ysCloseButtons2').style.display = 'none';
     document.getElementById('ysCloseBoxInput').value = '';
-    ysSetResult('close', `PTL ${ptlPadded}`, 'Close Box', `${normaliseSeason(hu.season)} ${hu.year} — ${hu.itemCount} items`);
+    ysSetResult('close', `PTL ${ptlPadded}`, 'Close Box', `${huLabel(hu)} — ${hu.itemCount} items`);
     document.getElementById('ysCloseModal').classList.add('active');
 
     YSState.pendingHuIdx = huIdx;
@@ -712,6 +839,7 @@ function ysToServerRow(s) {
         staff_name: s.staffName,
         remark: s.remark,
         ptl_number: s.ptlNumber,
+        ptl_rule: s.rule || null,
         season: s.season,
         year: s.year,
         brand: s.brand,
@@ -722,6 +850,12 @@ function ysToServerRow(s) {
         scan_timestamp: s.scanTimestamp,
         scanned_at: s.scanIso || new Date().toISOString()
     };
+}
+
+function ysServerRowForDb(s) {
+    const row = ysToServerRow(s);
+    if (YSState.noRuleColumn) delete row.ptl_rule;
+    return row;
 }
 
 // The in-page isSyncing flag cannot see a second tab or the installed PWA, which share
@@ -747,13 +881,17 @@ async function ysRunAutoSync() {
         const badge = document.getElementById('ysSyncBadge');
         for (let i = 0; i < unsynced.length; i += YS_SYNC_BATCH) {
             const batch = unsynced.slice(i, i + YS_SYNC_BATCH);
-            let { error } = await supabaseClient.from('ys_scans')
-                .upsert(batch.map(ysToServerRow), { onConflict: 'scan_uid' });
+            const send = () => supabaseClient.from('ys_scans').upsert(batch.map(ysServerRowForDb), { onConflict: 'scan_uid' });
+            let { error } = await send();
+            if (error && /ptl_rule/.test(error.message || '') && !YSState.noRuleColumn) {
+                // schema.sql not re-run yet: send without the rule rather than leaving scans stuck
+                YSState.noRuleColumn = true;
+                ({ error } = await send());
+            }
             if (error && isPermissionError(error)) {
                 // Team membership probably changed since the profile was loaded: re-read it and retry once.
                 await refreshProfile(0);
-                ({ error } = await supabaseClient.from('ys_scans')
-                    .upsert(batch.map(ysToServerRow), { onConflict: 'scan_uid' }));
+                ({ error } = await send());
             }
             if (error) throw error;
             for (const scan of batch) {
@@ -783,9 +921,13 @@ async function ysDownloadExcel() {
     const scans = await ysDbGetAll(YS_SCANS_STORE);
     const headers = [
         'Store ID', 'Store Name', 'Staff', 'Remark',
-        'PTL Number', 'Season', 'Year', 'Brand',
+        'PTL Number', 'PTL Rule', 'Season', 'Year', 'Brand',
         'Barcode', 'Qty', 'Box Barcode', 'Box Status', 'Scan Timestamp'
     ];
+    // the item's own extra Item Master columns (Style, Color...) follow, in the order first seen
+    const extra = [];
+    scans.forEach(s => { if (s.attrs) for (const k in s.attrs) if (!extra.includes(k) && !headers.includes(k)) extra.push(k); });
+    headers.push(...extra);
 
     if (scans.length === 0) {
         const ws = XLSX.utils.aoa_to_sheet([headers]);
@@ -801,6 +943,7 @@ async function ysDownloadExcel() {
         'Staff': s.staffName,
         'Remark': s.remark,
         'PTL Number': s.ptlNumber,
+        'PTL Rule': s.rule || '',
         'Season': s.season,
         'Year': s.year,
         'Brand': s.brand,
@@ -808,10 +951,11 @@ async function ysDownloadExcel() {
         'Qty': s.qty,
         'Box Barcode': s.boxBarcode,
         'Box Status': s.boxStatus,
-        'Scan Timestamp': s.scanTimestamp
+        'Scan Timestamp': s.scanTimestamp,
+        ...Object.fromEntries(extra.map(k => [k, s.attrs && s.attrs[k] != null ? s.attrs[k] : '']))
     }));
 
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
     ws['!cols'] = headers.map(() => ({ wch: 16 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'YS Scans');
@@ -1005,7 +1149,7 @@ function ysRenderHuPanel() {
                 return `<div class="ys-hu-cell pending" data-ptl="${hu.ptlNumber}">
                     <div class="ys-hu-cell-num">${hu.ptlNumber}</div>
                     <div class="ys-hu-cell-info">
-                        <div class="ys-hu-cell-cfg">${huLabel(hu)}</div>
+                        <div class="ys-hu-cell-cfg" title="${escapeHtml(huLabel(hu))}">${escapeHtml(huLabel(hu))}</div>
                     </div>
                 </div>`;
             }
@@ -1016,7 +1160,7 @@ function ysRenderHuPanel() {
         return `<div class="ys-hu-cell ${statusClass}${pendingClass}" data-ptl="${hu.ptlNumber}">
             <div class="ys-hu-cell-num">${hu.ptlNumber}</div>
             <div class="ys-hu-cell-info">
-                <div class="ys-hu-cell-cfg">${huLabel(hu)}</div>
+                <div class="ys-hu-cell-cfg" title="${escapeHtml(huLabel(hu))}">${escapeHtml(huLabel(hu))}</div>
                 ${boxLine}
             </div>
         </div>`;
